@@ -42,8 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
     'rest_framework',
     'corsheaders',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -90,6 +92,7 @@ DATABASES = {
         default = os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
         conn_max_age=600,
         conn_health_checks=True,
+        engine='django.contrib.gis.db.backends.postgis'
     )
 }
 
@@ -129,3 +132,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# macOS Apple Silicon (M1/M2/M3) GeoDjango Paths
+GDAL_LIBRARY_PATH = '/opt/homebrew/opt/gdal/lib/libgdal.dylib'
+GEOS_LIBRARY_PATH = '/opt/homebrew/opt/geos/lib/libgeos_c.dylib'
