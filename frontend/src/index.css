@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+    --color-dark: #141414;
+    --color-light: #ffffff;
+    --color-brand-red: #fb4040;
+    --color-brand-yellow: #f7c10d;
+    --color-brand-magenta: #eb00d0; 
+  
+    --radius-button: 0.5rem;
+    --font-sora: "Sora", sans-serif;
+  }
+  
+  @layer base {
+    body {
+        background-color: var(--color-dark);
+        color: var(--color-light);
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-sora);
+        @apply font-bold;
+      }
+  }
