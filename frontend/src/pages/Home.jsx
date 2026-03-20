@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import Navbar from "../components/Navbar";
+import MapComponent from "../components/MapComponent";
 import Glowbutton from "../components/Glowbutton";
 import GlowSwitch from "../components/GlowSwitch";
 import speaker from "../assets/speaker.png"
