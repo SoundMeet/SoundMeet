@@ -3,12 +3,13 @@ import reactLogo from "../assets/react.svg";
 import { useAuth } from "../injectables/Auth.jsx";
 import { useNavigate, Link } from "react-router-dom";
 
-const Login = () => {
-  const { login } = useAuth();
+const Register = () => {
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     username: "",
+    email: "",
     password: "",
   });
   const [error, setError] = useState(null);
@@ -21,10 +22,10 @@ const Login = () => {
     e.preventDefault();
     setError(null);
     try {
-      await login(formData);
+      await register(formData);
       navigate("/");
     } catch (err) {
-      setError("Invalid username or password.");
+      setError("Registration failed. That username might be taken!");
       console.error(err);
     }
   };
@@ -40,9 +41,7 @@ const Login = () => {
             <div>
               <div className="flex gap-2">
                 <img src={reactLogo} alt="logo" />
-                <h1 className="text-2xl font-semibold text-white">
-                  SoundMeet
-                </h1>
+                <h1 className="text-2xl font-semibold text-white">SoundMeet</h1>
               </div>
             </div>
             <div className="mt-8 space-y-8">
@@ -51,7 +50,7 @@ const Login = () => {
                 {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
 
                 <input
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md placeholder-gray-300 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 invalid:border-red-500 invalid:text-red-500 text-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md placeholder-gray-300 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-white"
                   placeholder="Username"
                   type="text"
                   name="username"
@@ -59,8 +58,17 @@ const Login = () => {
                   onChange={handleChange}
                   required
                 />
+                 <input
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md placeholder-gray-300 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-white"
+                  placeholder="Email"
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
                 <input
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md placeholder-gray-300 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 invalid:border-red-500 invalid:text-red-500 text-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md placeholder-gray-300 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-white"
                   placeholder="Password"
                   type="password"
                   name="password"
@@ -68,28 +76,17 @@ const Login = () => {
                   onChange={handleChange}
                   required
                 />
-                <p className="text-sm tracking-wide text-gray-300">
-                  <Link
-                    to="/forgot-password"
-                    className="text-yellow-400 hover:underline transition duration-200"
-                  >
-                    Forgot Password
-                  </Link>
-                </p>
 
                 <button 
                   type="submit" 
-                  className="h-9 px-3 w-full bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-800 focus:bg-blue-700 transition duration-500 rounded-md"
+                  className="h-9 px-3 w-full bg-blue-500 text-white hover:bg-blue-600 transition duration-500 rounded-md mt-4"
                 >
-                  Login
+                  Sign Up
                 </button>
-                <p className="text-center text-sm tracking-wide text-gray-300">
-                  Create an account{" "}
-                  <Link
-                    to="/register"
-                    className="text-yellow-400 hover:underline transition duration-200"
-                  >
-                    Sign Up
+                <p className="text-center text-sm tracking-wide text-gray-300 mt-4">
+                  Already have an account?{" "}
+                  <Link to="/login" className="text-yellow-400 hover:underline transition duration-200">
+                    Log In
                   </Link>
                 </p>
               </div>
@@ -101,4 +98,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;
