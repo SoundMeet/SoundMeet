@@ -12,6 +12,26 @@
     --font-sora: "Sora", sans-serif;
   }
   
+  @layer utilities {
+  .glow-pink {
+    box-shadow: 0 0 0px rgba(236, 72, 153, 0);
+    transition: all 0.3s ease;
+  }
+  
+  @keyframes shine {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+  .glow-pink:hover {
+    box-shadow: 
+      0 0 8px rgba(236, 72, 153, 0.6),
+      0 0 16px rgba(236, 72, 153, 0.4),
+      0 0 24px rgba(236, 72, 153, 0.2);
+    transform: scale(1.05);
+  }
+}
+
   @layer base {
     body {
         background-color: var(--color-dark);
