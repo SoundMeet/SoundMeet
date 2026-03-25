@@ -84,7 +84,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5173',
 ]
 
-CORS_ALLOWS_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'soundmeet_core.urls'
 
