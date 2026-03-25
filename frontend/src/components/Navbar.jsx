@@ -1,12 +1,19 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import React, { useState } from "react";
 =======
 import React, { useEffect, useState } from "react";
 >>>>>>> 2dc5f40 (Replace navbar logo+text with SVG assets, responsive swap at sm breakpoint)
+=======
+>>>>>>> e64aeeb (Use Logo.svg as favicon)
 import LogowText from "../assets/LogowText.svg";
 import LogoOnly from "../assets/Logo.svg";
 import { navItems } from "../constants";
 import { MdNotificationsNone } from "react-icons/md";
+<<<<<<< HEAD
+=======
+import { useState } from "react";
+>>>>>>> e64aeeb (Use Logo.svg as favicon)
 import { Link } from "react-router-dom";
 import { FaUser, FaBars, FaTimes } from "react-icons/fa";
 
@@ -17,11 +24,15 @@ const Navbar = () => {
 
   return (
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> e64aeeb (Use Logo.svg as favicon)
     <div className="w-full bg-none text-white px-4 md:px-8 h-16 flex items-center justify-between relative">
       {/* LEFT: LOGO */}
       <div className="flex items-center">
         <img src={LogowText} className="hidden sm:block h-8 md:h-10" />
         <img src={LogoOnly} className="block sm:hidden h-8" />
+<<<<<<< HEAD
 =======
     <div
       id="navbar"
@@ -35,6 +46,8 @@ const Navbar = () => {
           <img src={LogoOnly} className="block sm:hidden h-8" />
         </Link>
 >>>>>>> 2dc5f40 (Replace navbar logo+text with SVG assets, responsive swap at sm breakpoint)
+=======
+>>>>>>> e64aeeb (Use Logo.svg as favicon)
       </div>
 
       {/* CENTER: NAV ITEMS (DESKTOP) */}
