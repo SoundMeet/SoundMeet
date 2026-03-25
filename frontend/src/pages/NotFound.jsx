@@ -147,7 +147,6 @@ const NotFound = () => {
   return (
     <div
       className="relative min-h-screen overflow-hidden flex items-center"
-      style={{ backgroundColor: '#141414' }}
     >
 
       {/* Guitar-side ambient glow */}
