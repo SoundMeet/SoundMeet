@@ -6,6 +6,7 @@ import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
 import Login from './pages/Login.jsx'
 import Meet from './pages/Meet.jsx'
+import Chat from './pages/Chat.jsx'
 import Navbar from './components/Navbar.jsx'
 
 const App = () => {
@@ -20,6 +21,7 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/meet" element={<Meet />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

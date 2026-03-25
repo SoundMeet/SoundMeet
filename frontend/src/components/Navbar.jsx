@@ -13,14 +13,14 @@ import { MdNotificationsNone } from "react-icons/md";
 <<<<<<< HEAD
 =======
 import { useState } from "react";
->>>>>>> e64aeeb (Use Logo.svg as favicon)
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { FaUser, FaBars, FaTimes } from "react-icons/fa";
 
 const Navbar = () => {
   const [navHover, setNavHover] = useState(-1);
-  const [activePage, setActivePage] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const activePage = navItems.findIndex((item) => item.path === location.pathname);
 
   return (
 <<<<<<< HEAD
@@ -56,7 +56,6 @@ const Navbar = () => {
           <Link
             to={ele.path}
             key={ind}
-            onClick={() => setActivePage(ind)}
             onMouseEnter={() => setNavHover(ind)}
             onMouseLeave={() => setNavHover(-1)}
             className="relative text-sm md:text-base font-medium"
@@ -95,10 +94,7 @@ const Navbar = () => {
             <Link
               to={ele.path}
               key={ind}
-              onClick={() => {
-                setActivePage(ind);
-                setMenuOpen(false);
-              }}
+              onClick={() => setMenuOpen(false)}
               className="text-lg font-medium"
             >
               {ele.name}
