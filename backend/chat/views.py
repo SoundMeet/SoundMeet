@@ -43,7 +43,7 @@ def get_profile(request):
         'display_name': profile.display_name,
         'about': profile.about,
         'spectator': profile.spectator,
-        'pfp': profile.pfp,
+        'pfp': profile.pfp.url,
         'country': profile.country,
         'city': profile.city,
         'age': profile.age,
