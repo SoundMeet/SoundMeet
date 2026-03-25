@@ -5,12 +5,14 @@ import GlowSwitch from "../components/GlowSwitch";
 import speaker from "../assets/speaker.png"
 import AnimatedIcon from "../components/AnimatedIcon";
 import { motion, AnimatePresence } from "framer-motion";
+import CreateJamModal from "../components/CreateJamModal";
 const filterPills = ["All", "Jams", "Musicians", "Bands", "Shows"];
 
 const Home = () => {
   const [activePill, setActivePill] = useState(0)
   const [isOn, setIsOn] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [jamModalOpen, setJamModalOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -82,12 +84,12 @@ const Home = () => {
                         className="absolute right-0 top-9 z-50 w-36 rounded-2xl bg-neutral-900/90 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.25),0_0_40px_rgba(0,0,0,0.5)] overflow-hidden"
                       >
                         {[
-                          { label: "Create Jam", icon: "🎵" },
-                          { label: "Post", icon: "📢" },
-                        ].map(({ label, icon }) => (
+                          { label: "Create Jam", icon: "🎵", onClick: () => { setJamModalOpen(true); setDropdownOpen(false); } },
+                          { label: "Post", icon: "📢", onClick: () => setDropdownOpen(false) },
+                        ].map(({ label, icon, onClick }) => (
                           <button
                             key={label}
-                            onClick={() => setDropdownOpen(false)}
+                            onClick={onClick}
                             className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-200 hover:bg-white/10 hover:text-white transition-colors duration-150 font-medium"
                           >
                             <span>{icon}</span>
@@ -132,6 +134,7 @@ const Home = () => {
           </div>
         </div>
       </div>
+      <CreateJamModal open={jamModalOpen} onOpenChange={setJamModalOpen} />
     </div>
   );
 };
