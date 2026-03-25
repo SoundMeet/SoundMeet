@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import Logo from "../assets/Logosmall.png";
+import LogowText from "../assets/LogowText.svg";
+import LogoOnly from "../assets/Logo.svg";
 import { navItems } from "../constants";
 import { MdNotificationsNone } from "react-icons/md";
 import { Link } from "react-router-dom";
@@ -13,9 +14,9 @@ const Navbar = () => {
   return (
     <div className="w-full bg-none text-white px-4 md:px-8 h-16 flex items-center justify-between relative">
       {/* LEFT: LOGO */}
-      <div className="flex items-center gap-2">
-        <img src={Logo} className="w-8 h-8 md:w-10 md:h-10" />
-        <h2 className="text-lg md:text-2xl font-medium">SoundMeet</h2>
+      <div className="flex items-center">
+        <img src={LogowText} className="hidden sm:block h-8 md:h-10" />
+        <img src={LogoOnly} className="block sm:hidden h-8" />
       </div>
 
       {/* CENTER: NAV ITEMS (DESKTOP) */}
