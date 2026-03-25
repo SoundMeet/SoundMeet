@@ -42,5 +42,14 @@ def get_profile(request):
     return Response({
         'display_name': profile.display_name,
         'about': profile.about,
-        'spectator': profile.spectator
+        'spectator': profile.spectator,
+        'pfp': profile.pfp,
+        'country': profile.country,
+        'city': profile.city,
+        'age': profile.age,
+        'gender': profile.gender,
+        'instruments_liked': profile.instruments_liked,
+        'genres_liked': profile.genres_liked, 
+        'vibes_liked': profile.vibes_liked,
+        'friends_count': profile.friends_count,
     })
