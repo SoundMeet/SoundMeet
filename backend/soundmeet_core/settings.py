@@ -32,7 +32,7 @@ if platform.system() == 'Darwin':
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG')
+DEBUG = os.environ.get('DEBUG') == 'True'
 
 ALLOWED_HOSTS = ['soundmeet-production.up.railway.app', 'localhost', '127.0.0.1']
 
@@ -61,10 +61,10 @@ REST_FRAMEWORK = {
 }
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -73,11 +73,18 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
     'http://localhost:5173',
     'https://soundmeet-production.up.railway.app',
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://soundmeet-production.up.railway.app',
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
+]
+
+CORS_ALLOWS_CREDENTIALS = True
 
 ROOT_URLCONF = 'soundmeet_core.urls'
 
@@ -102,13 +109,17 @@ WSGI_APPLICATION = 'soundmeet_core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+db_config = dj_database_url.config(
+    default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
+    conn_max_age=600,
+    conn_health_checks=True,
+)
+
+if db_config.get('ENGINE') == 'django.db.backends.postgresql':
+    db_config['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default = os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
-        conn_max_age=600,
-        conn_health_checks=True,
-        engine='django.contrib.gis.db.backends.postgis'
-    )
+    'default': db_config
 }
 
 
