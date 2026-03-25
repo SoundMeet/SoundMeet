@@ -1,14 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Glowbutton from "../components/Glowbutton";
 import GlowSwitch from "../components/GlowSwitch";
 import speaker from "../assets/speaker.png"
 import AnimatedIcon from "../components/AnimatedIcon";
+import { motion, AnimatePresence } from "framer-motion";
 const filterPills = ["All", "Jams", "Musicians", "Bands", "Shows"];
 
 const Home = () => {
   const [activePill, setActivePill] = useState(0)
   const [isOn, setIsOn] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   return (
     <div className="h-screen text-white flex flex-col overflow-hidden">
       {/* Search + Filter Bar */}
@@ -52,8 +65,38 @@ const Home = () => {
                 size="sm"
                 onChange={setIsOn} 
                 className="text-sm"/>
-                <div className="w-7 h-7 cursor-pointer border-gray-300 flex items-center justify-center rounded-full border">
-                  <p className="text-xl pb-1">+</p>
+                <div className="relative" ref={dropdownRef}>
+                  <div
+                    onClick={() => setDropdownOpen((v) => !v)}
+                    className="w-7 h-7 cursor-pointer border-gray-300 flex items-center justify-center rounded-full border select-none"
+                  >
+                    <p className="text-xl pb-1">+</p>
+                  </div>
+                  <AnimatePresence>
+                    {dropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: -6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: -6 }}
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="absolute right-0 top-9 z-50 w-36 rounded-2xl bg-neutral-900/90 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.25),0_0_40px_rgba(0,0,0,0.5)] overflow-hidden"
+                      >
+                        {[
+                          { label: "Create Jam", icon: "🎵" },
+                          { label: "Post", icon: "📢" },
+                        ].map(({ label, icon }) => (
+                          <button
+                            key={label}
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-200 hover:bg-white/10 hover:text-white transition-colors duration-150 font-medium"
+                          >
+                            <span>{icon}</span>
+                            {label}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>
