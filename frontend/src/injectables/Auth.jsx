@@ -6,7 +6,7 @@ import {
   useCallback,
 } from "react";
 
-const API_URL = "http://soundmeet-production.up.railway.app/";
+const API_URL = "https://soundmeet-production.up.railway.app/";
 const TOKEN_KEY = "auth_token";
 
 
