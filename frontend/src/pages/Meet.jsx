@@ -5,7 +5,6 @@ import MeetCard from '../components/MeetCard'
 const Meet = () => {
   return (
     <div className="flex flex-col min-h-screen">
-        <Navbar/>
         <main className="flex flex-col px-12 my-4 flex-1">
             <div className="flex justify-between text-3xl">
                 <h3>Find Musicians near you</h3>

@@ -3,14 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { BrowserRouter } from 'react-router-dom'
-import { AuthProvider } from './injectables/Auth.jsx'
+import NavState from './context/navState.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
+  <BrowserRouter>
+    <NavState>
+      <StrictMode>
         <App />
-      </AuthProvider>
-    </BrowserRouter>
-  </StrictMode>,
+      </StrictMode>
+    </NavState>
+  </BrowserRouter>,
 )

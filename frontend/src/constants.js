@@ -16,6 +16,11 @@ const navItems = [
       },
       {
         id: 4,
+        name: "Chat",
+        path: "/chat",
+      },
+      {
+        id: 5,
         name: "Friends",
         path: "/friends",
       },

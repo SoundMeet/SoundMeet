@@ -1,18 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import Navbar from "../components/Navbar";
 import Glowbutton from "../components/Glowbutton";
 import GlowSwitch from "../components/GlowSwitch";
-import speaker from "../assets/speaker.png";
+import speaker from "../assets/speaker.png"
 import AnimatedIcon from "../components/AnimatedIcon";
 const filterPills = ["All", "Jams", "Musicians", "Bands", "Shows"];
 
 const Home = () => {
-  const [activePill, setActivePill] = useState(0);
+  const [activePill, setActivePill] = useState(0)
   const [isOn, setIsOn] = useState(false);
   return (
-    <div className="h-screen bg-neutral-950 text-white flex flex-col overflow-hidden">
-      <Navbar />
-
+    <div className="h-screen text-white flex flex-col overflow-hidden">
       {/* Search + Filter Bar */}
       <div className="flex items-center gap-3 px-6 py-3 z-10">
         <div className="flex items-center bg-neutral-800 rounded-full px-4 py-2 w-80">
@@ -24,28 +22,24 @@ const Home = () => {
           />
         </div>
         <div className="flex gap-2">
-          {filterPills.map((pill) => (
-            <button
-              key={pill}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                pill === "All"
-                  ? "bg-pink-600 border-pink-600 text-white"
-                  : "border-neutral-600 text-neutral-300 hover:border-pink-500 hover:text-white"
-              }`}
-            >
-              {pill}
-            </button>
-          ))}
+          {filterPills.map((pill,ind) => {
+            return (
+              <Glowbutton
+                key={ind}
+                isActive={activePill === ind}
+                value={pill}
+                onClick={() => {setActivePill(ind)}}
+              />
+            );
+          })}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Map Area */}
-        <div className="relative flex-1 bg-neutral-900">
-          {/* Map will go here */}
-          <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-600 text-sm">
-            Map Component
+      <div className="flex w-full h-[39rem]">
+        <div className="w-[68%] h-full flex items-center justify-center">
+          <div className="w-[95%] h-[95%] flex items-center justify-center rounded-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10 shadow-[0_0_25px_rgba(255,255,255,0.08),0_0_40px_rgba(220,46,115,0.15)]">
+            <h2 className="text-gray-500 text-xs font-light">Map Component</h2>
           </div>
         </div>
         <div className="w-[32%] h-full flex items-center justify-center">
@@ -53,12 +47,11 @@ const Home = () => {
             <div className="w-full h-14 px-6 pt-2 items-center flex justify-between">
               <h2 className="text-white font-medium text-xl">Near You</h2>
               <div className="flex gap-2 items-center">
-                <GlowSwitch
-                  value={isOn}
-                  size="sm"
-                  onChange={setIsOn}
-                  className="text-sm"
-                />
+                <GlowSwitch 
+                value={isOn}
+                size="sm"
+                onChange={setIsOn} 
+                className="text-sm"/>
                 <div className="w-7 h-7 cursor-pointer border-gray-300 flex items-center justify-center rounded-full border">
                   <p className="text-xl pb-1">+</p>
                 </div>
@@ -72,34 +65,23 @@ const Home = () => {
                     <h2 className="text-xl font-light bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
                       The Attio Collective
                     </h2>
-                    <p className="text-xs font-medium text-gray-500">
-                      {" "}
-                      Jazz Fusion 0.6 miles away
-                    </p>
+                    <p className="text-xs font-medium text-gray-500"> Jazz Fusion 0.6 miles away</p>
                   </div>
-                  <button
-                    className="bg-red-500 w-12 h-5 text-xs font-medium rounded-xl text-white
+                  <button className="bg-red-500 w-12 h-5 text-xs font-medium rounded-xl text-white
                     shadow-[0_0_10px_rgba(239,68,68,0.8),0_0_20px_rgba(239,68,68,0.5)]
-                    animate-pulse transition-all duration-300"
-                  >
+                    animate-pulse transition-all duration-300">
                     Live
                   </button>
                 </div>
                 <div className="flex gap-1 px-3">
-                  <div className="h-6 flex items-center justify-center rounded-xl text-xs w-max px-2 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-                    IMPOOV
-                  </div>
-                  <div className="h-6 flex items-center justify-center rounded-xl text-xs w-max px-2 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-                    BEOOP
-                  </div>
+                  <div className="h-6 flex items-center justify-center rounded-xl text-xs w-max px-2 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">IMPOOV</div>
+                  <div className="h-6 flex items-center justify-center rounded-xl text-xs w-max px-2 backdrop-blur-md border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">BEOOP</div>
                 </div>
                 <div className="w-full h-16 flex items-center justify-center">
-                  <button
-                    className="bg-[#F7C10D] rounded-3xl font-sora text-black font-semibold w-[85%] h-10
+                  <button className="bg-[#F7C10D] rounded-3xl font-sora text-black font-semibold w-[85%] h-10
                     shadow-[0_0_10px_rgba(247,193,13,0.8),0_0_25px_rgba(247,193,13,0.5)]
-                    transition-all duration-300"
-                  >
-                    JOIN THE JAM
+                    transition-all duration-300">
+                    JOIN THE JAM 
                   </button>
                 </div>
               </div>
