@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useState } from "react";
+=======
+import React, { useEffect, useState } from "react";
+>>>>>>> 2dc5f40 (Replace navbar logo+text with SVG assets, responsive swap at sm breakpoint)
 import LogowText from "../assets/LogowText.svg";
 import LogoOnly from "../assets/Logo.svg";
 import { navItems } from "../constants";
@@ -12,11 +16,25 @@ const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+<<<<<<< HEAD
     <div className="w-full bg-none text-white px-4 md:px-8 h-16 flex items-center justify-between relative">
       {/* LEFT: LOGO */}
       <div className="flex items-center">
         <img src={LogowText} className="hidden sm:block h-8 md:h-10" />
         <img src={LogoOnly} className="block sm:hidden h-8" />
+=======
+    <div
+      id="navbar"
+      className={`flex inset-x-0 justify-between p-2 font-bold mb-8 backdrop-blur-sm items-center md:px-10 sm:px-10 top-0 transition-all ease-in-out duration-300 z-50 py-10 ${
+        isScrolled ? "bg-sky-100 " : "bg-transparent"
+      }`}
+    >
+      <div className="flex items-center gap-2 md:pr-16 pr-0">
+        <Link to="/">
+          <img src={LogowText} className="hidden sm:block h-8 md:h-10" />
+          <img src={LogoOnly} className="block sm:hidden h-8" />
+        </Link>
+>>>>>>> 2dc5f40 (Replace navbar logo+text with SVG assets, responsive swap at sm breakpoint)
       </div>
 
       {/* CENTER: NAV ITEMS (DESKTOP) */}
