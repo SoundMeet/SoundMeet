@@ -36,3 +36,6 @@ cypress/screenshots/
 
 # TypeScript
 *.tsbuildinfo
+
+# Design docs
+DESIGN.md
