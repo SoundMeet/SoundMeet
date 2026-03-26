@@ -2,20 +2,25 @@
  * AvatarButton
  *
  * The navbar avatar trigger. Renders:
- *   – User avatar image (if avatarUrl is set)
- *   – Initials fallback (if name is available, no image)
- *   – Generic icon (logged-out / no user data)
+ *   – User avatar image   (if user.pfp is set)
+ *   – Initials fallback   (if display_name / username available, no image)
+ *   – Generic person icon (logged-out / no user data)
  *
- * Visual state changes:
+ * Visual state:
  *   – Logged out: subtle gray surface + person icon
  *   – Logged in:  dark surface + initials in brand pink
- *   – isOpen:     pink ring glow to signal active state
+ *   – isOpen:     pink ring glow (signals active menu)
  *
- * Fully accessible: aria-haspopup, aria-expanded, aria-label.
+ * Props:
+ *   user       – profile object from AuthProvider (or null)
+ *   isLoggedIn – boolean from AuthProvider
+ *   isOpen     – whether the dropdown is open
+ *   onClick    – toggle handler
  */
 import { FaUser } from 'react-icons/fa'
 
-function getInitials(name) {
+function getInitials(user) {
+  const name = user?.display_name || user?.username
   if (!name) return null
   return name
     .trim()
@@ -26,9 +31,8 @@ function getInitials(name) {
     .toUpperCase()
 }
 
-export default function AvatarButton({ user, isOpen, onClick }) {
-  const isAuth = user?.isAuthenticated
-  const initials = isAuth ? getInitials(user?.name) : null
+export default function AvatarButton({ user, isLoggedIn, isOpen, onClick }) {
+  const initials = isLoggedIn ? getInitials(user) : null
 
   const ringStyle = isOpen
     ? '0 0 0 2px #DC2E73, 0 0 12px rgba(220,46,115,0.35)'
@@ -43,7 +47,7 @@ export default function AvatarButton({ user, isOpen, onClick }) {
       aria-label="Open account menu"
       className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center overflow-hidden cursor-pointer focus:outline-none transition-all duration-200"
       style={{
-        background: isAuth ? '#242424' : '#374151',
+        background: isLoggedIn ? '#242424' : '#374151',
         boxShadow: ringStyle,
         transition: 'box-shadow 0.2s ease',
       }}
@@ -58,13 +62,12 @@ export default function AvatarButton({ user, isOpen, onClick }) {
         }
       }}
     >
-      {user?.avatarUrl ? (
+      {user?.pfp ? (
         <img
-          src={user.avatarUrl}
-          alt={user.name ?? 'User avatar'}
+          src={user.pfp}
+          alt={user.display_name ?? user.username ?? 'User avatar'}
           className="w-full h-full object-cover"
           onError={(e) => {
-            // Hide broken image; initials/icon will show via sibling logic
             e.currentTarget.style.display = 'none'
           }}
         />

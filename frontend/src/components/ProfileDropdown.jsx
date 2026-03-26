@@ -2,32 +2,40 @@
  * ProfileDropdown
  *
  * Composes AvatarButton + AppDropdown into the profile menu.
- * Menu items are config-driven so adding new items later requires
- * only a new entry in buildMenuItems() — no JSX surgery needed.
+ * Uses real AuthProvider (not MockAuth).
  *
- * To extend with more items (billing, admin, theme toggle, etc.):
- *   1. Add an entry to the items array in buildMenuItems()
- *   2. Give it a unique id, label, icon, and onClick handler
- *   3. Optionally add a variant: 'accent' | 'danger' for color treatment
- *   4. Optionally add dividerAbove: true to insert a separator before the item
+ * Behavior:
+ *   – Unauthenticated: clicking Profile or Settings opens the auth modal
+ *   – Unauthenticated: "Log in" / "Sign up" items open the auth modal
+ *   – Authenticated: Profile and Settings navigate directly; Log out clears session
+ *
+ * To add menu items: add an entry to buildMenuItems() with
+ * { id, label, icon, onClick, variant?, dividerAbove? }
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaUser, FaCog, FaSignInAlt, FaSignOutAlt } from 'react-icons/fa'
+import { FaUser, FaCog, FaSignInAlt, FaSignOutAlt, FaUserPlus } from 'react-icons/fa'
 import AppDropdown from './ui/AppDropdown'
 import AvatarButton from './AvatarButton'
-import { useAuth } from '../context/MockAuthContext'
+import { useAuth } from '../injectables/Auth'
+import { useAuthModal } from '../context/AuthModalContext'
 
-// ─── Menu item config ────────────────────────────────────────────────────────
+// ─── Menu item config ─────────────────────────────────────────────────────────
 
-/**
- * Builds the ordered list of menu items based on auth state.
- * Each item: { id, label, icon, onClick, variant?, dividerAbove? }
- */
-function buildMenuItems({ isAuthenticated, login, logout, navigate, onClose }) {
+function buildMenuItems({ isLoggedIn, logout, navigate, openModal, onClose }) {
   const go = (path) => {
     navigate(path)
     onClose()
+  }
+
+  // If not logged in, intercept and open auth modal instead
+  const guardedGo = (path) => {
+    if (!isLoggedIn) {
+      openModal('login')
+      onClose()
+      return
+    }
+    go(path)
   }
 
   const shared = [
@@ -35,17 +43,17 @@ function buildMenuItems({ isAuthenticated, login, logout, navigate, onClose }) {
       id: 'profile',
       label: 'Profile',
       icon: FaUser,
-      onClick: () => go('/profile'),
+      onClick: () => guardedGo('/profile'),
     },
     {
       id: 'settings',
       label: 'Settings',
       icon: FaCog,
-      onClick: () => go('/settings'),
+      onClick: () => guardedGo('/settings'),
     },
   ]
 
-  if (isAuthenticated) {
+  if (isLoggedIn) {
     return [
       ...shared,
       {
@@ -69,20 +77,31 @@ function buildMenuItems({ isAuthenticated, login, logout, navigate, onClose }) {
       label: 'Log in',
       icon: FaSignInAlt,
       onClick: () => {
-        login()
+        openModal('login')
         onClose()
       },
       variant: 'accent',
       dividerAbove: true,
     },
+    {
+      id: 'signup',
+      label: 'Sign up',
+      icon: FaUserPlus,
+      onClick: () => {
+        openModal('signup')
+        onClose()
+      },
+      variant: 'accent',
+    },
   ]
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function UserHeader({ user }) {
-  const initials = user.name
-    ?.trim()
+  const displayName = user?.display_name || user?.username || ''
+  const initials = displayName
+    .trim()
     .split(/\s+/)
     .map((p) => p[0])
     .join('')
@@ -99,12 +118,8 @@ function UserHeader({ user }) {
         className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
         style={{ background: '#2A2A2A' }}
       >
-        {user.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt={user.name}
-            className="w-full h-full object-cover"
-          />
+        {user?.pfp ? (
+          <img src={user.pfp} alt={displayName} className="w-full h-full object-cover" />
         ) : (
           <span
             className="text-xs font-semibold select-none"
@@ -115,20 +130,22 @@ function UserHeader({ user }) {
         )}
       </div>
 
-      {/* Name + username */}
+      {/* Display name + @username */}
       <div className="min-w-0">
         <p
           className="text-sm font-semibold text-white truncate"
           style={{ fontFamily: 'Sora, sans-serif' }}
         >
-          {user.name}
+          {user?.display_name || user?.username}
         </p>
-        <p
-          className="text-xs truncate"
-          style={{ fontFamily: 'Sora, sans-serif', color: 'rgba(255,255,255,0.38)' }}
-        >
-          {user.username}
-        </p>
+        {user?.display_name && user?.username && (
+          <p
+            className="text-xs truncate"
+            style={{ fontFamily: 'Sora, sans-serif', color: 'rgba(255,255,255,0.38)' }}
+          >
+            @{user.username}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -148,11 +165,7 @@ function MenuItem({ item }) {
   const Icon = item.icon
   const isAccent = item.variant === 'accent'
   const isDanger = item.variant === 'danger'
-
-  const defaultColor = 'rgba(255,255,255,0.78)'
-  const accentColor = '#DC2E73'
-  const dangerColor = '#fb4040'
-  const textColor = isDanger ? dangerColor : isAccent ? accentColor : defaultColor
+  const textColor = isDanger ? '#fb4040' : isAccent ? '#DC2E73' : 'rgba(255,255,255,0.78)'
 
   return (
     <button
@@ -172,27 +185,35 @@ function MenuItem({ item }) {
 
 export default function ProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false)
-  const { user, login, logout, isAuthenticated } = useAuth()
+  const { user, isLoggedIn, logout } = useAuth()
+  const { openModal } = useAuthModal()
   const navigate = useNavigate()
 
   const close = () => setIsOpen(false)
   const toggle = () => setIsOpen((prev) => !prev)
 
-  const menuItems = buildMenuItems({ isAuthenticated, login, logout, navigate, onClose: close })
+  const menuItems = buildMenuItems({ isLoggedIn, logout, navigate, openModal, onClose: close })
 
   return (
     <AppDropdown
-      trigger={<AvatarButton user={user} isOpen={isOpen} onClick={toggle} />}
+      trigger={
+        <AvatarButton
+          user={user}
+          isLoggedIn={isLoggedIn}
+          isOpen={isOpen}
+          onClick={toggle}
+        />
+      }
       isOpen={isOpen}
       onClose={close}
       align="right"
       minWidth={232}
     >
       {/* Logged-in header */}
-      {isAuthenticated && <UserHeader user={user} />}
+      {isLoggedIn && user && <UserHeader user={user} />}
 
       {/* Menu items */}
-      <nav className="px-2 py-2">
+      <nav className="px-2 py-2" role="menu">
         {menuItems.map((item) => (
           <div key={item.id}>
             {item.dividerAbove && <MenuDivider />}
