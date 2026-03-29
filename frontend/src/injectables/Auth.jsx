@@ -114,23 +114,6 @@ export function AuthProvider({ children }) {
     return updated;
   };
 
-  const updateSecurityQuestion = async (question, answer) => {
-    const form = new FormData();
-    form.append("recovery_question", question);
-    form.append("recovery_answer", answer);
-    await apiFetch("api/profiles/me/", { method: "PATCH", body: form });
-  };
-
-  const getRecoveryQuestion = (username) =>
-    apiFetch(`api/password-reset/?username=${encodeURIComponent(username)}`);
-
-  const resetPassword = async (payload) => {
-    await apiFetch("api/password-reset/", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -142,9 +125,6 @@ export function AuthProvider({ children }) {
         logout,
         fetchProfile,
         updateProfile,
-        updateSecurityQuestion,
-        getRecoveryQuestion,
-        resetPassword,
       }}
     >
       {children}
