@@ -71,16 +71,18 @@ export const apiService = {
 
   async getAllFormOptions() {
     try {
-      const [instruments, genres, vibes] = await Promise.all([
+      const [instruments, genres, vibes, artists] = await Promise.all([
         this.getInstruments(),
         this.getGenres(),
-        this.getVibes()
+        this.getVibes(),
+        this.getArtists()
       ]);
 
       return {
         instruments,
         genres,
-        vibes
+        vibes,
+        artists
       };
     } catch (error) {
       console.error("Error fetching form options:", error);

@@ -9,7 +9,7 @@ import Meet from './pages/Meet.jsx'
 import Navbar from './components/Navbar.jsx'
 
 const App = () => {
-  return(<div className='bg-gradient-to-r from-black via-neutral-900 to-gray-900'>
+  return(<div className='bg-linear-to-r from-black via-neutral-900 to-gray-900'>
     <Navbar/>
       <Routes>
         {/* <Route path="/" element={<Navigate to="/" />} /> */}
