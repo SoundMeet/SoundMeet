@@ -54,8 +54,8 @@ const Home = () => {
       {/* Main Content */}
       <div className="flex w-full h-[39rem]">
         <div className="w-[68%] h-full flex items-center justify-center">
-          <div className="w-[95%] h-[95%] flex items-center justify-center rounded-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10 shadow-[0_0_25px_rgba(255,255,255,0.08),0_0_40px_rgba(220,46,115,0.15)]">
-            <h2 className="text-gray-500 text-xs font-light">Map Component</h2>
+          <div className="w-[95%] h-[95%] rounded-3xl overflow-hidden border border-white/10 shadow-[0_0_25px_rgba(255,255,255,0.08),0_0_40px_rgba(220,46,115,0.15)]">
+            <MapComponent />
           </div>
         </div>
         <div className="w-[32%] h-full flex items-center justify-center">
