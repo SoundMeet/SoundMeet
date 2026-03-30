@@ -10,11 +10,7 @@ import Chat from './pages/Chat.jsx'
 import Navbar from './components/Navbar.jsx'
 
 const App = () => {
-<<<<<<< HEAD
   return(<div className='bg-linear-to-r from-black via-neutral-900 to-gray-900'>
-=======
-  return(<div className='bg-gradient-to-r from-black via-neutral-900 to-gray-900'>
->>>>>>> e64aeeb (Use Logo.svg as favicon)
     <Navbar/>
       <Routes>
         {/* <Route path="/" element={<Navigate to="/" />} /> */}

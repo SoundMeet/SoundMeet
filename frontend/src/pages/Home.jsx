@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import React, { useState, useRef, useEffect } from "react";
-=======
-import React, { useState } from "react";
->>>>>>> e64aeeb (Use Logo.svg as favicon)
+import { useState, useRef, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Glowbutton from "../components/Glowbutton";
 import GlowSwitch from "../components/GlowSwitch";
@@ -15,7 +11,6 @@ const filterPills = ["All", "Jams", "Musicians", "Bands", "Shows"];
 const Home = () => {
   const [activePill, setActivePill] = useState(0)
   const [isOn, setIsOn] = useState(false);
-<<<<<<< HEAD
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [jamModalOpen, setJamModalOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -29,8 +24,6 @@ const Home = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-=======
->>>>>>> e64aeeb (Use Logo.svg as favicon)
   return (
     <div className="h-screen text-white flex flex-col overflow-hidden">
       {/* Search + Filter Bar */}
@@ -74,7 +67,6 @@ const Home = () => {
                 size="sm"
                 onChange={setIsOn} 
                 className="text-sm"/>
-<<<<<<< HEAD
                 <div className="relative" ref={dropdownRef}>
                   <div
                     onClick={() => setDropdownOpen((v) => !v)}
@@ -107,10 +99,6 @@ const Home = () => {
                       </motion.div>
                     )}
                   </AnimatePresence>
-=======
-                <div className="w-7 h-7 cursor-pointer border-gray-300 flex items-center justify-center rounded-full border">
-                  <p className="text-xl pb-1">+</p>
->>>>>>> e64aeeb (Use Logo.svg as favicon)
                 </div>
               </div>
             </div>
