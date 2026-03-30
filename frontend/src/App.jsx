@@ -28,6 +28,9 @@ const PrivateRoute = ({ children }) => {
   if (!user) return <Navigate to="/" replace />
   return children
 }
+import Onboarding from "./pages/Onboarding";
+
+
 
 const App = () => {
   const { isLoading } = useAuth()
@@ -58,7 +61,8 @@ const App = () => {
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
-            </Routes>
+              <Route path="/onboarding" element={<Onboarding />} />
+      </Routes>
             {/* Auth modal rendered at app root so it can be triggered from anywhere */}
             <AuthModal />
           </div>
