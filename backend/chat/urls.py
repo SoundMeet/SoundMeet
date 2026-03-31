@@ -14,4 +14,6 @@ urlpatterns = [
     path('api/register/', views.register_user, name='register'),
     
     path('api/profiles/me/', views.get_profile, name='get_profile'),
+    
+    path('api/logout/', views.logout_user, name='logout'),
 ]

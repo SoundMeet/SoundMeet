@@ -7,23 +7,26 @@ import Settings from './pages/Settings.jsx'
 import Navbar from './components/Navbar.jsx'
 import AuthModal from './components/AuthModal.jsx'
 import { AuthModalProvider } from './context/AuthModalContext.jsx'
+import { AuthProvider } from './injectables/Auth.jsx'
 
 const App = () => {
   return (
-    <AuthModalProvider>
-      <div className='bg-gradient-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/meet" element={<Meet />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        {/* Auth modal rendered at app root so it can be triggered from anywhere */}
-        <AuthModal />
-      </div>
-    </AuthModalProvider>
+    <AuthProvider>
+      <AuthModalProvider>
+        <div className='bg-gradient-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/meet" element={<Meet />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          {/* Auth modal rendered at app root so it can be triggered from anywhere */}
+          <AuthModal />
+        </div>
+      </AuthModalProvider>
+    </AuthProvider>
   )
 }
 

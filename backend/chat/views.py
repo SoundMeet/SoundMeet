@@ -53,3 +53,9 @@ def get_profile(request):
         'vibes_liked': list(profile.vibes_liked.values('id', 'name')),
         'friends_count': profile.friends_count,
     })
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_user(request):
+    request.user.auth_token.delete()
+    return Response({'message': 'Successfully logged out'}, status=200)
