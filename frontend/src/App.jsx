@@ -4,6 +4,7 @@ import NotFound from './pages/NotFound.jsx'
 import Login from './pages/Login.jsx'
 import Meet from './pages/Meet.jsx'
 import Navbar from './components/Navbar.jsx'
+import GuestLocationGuard from './components/GuestLocationGuard.jsx'
 
 const App = () => {
   return(<div className='bg-linear-to-r from-black via-neutral-900 to-gray-900'>
@@ -11,7 +12,7 @@ const App = () => {
       <Navbar/>
     </div>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<GuestLocationGuard><Home /></GuestLocationGuard>} />
         <Route path="/login" element={<Login />} />
         <Route path="/meet" element={<Meet />} />
         <Route path="*" element={<NotFound />} />

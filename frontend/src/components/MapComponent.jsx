@@ -1,67 +1,43 @@
-import React, { useState, useEffect } from "react";
-import Map, { Marker, Popup } from "react-map-gl/maplibre";
+import { useState, useEffect } from "react";
+import Map, { Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapPin from "./MapPin";
-import JamPopup from "./JamPopup";
 
 const MAP_STYLE = `https://api.maptiler.com/maps/019d0d5e-d7ec-7ed1-942f-952f70c3b58b/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`;
 
-const MOCK_PINS = [
-  {
-    id: 1,
-    lat: 25.755,
-    lng: -80.374,
-    noteIndex: 0,
-    status: "now",
-    name: "Jam Collective",
-    time: "Happening Now",
-    genre: "Jazz",
-    tags: ["On Campus", "Improv", "Live"],
-  },
-  {
-    id: 2,
-    lat: 25.7562,
-    lng: -80.371,
-    noteIndex: 1,
-    status: "soon",
-    name: "test",
-    time: "Starts at x:xx PM",
-    genre: "testing",
-    tags: ["1", "2", "3"],
-  },
-  {
-    id: 3,
-    lat: 25.752,
-    lng: -80.376,
-    noteIndex: 2,
-    status: "later",
-    name: "test2",
-    time: "Tomorrow at xx:xx PM",
-    genre: "testing2",
-    tags: ["1", "2", "3"],
-  },
-  {
-    id: 4,
-    lat: 25.758,
-    lng: -80.378,
-    noteIndex: 3,
-    status: "soon",
-    name: "test3",
-    time: "Starts at x:xx PM",
-    genre: "testing3B",
-    tags: ["1", "2"],
-  },
-];
+// Centered on Miami proper so all neighborhood pins are visible at zoom 12.
+// TODO: replace with real user location from auth profile when available.
+const FALLBACK_COORDS = { latitude: 25.775, longitude: -80.200, zoom: 12 };
 
-const FALLBACK_COORDS = { latitude: 25.7562, longitude: -80.3755 };
+// Derive pin status from jam data for visual differentiation
+const jamToStatus = (jam) => {
+  if (jam.isLive) return "now";
+  if (jam.isPrivate) return "later"; // yellow — invite-only
+  return "soon";
+};
 
-const MapComponent = () => {
-  const [selectedPin, setSelectedPin] = useState(null);
-  const [viewState, setViewState] = useState({
-    ...FALLBACK_COORDS,
-    zoom: 14,
-  });
+/**
+ * MapComponent — renders the interactive map with pins from shared jam data.
+ *
+ * Props:
+ *   jams         {object[]} - Full jam list from mockJams (single source of truth)
+ *   selectedJamId {string}  - Currently selected jam id (drives pin highlight)
+ *   hoveredJamId  {string}  - Currently hovered jam id (drives pin hover state)
+ *   onPinSelect  {function} - Called with jamId when a pin is clicked
+ *   onPinHover   {function} - Called with jamId when mouse enters a pin
+ *   onPinLeave   {function} - Called when mouse leaves a pin
+ */
+const MapComponent = ({
+  jams = [],
+  selectedJamId,
+  hoveredJamId,
+  onPinSelect,
+  onPinHover,
+  onPinLeave,
+}) => {
+  const [viewState, setViewState] = useState(FALLBACK_COORDS);
 
+  // Attempt to center on user's real location; fall back silently on denial/error
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -69,12 +45,10 @@ const MapComponent = () => {
         setViewState({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-          zoom: 15,
+          zoom: 13,
         });
       },
-      () => {
-        // Permission denied or error — stay on fallback
-      },
+      () => {}, // permission denied — stay on fallback
       { timeout: 8000 }
     );
   }, []);
@@ -84,36 +58,36 @@ const MapComponent = () => {
       initialViewState={viewState}
       style={{ width: "100%", height: "100%" }}
       mapStyle={MAP_STYLE}
-      onClick={() => setSelectedPin(null)}
       onStyleImageMissing={(e) => {
+        // Silently provide a transparent placeholder for any missing sprite images
         const map = e.target;
         if (!map.hasImage(e.id)) {
-          const empty = { width: 1, height: 1, data: new Uint8Array(4) };
-          map.addImage(e.id, empty);
+          map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
         }
       }}
     >
-      {MOCK_PINS.map((pin) => (
+      {/* Render one pin per jam — no separate MOCK_PINS needed */}
+      {jams.map((jam, i) => (
         <Marker
-          key={pin.id}
-          latitude={pin.lat}
-          longitude={pin.lng}
+          key={jam.id}
+          latitude={jam.lat}
+          longitude={jam.lng}
           anchor="bottom"
         >
           <MapPin
-            noteIndex={pin.noteIndex}
-            status={pin.status}
+            noteIndex={i % 4}
+            status={jamToStatus(jam)}
+            isSelected={selectedJamId === jam.id}
+            isHovered={hoveredJamId === jam.id}
             onClick={(e) => {
               e.stopPropagation();
-              setSelectedPin(pin);
+              onPinSelect?.(jam.id);
             }}
+            onMouseEnter={() => onPinHover?.(jam.id)}
+            onMouseLeave={() => onPinLeave?.()}
           />
         </Marker>
       ))}
-
-      {selectedPin && (
-        <JamPopup pin={selectedPin} onClose={() => setSelectedPin(null)} />
-      )}
     </Map>
   );
 };
