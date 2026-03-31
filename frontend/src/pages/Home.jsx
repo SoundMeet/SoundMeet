@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import Navbar from "../components/Navbar";
+import MapComponent from "../components/MapComponent";
 import Glowbutton from "../components/Glowbutton";
 import GlowSwitch from "../components/GlowSwitch";
-import speaker from "../assets/speaker.png"
-import AnimatedIcon from "../components/AnimatedIcon";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateJamModal from "../components/CreateJamModal";
 const filterPills = ["All", "Jams", "Musicians", "Bands", "Shows"];
@@ -25,40 +23,60 @@ const Home = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
   return (
-    <div className="h-screen text-white flex flex-col overflow-hidden">
-      {/* Search + Filter Bar */}
-      <div className="flex items-center gap-3 px-6 py-3 z-10">
-        <div className="flex items-center bg-neutral-800 rounded-full px-4 py-2 w-80">
-          <span className="text-neutral-400 mr-2">&#128269;</span>
-          <input
-            type="text"
-            placeholder="Search jams, musicians, bands..."
-            className="bg-transparent text-sm text-white placeholder-neutral-400 outline-none w-full"
-          />
-        </div>
-        <div className="flex gap-2">
-          {filterPills.map((pill,ind) => {
-            return (
-              <Glowbutton
-                key={ind}
-                isActive={activePill === ind}
-                value={pill}
-                onClick={() => {setActivePill(ind)}}
-              />
-            );
-          })}
-        </div>
+    <div className="fixed inset-0 text-white">
+      {/* Full-screen map background */}
+      <div className="fixed inset-x-0 bottom-0 top-16 z-0">
+        <MapComponent />
       </div>
 
-      {/* Main Content */}
-      <div className="flex w-full h-[39rem]">
-        <div className="w-[68%] h-full flex items-center justify-center">
-          <div className="w-[95%] h-[95%] flex items-center justify-center rounded-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10 shadow-[0_0_25px_rgba(255,255,255,0.08),0_0_40px_rgba(220,46,115,0.15)]">
-            <h2 className="text-gray-500 text-xs font-light">Map Component</h2>
+      {/* Top blur — covers navbar, fades 16px below it */}
+      <div
+        className="fixed inset-x-0 top-0 z-10 pointer-events-none"
+        style={{
+          height: "calc(4rem + 72px)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          maskImage: "linear-gradient(to bottom, black 0px, black 74px, transparent calc(4rem + 72px))",
+          WebkitMaskImage: "linear-gradient(to bottom, black 0px, black 74px, transparent calc(4rem + 72px))",
+        }}
+      />
+
+      {/* UI layer */}
+      <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col pointer-events-none">
+        {/* Search + Filter Bar */}
+        <div className="flex items-center px-6 py-3 pointer-events-auto">
+          <div className="flex items-center gap-3 bg-neutral-900/50 backdrop-blur-2xl rounded-full px-3 py-2 border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.55)]">
+            <div className="flex items-center bg-neutral-800 rounded-full px-4 py-2 w-80">
+              <span className="text-neutral-400 mr-2">&#128269;</span>
+              <input
+                type="text"
+                placeholder="Search jams, musicians, bands..."
+                className="bg-transparent text-sm text-white placeholder-neutral-400 outline-none w-full"
+              />
+            </div>
+            <div className="flex gap-2">
+              {filterPills.map((pill,ind) => {
+                return (
+                  <Glowbutton
+                    key={ind}
+                    isActive={activePill === ind}
+                    value={pill}
+                    onClick={() => {setActivePill(ind)}}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
-        <div className="w-[32%] h-full flex items-center justify-center">
-          <div className="w-[95%] h-[95%] pt-2 rounded-3xl bg-neutral-900/80 backdrop-blur-md border border-white/10 shadow-[0_0_25px_rgba(255,255,255,0.08),0_0_40px_rgba(220,46,115,0.15)]">
+
+        {/* Main Content */}
+        <div className="flex w-full flex-1">
+          {/* Left: transparent — map shows through */}
+          <div className="w-[68%] h-full pointer-events-none" />
+
+          {/* Right: sidebar */}
+          <div className="w-[32%] h-full flex items-center justify-center pointer-events-auto">
+            <div className="w-[95%] h-[95%] pt-2 rounded-3xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.55)]">
             <div className="w-full h-14 px-6 pt-2 items-center flex justify-between">
               <h2 className="text-white font-medium text-xl">Near You</h2>
               <div className="flex gap-2 items-center">
@@ -136,6 +154,7 @@ const Home = () => {
       </div>
       <CreateJamModal open={jamModalOpen} onOpenChange={setJamModalOpen} />
     </div>
+  </div>
   );
 };
 

@@ -79,6 +79,18 @@
   }
 }
 
+  /* MapLibre popup overrides */
+  .maplibregl-popup-content {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .maplibregl-popup-tip {
+    display: none !important;
+  }
+
   @layer base {
     body {
         background-color: var(--color-dark);
