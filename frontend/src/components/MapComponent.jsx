@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Map, { Marker, Popup } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapPin from "./MapPin";
@@ -58,16 +58,35 @@ const STATUS_LABEL = {
   later:{ text: "UPCOMING",   style: "bg-yellow-900 text-yellow-300" },
 };
 
+const FALLBACK_COORDS = { latitude: 25.7562, longitude: -80.3755 };
+
 const MapComponent = () => {
   const [selectedPin, setSelectedPin] = useState(null);
+  const [viewState, setViewState] = useState({
+    ...FALLBACK_COORDS,
+    zoom: 14,
+  });
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setViewState({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          zoom: 15,
+        });
+      },
+      () => {
+        // Permission denied or error — stay on fallback
+      },
+      { timeout: 8000 }
+    );
+  }, []);
 
   return (
     <Map
-      initialViewState={{
-        latitude: 25.7562,
-        longitude: -80.3755,
-        zoom: 13,
-      }}
+      initialViewState={viewState}
       style={{ width: "100%", height: "100%" }}
       mapStyle={MAP_STYLE}
       onClick={() => setSelectedPin(null)}
