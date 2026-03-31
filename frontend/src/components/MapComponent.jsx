@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Map, { Marker, Popup } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapPin from "./MapPin";
+import JamPopup from "./JamPopup";
 
 const MAP_STYLE = `https://api.maptiler.com/maps/019d0d5e-d7ec-7ed1-942f-952f70c3b58b/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`;
 
@@ -51,12 +52,6 @@ const MOCK_PINS = [
     tags: ["1", "2"],
   },
 ];
-
-const STATUS_LABEL = {
-  now:  { text: "LIVE NOW",    style: "bg-purple-600 text-white" },
-  soon: { text: "STARTING SOON", style: "bg-purple-900 text-purple-200" },
-  later:{ text: "UPCOMING",   style: "bg-yellow-900 text-yellow-300" },
-};
 
 const FALLBACK_COORDS = { latitude: 25.7562, longitude: -80.3755 };
 
@@ -117,43 +112,7 @@ const MapComponent = () => {
       ))}
 
       {selectedPin && (
-        <Popup
-          latitude={selectedPin.lat}
-          longitude={selectedPin.lng}
-          anchor="bottom"
-          offset={[0, -48]}
-          closeButton={false}
-          closeOnClick={false}
-          onClose={() => setSelectedPin(null)}
-        >
-          <div className="bg-neutral-900 text-white rounded-xl p-4 w-56 shadow-xl">
-            {/* Status badge */}
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_LABEL[selectedPin.status].style}`}>
-              {STATUS_LABEL[selectedPin.status].text}
-            </span>
-
-            {/* Name */}
-            <h3 className="text-base font-bold mt-2">{selectedPin.name}</h3>
-
-            {/* Time */}
-            <p className="text-xs text-neutral-400 mt-1">{selectedPin.time}</p>
-
-            {/* Genre */}
-            <p className="text-xs text-neutral-300 mt-1 font-medium">{selectedPin.genre}</p>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {selectedPin.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs bg-neutral-700 text-neutral-300 px-2 py-0.5 rounded-full"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        </Popup>
+        <JamPopup pin={selectedPin} onClose={() => setSelectedPin(null)} />
       )}
     </Map>
   );
