@@ -6,8 +6,19 @@
     --color-light: #ffffff;
     --color-brand-red: #fb4040;
     --color-brand-yellow: #f7c10d;
-    --color-brand-magenta: #eb00d0; 
-  
+    --color-brand-magenta: #eb00d0;
+
+    /* Chat design-system tokens */
+    --color-surface-low: #1C1B1B;
+    --color-surface-high: #2A2A2A;
+    --color-surface-bright: #393939;
+    --color-primary: #DC2E73;
+    --color-accent-red: #FB4040;
+    --color-accent-yellow: #F7C10D;
+    --color-on-surface: #E5E2E1;
+    --color-status-online: #22C55E;
+    --color-status-away: #F7C10D;
+
     --radius-button: 0.5rem;
     --font-sora: "Sora", sans-serif;
   }

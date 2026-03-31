@@ -46,7 +46,6 @@ const GuitarSVG = () => (
       stroke="#4a3218"
       strokeWidth="1"
     />
-    {/* SoundMeet logo area on headstock */}
     <text x="125" y="58" textAnchor="middle" fill="rgba(247,193,13,0.55)" fontSize="7" fontFamily="Sora, sans-serif" fontWeight="700" letterSpacing="1">
       SOUNDMEET
     </text>
@@ -101,7 +100,6 @@ const GuitarSVG = () => (
       stroke="#ff4a4a"
       strokeWidth="1.5"
     />
-    {/* Sheen overlay */}
     <path
       d="M 125 348
          C 178 348, 218 372, 218 416
@@ -121,15 +119,14 @@ const GuitarSVG = () => (
     <circle cx="125" cy="492" r="23" fill="none" stroke="#ff5555" strokeWidth="0.5" opacity="0.25" />
     <circle cx="125" cy="492" r="15" fill="none" stroke="#ff5555" strokeWidth="0.5" opacity="0.15" />
 
-    {/* Neck block (neck-to-body joint fill) */}
+    {/* Neck block */}
     <rect x="108" y="348" width="34" height="22" fill="url(#neckGrad)" />
 
     {/* Bridge */}
     <rect x="109" y="582" width="32" height="10" rx="2" fill="#2a1a08" stroke="#f7c10d" strokeWidth="0.8" />
-    {/* Saddle */}
     <rect x="111" y="584" width="28" height="4" rx="1" fill="#e0d8b0" />
 
-    {/* ── STRINGS (SMIL vibration) ── */}
+    {/* ── STRINGS ── */}
     {STRING_DEFS.map((s, i) => (
       <line
         key={i}
@@ -145,9 +142,7 @@ const GuitarSVG = () => (
 
 const NotFound = () => {
   return (
-    <div
-      className="relative min-h-screen overflow-hidden flex items-center"
-    >
+    <div className="relative min-h-screen overflow-hidden flex items-center">
 
       {/* Guitar-side ambient glow */}
       <div
@@ -161,10 +156,9 @@ const NotFound = () => {
       {/* Main layout */}
       <div className="relative z-10 flex items-center w-full px-10 lg:px-50 min-h-screen">
 
-        {/* ── LEFT: Text ── */}
+        {/* LEFT: Text */}
         <div className="flex-shrink-0 w-full max-w-sm lg:max-w-md">
 
-          {/* 404 */}
           <h1
             className="font-black leading-none mb-3 select-none"
             style={{
@@ -177,7 +171,6 @@ const NotFound = () => {
             SORRY
           </h1>
 
-          {/* Subtitle */}
           <h2
             className="font-bold mb-5"
             style={{
@@ -189,7 +182,6 @@ const NotFound = () => {
             404s and Heartbreaks
           </h2>
 
-          {/* Body copy */}
           <p
             className="mb-10 leading-relaxed"
             style={{
@@ -201,7 +193,6 @@ const NotFound = () => {
             The page you're looking for was doesn't exist :(
           </p>
 
-          {/* CTA */}
           <Link
             to="/"
             className="not-found-btn inline-flex items-center gap-3 font-bold"
@@ -231,7 +222,7 @@ const NotFound = () => {
           </Link>
         </div>
 
-        {/* ── RIGHT: Guitar ── */}
+        {/* RIGHT: Guitar */}
         <div className="hidden lg:block flex-1 relative" style={{ height: '100vh' }}>
           <div
             style={{

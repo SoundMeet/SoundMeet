@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import MapComponent from "../components/MapComponent";
 import Glowbutton from "../components/Glowbutton";
 import GlowSwitch from "../components/GlowSwitch";

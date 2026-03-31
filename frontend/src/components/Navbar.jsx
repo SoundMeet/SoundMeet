@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import LogowText from "../assets/LogowText.svg";
 import LogoOnly from "../assets/Logo.svg";
 import { navItems } from "../constants";
 import { MdNotificationsNone } from "react-icons/md";
-import { Link } from "react-router-dom";
-import { FaUser, FaBars, FaTimes } from "react-icons/fa";
+import { Link, useLocation } from "react-router-dom";
+import { FaBars, FaTimes } from "react-icons/fa";
+import ProfileDropdown from "./ProfileDropdown";
 
 const Navbar = () => {
   const [navHover, setNavHover] = useState(-1);
-  const [activePage, setActivePage] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const activePage = navItems.findIndex((item) => item.path === location.pathname);
 
   return (
     <div className="w-full bg-none text-white px-4 md:px-8 h-16 flex items-center justify-between relative">
@@ -25,7 +27,6 @@ const Navbar = () => {
           <Link
             to={ele.path}
             key={ind}
-            onClick={() => setActivePage(ind)}
             onMouseEnter={() => setNavHover(ind)}
             onMouseLeave={() => setNavHover(-1)}
             className="relative text-sm md:text-base font-medium"
@@ -43,9 +44,7 @@ const Navbar = () => {
       {/* RIGHT: ICONS */}
       <div className="hidden md:flex items-center gap-4">
         <MdNotificationsNone className="text-xl md:text-2xl cursor-pointer" />
-        <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden">
-          <FaUser />
-        </div>
+        <ProfileDropdown />
       </div>
 
       {/* MOBILE MENU BUTTON */}
@@ -59,15 +58,14 @@ const Navbar = () => {
 
       {/* MOBILE MENU */}
       {menuOpen && (
-        <div className="absolute top-16 left-0 w-full flex flex-col items-center gap-6 py-6 md:hidden z-50">
+        <div className="absolute top-16 left-0 w-full flex flex-col items-center gap-6 py-6 md:hidden z-40"
+          style={{ background: 'rgba(18,18,18,0.97)', backdropFilter: 'blur(20px)' }}
+        >
           {navItems.map((ele, ind) => (
             <Link
               to={ele.path}
               key={ind}
-              onClick={() => {
-                setActivePage(ind);
-                setMenuOpen(false);
-              }}
+              onClick={() => setMenuOpen(false)}
               className="text-lg font-medium"
             >
               {ele.name}
@@ -77,9 +75,7 @@ const Navbar = () => {
           {/* Mobile Icons */}
           <div className="flex items-center gap-6 mt-4">
             <MdNotificationsNone className="text-2xl" />
-            <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center">
-              <FaUser />
-            </div>
+            <ProfileDropdown />
           </div>
         </div>
       )}
