@@ -3,8 +3,16 @@ import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 
 export default function Profile() {
-  const { user, isLoggedIn } = useAuth()
+  const { user, isLoggedIn, isLoading } = useAuth()
   const { openModal } = useAuthModal()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+      </div>
+    )
+  }
 
   // Display name: prefer display_name, fall back to username
   const displayName = user?.display_name || user?.username
@@ -84,9 +92,9 @@ export default function Profile() {
       {/* Stat chips */}
       <div className="flex gap-6 mb-12">
         {[
-          { icon: FaMusic, label: 'Jams', value: '—' },
-          { icon: FaGuitar, label: 'Instruments', value: '—' },
-          { icon: FaUser, label: 'Friends', value: '—' },
+          { icon: FaMusic,  label: 'Jams',        value: '—' },
+          { icon: FaGuitar, label: 'Instruments',  value: user?.instruments_liked?.length ?? '—' },
+          { icon: FaUser,   label: 'Friends',      value: '—' },
         ].map(({ icon: Icon, label, value }) => (
           <div
             key={label}
@@ -118,7 +126,7 @@ export default function Profile() {
         </h2>
         <p className="text-sm text-white/50" style={{ fontFamily: 'Sora, sans-serif' }}>
           {isLoggedIn
-            ? user?.bio || 'No bio yet. Full profile editing coming soon.'
+            ? user?.about || 'No bio yet. Full profile editing coming soon.'
             : 'Log in to view and edit your profile.'}
         </p>
       </div>
