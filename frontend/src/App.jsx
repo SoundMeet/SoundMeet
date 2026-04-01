@@ -17,6 +17,8 @@ import { NotificationsProvider } from './context/NotificationsContext.jsx'
 import { FriendsProvider } from './context/FriendsContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { useAuth } from './injectables/Auth.jsx'
+import Onboarding from "./pages/Onboarding"
+import EventDetailPage from "./pages/EventDetailPage"
 
 /** Redirects unauthenticated users to / and opens the login modal. */
 const PrivateRoute = ({ children }) => {
@@ -30,10 +32,6 @@ const PrivateRoute = ({ children }) => {
   if (!user) return <Navigate to="/" replace />
   return children
 }
-import Onboarding from "./pages/Onboarding";
-import EventDetailPage from "./pages/EventDetailPage";
-
-
 
 const OnboardingGuard = ({ children }) => {
   const { isLoggedIn, user, isLoading } = useAuth()
