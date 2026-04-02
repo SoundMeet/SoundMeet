@@ -40,6 +40,8 @@ def get_profile(request):
     )
     
     return Response({
+        'id': request.user.id,
+        'username': request.user.username,
         'display_name': profile.display_name,
         'about': profile.about,
         'spectator': profile.spectator,
@@ -49,7 +51,7 @@ def get_profile(request):
         'age': profile.age,
         'gender': profile.gender,
         'instruments_liked': list(profile.instruments_liked.values('id', 'name', 'family')),
-        'genres_liked': list(profile.genres_liked.values('id', 'name')), 
+        'genres_liked': list(profile.genres_liked.values('id', 'name')),
         'vibes_liked': list(profile.vibes_liked.values('id', 'name')),
         'friends_count': profile.friends_count,
     })

@@ -2,13 +2,17 @@ import { Routes, Route } from "react-router-dom"
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
 import Meet from './pages/Meet.jsx'
+import MyJams from './pages/MyJams.jsx'
 import Chat from './pages/Chat.jsx'
 import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
+import Feed from './pages/Feed.jsx'
 import Navbar from './components/Navbar.jsx'
 import GuestLocationGuard from './components/GuestLocationGuard.jsx'
 import AuthModal from './components/AuthModal.jsx'
 import { AuthModalProvider } from './context/AuthModalContext.jsx'
+import { NotificationsProvider } from './context/NotificationsContext.jsx'
+import { FriendsProvider } from './context/FriendsContext.jsx'
 import { useAuth } from './injectables/Auth.jsx'
 
 const App = () => {
@@ -24,21 +28,29 @@ const App = () => {
   }
 
   return (
-    <AuthModalProvider>
-      <div className='bg-linear-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<GuestLocationGuard><Home /></GuestLocationGuard>} />
-          <Route path="/meet" element={<Meet />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        {/* Auth modal rendered at app root so it can be triggered from anywhere */}
-        <AuthModal />
-      </div>
-    </AuthModalProvider>
+    <NotificationsProvider>
+      <FriendsProvider>
+        <AuthModalProvider>
+          <div className='bg-linear-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
+            <div className="sticky top-0 z-50">
+              <Navbar />
+            </div>
+            <Routes>
+              <Route path="/" element={<GuestLocationGuard><Home /></GuestLocationGuard>} />
+              <Route path="/meet" element={<Meet />} />
+              <Route path="/jams" element={<MyJams />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/feed" element={<Feed />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            {/* Auth modal rendered at app root so it can be triggered from anywhere */}
+            <AuthModal />
+          </div>
+        </AuthModalProvider>
+      </FriendsProvider>
+    </NotificationsProvider>
   )
 }
 

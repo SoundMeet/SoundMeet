@@ -2,10 +2,10 @@ import { useState } from "react";
 import LogowText from "../assets/LogowText.svg";
 import LogoOnly from "../assets/Logo.svg";
 import { navItems } from "../constants";
-import { MdNotificationsNone } from "react-icons/md";
 import { Link, useLocation } from "react-router-dom";
 import { FaBars, FaTimes } from "react-icons/fa";
 import ProfileDropdown from "./ProfileDropdown";
+import { NotificationsDropdown } from "./notifications/NotificationsDropdown";
 
 const Navbar = () => {
   const [navHover, setNavHover] = useState(-1);
@@ -43,7 +43,7 @@ const Navbar = () => {
 
       {/* RIGHT: ICONS */}
       <div className="hidden md:flex items-center gap-4">
-        <MdNotificationsNone className="text-xl md:text-2xl cursor-pointer" />
+        <NotificationsDropdown />
         <ProfileDropdown />
       </div>
 
@@ -74,7 +74,7 @@ const Navbar = () => {
 
           {/* Mobile Icons */}
           <div className="flex items-center gap-6 mt-4">
-            <MdNotificationsNone className="text-2xl" />
+            <NotificationsDropdown />
             <ProfileDropdown />
           </div>
         </div>

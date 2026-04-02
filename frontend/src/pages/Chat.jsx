@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Menu } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import ChatSidebar from '../components/chat/ChatSidebar'
 import ChatHeader from '../components/chat/ChatHeader'
 import MessageList from '../components/chat/MessageList'
@@ -9,6 +10,7 @@ import JamInfoModal from '../components/chat/JamInfoModal'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
+import { jamService } from '../services/jamService'
 
 // Converts a Supabase chat_message row into the shape expected by MessageList / MessageBubble.
 // All IDs are kept as-is (numbers from DB). Comparisons in MessageList use ===, so we
@@ -29,6 +31,7 @@ function normalizeMessage(row) {
 const Chat = () => {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
   const { openModal } = useAuthModal()
+  const location = useLocation()
 
   // ─── State ────────────────────────────────────────────────────────────────
   const [dmThreads, setDmThreads]           = useState([])
@@ -92,6 +95,12 @@ const Chat = () => {
         // Seed current user into map
         if (chatCurrentUser) usersMap[chatCurrentUser.id] = chatCurrentUser
 
+        // Enrich jam thread names from chat_jam table
+        const jamConvIds = conversations.filter(c => c.jam_id).map(c => c.jam_id)
+        const jamNames = jamConvIds.length
+          ? await jamService.getJamNames(jamConvIds).catch(() => ({}))
+          : {}
+
         conversations.forEach((conv) => {
           const threadId = `c_${conv.id}`
           const participants = allParticipants.filter(
@@ -104,8 +113,7 @@ const Chat = () => {
               id: threadId,
               _convId: conv.id,
               type: 'jam',
-              // TODO: enrich with actual jam name by joining chat_jam table
-              name: `Jam #${conv.jam_id}`,
+              name: jamNames[String(conv.jam_id)] ?? `Jam #${conv.jam_id}`,
               active: false,
               memberCount: participants.length,
               onlineCount: 0,
@@ -163,6 +171,57 @@ const Chat = () => {
 
     return () => { cancelled = true }
   }, [isLoggedIn, user?.id])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Auto-open or create DM when navigated from Friends page ─────────────
+  // Triggered when location.state.openDmWith is set (e.g. clicking "Chat" on
+  // a friend). Runs after conversations are loaded so we can check for an
+  // existing thread first before creating a new one.
+  useEffect(() => {
+    const target = location.state?.openDmWith
+    if (!target?.id || !isLoggedIn || !user?.id || isLoadingConvs) return
+
+    // Check if a DM thread with this user already exists in loaded threads
+    const existing = dmThreads.find(
+      (t) => String(t.participantId) === String(target.id)
+    )
+
+    if (existing) {
+      setActiveThreadId(existing.id)
+      return
+    }
+
+    // No existing thread — create one via Supabase
+    chatService.getOrCreateDMChat(user.id, target.id)
+      .then((convId) => {
+        const threadId = `c_${convId}`
+        const newThread = {
+          id: threadId,
+          _convId: convId,
+          type: 'dm',
+          participantId: String(target.id),
+          unread: 0,
+        }
+        const newUser = {
+          id: String(target.id),
+          name: target.displayName || target.username || `User #${target.id}`,
+          avatar: target.avatarUrl ?? null,
+          status: 'offline',
+        }
+        setDmThreads((prev) => {
+          // Guard against duplicates if the effect fires twice
+          if (prev.some((t) => t.id === threadId)) return prev
+          return [...prev, newThread]
+        })
+        setChatUsers((prev) => {
+          if (prev.some((u) => u.id === newUser.id)) return prev
+          return [...prev, newUser]
+        })
+        setActiveThreadId(threadId)
+      })
+      .catch((err) => {
+        console.error('[Chat] Failed to open DM with friend:', err)
+      })
+  }, [location.state, isLoggedIn, user?.id, isLoadingConvs, dmThreads]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Load messages + subscribe when active thread changes ─────────────────
   useEffect(() => {

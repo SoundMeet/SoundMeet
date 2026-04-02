@@ -21,8 +21,8 @@ const navItems = [
       },
       {
         id: 5,
-        name: "Friends",
-        path: "/friends",
+        name: "Feed",
+        path: "/feed",
       },
 ]
 
