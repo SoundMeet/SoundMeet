@@ -8,7 +8,10 @@ export const chatService = {
 
   // ─── Conversation creation ────────────────────────────────────────────────
 
-  async getOrCreateJamChat(jamId) {
+  async getOrCreateJamChat(jamId, currentUserId) {
+    const M2M_TABLE = 'chat_conversation_participants';
+
+    let conversationId;
     const { data: existingChat, error: fetchError } = await supabase
       .from('chat_conversation')
       .select('id')
@@ -16,35 +19,75 @@ export const chatService = {
       .maybeSingle();
 
     if (fetchError) throw fetchError;
-    if (existingChat) return existingChat.id;
 
-    const { data: newChat, error: createError } = await supabase
-      .from('chat_conversation')
-      .insert([{ jam_id: jamId }])
-      .select('id')
-      .single();
+    if (existingChat) {
+      conversationId = existingChat.id;
+    } else {
+      const { data: newChat, error: createError } = await supabase
+        .from('chat_conversation')
+        .insert([{ jam_id: jamId }])
+        .select('id')
+        .single();
 
-    if (createError) throw createError;
-    return newChat.id;
+      if (createError) throw createError;
+      conversationId = newChat.id;
+    }
+
+    if (currentUserId) {
+      const { data: existingPart, error: partCheckError } = await supabase
+        .from(M2M_TABLE)
+        .select('conversation_id')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+
+      if (partCheckError) throw partCheckError;
+
+      if (!existingPart) {
+        const { error: partInsertError } = await supabase
+          .from(M2M_TABLE)
+          .insert([{ conversation_id: conversationId, user_id: currentUserId }]);
+
+        if (partInsertError) throw partInsertError;
+      }
+    }
+
+    return conversationId;
+  },
+
+  async getUsersProfiles(userIds) {
+    if (!userIds || userIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('chat_profile') 
+      .select('user_id, display_name, pfp')
+      .in('user_id', userIds);
+
+    if (error) throw error;
+    return data ?? [];
   },
 
   async getOrCreateDMChat(currentUserId, targetUserId) {
     const M2M_TABLE = 'chat_conversation_participants';
 
-    const { data: myConversations, error: myConvError } = await supabase
-      .from(M2M_TABLE)
-      .select('conversation_id')
-      .eq('user_id', currentUserId);
+    const { data: myDms, error: myConvError } = await supabase
+      .from('chat_conversation')
+      .select(`
+        id,
+        chat_conversation_participants!inner(user_id)
+      `)
+      .is('jam_id', null) 
+      .eq('chat_conversation_participants.user_id', currentUserId);
 
     if (myConvError) throw myConvError;
 
-    const myConvIds = myConversations.map(c => c.conversation_id);
+    const myDmConvIds = myDms.map(c => c.id);
 
-    if (myConvIds.length > 0) {
+    if (myDmConvIds.length > 0) {
       const { data: sharedChat, error: sharedError } = await supabase
         .from(M2M_TABLE)
         .select('conversation_id')
-        .in('conversation_id', myConvIds)
+        .in('conversation_id', myDmConvIds)
         .eq('user_id', targetUserId)
         .maybeSingle();
 
@@ -75,31 +118,40 @@ export const chatService = {
     return newConversation.id;
   },
 
+  async getUserConversations(currentUserId) {
+      const M2M_TABLE = 'chat_conversation_participants';
+
+      const { data: participations, error: fetchError } = await supabase
+        .from(M2M_TABLE)
+        .select('conversation_id')
+        .eq('user_id', currentUserId);
+
+      if (fetchError) throw fetchError;
+
+      if (!participations || participations.length === 0) {
+        return [];
+      }
+
+      const conversationIds = participations.map(p => p.conversation_id);
+
+      const { data: conversations, error: convError } = await supabase
+        .from('chat_conversation')
+        .select(`
+          id,
+          jam_id,
+          chat_conversation_participants (
+            user_id
+          )
+        `)
+        .in('id', conversationIds);
+
+      if (convError) throw convError;
+
+      return conversations;
+    },
+
   // ─── Conversation listing ─────────────────────────────────────────────────
 
-  // Returns all conversations the user participates in, with jam_id populated.
-  async getUserConversations(userId) {
-    const { data: participations, error: partError } = await supabase
-      .from('chat_conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', userId);
-
-    if (partError) throw partError;
-    if (!participations?.length) return [];
-
-    const convIds = participations.map(p => p.conversation_id);
-
-    const { data: conversations, error: convError } = await supabase
-      .from('chat_conversation')
-      .select('id, jam_id')
-      .in('id', convIds);
-
-    if (convError) throw convError;
-    return conversations ?? [];
-  },
-
-  // Returns all participant user_ids for a batch of conversation IDs.
-  // Used to identify the "other" participant in DM conversations.
   async getParticipantsForConversations(convIds) {
     if (!convIds.length) return [];
 
@@ -114,29 +166,24 @@ export const chatService = {
 
   // ─── Messages ─────────────────────────────────────────────────────────────
 
-  // Fetch messages for a conversation, oldest first.
-  // Assumes a `chat_message` table with columns:
-  //   id, conversation_id, sender_id, content, message_type, created_at
   async getMessages(conversationId) {
     const { data, error } = await supabase
       .from('chat_message')
-      .select('id, conversation_id, sender_id, content, message_type, created_at')
+      .select('id, conversation_id, sender_id, content, timestamp, is_read')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .order('timestamp', { ascending: true });
 
     if (error) throw error;
     return data ?? [];
   },
 
-  // Insert a new message into a conversation.
-  async sendMessage(conversationId, senderId, content, type = 'text') {
+  async sendMessage(conversationId, senderId, content) {
     const { data, error } = await supabase
       .from('chat_message')
       .insert([{
         conversation_id: conversationId,
         sender_id: senderId,
-        content,
-        message_type: type,
+        content
       }])
       .select()
       .single();
@@ -145,9 +192,6 @@ export const chatService = {
     return data;
   },
 
-  // Subscribe to new messages in a conversation.
-  // callback receives the raw Supabase row for each INSERT.
-  // Returns an unsubscribe function — call it when the component unmounts.
   subscribeToMessages(conversationId, callback) {
     const channel = supabase
       .channel(`chat_msgs_${conversationId}`)

@@ -13,15 +13,13 @@ import { chatService } from '../injectables/chatService'
 import { jamService } from '../services/jamService'
 
 // Converts a Supabase chat_message row into the shape expected by MessageList / MessageBubble.
-// All IDs are kept as-is (numbers from DB). Comparisons in MessageList use ===, so we
-// normalise both senderId and currentUserId to strings to avoid type mismatches.
 function normalizeMessage(row) {
   return {
     id: String(row.id),
     senderId: String(row.sender_id),
-    type: row.message_type ?? 'text',
+    type: 'text',
     content: row.content ?? '',
-    timestamp: new Date(row.created_at).toLocaleTimeString([], {
+    timestamp: new Date(row.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     }),
@@ -36,7 +34,6 @@ const Chat = () => {
   // ─── State ────────────────────────────────────────────────────────────────
   const [dmThreads, setDmThreads]           = useState([])
   const [jamThreads, setJamThreads]         = useState([])
-  // Minimal user objects for chat display: current user + DM partners
   const [chatUsers, setChatUsers]           = useState([])
   const [activeThreadId, setActiveThreadId] = useState(null)
   const [messagesByThread, setMessagesByThread] = useState({})
@@ -48,7 +45,6 @@ const Chat = () => {
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false)
   const [isTyping, setIsTyping]             = useState(false)
 
-  // Realtime subscription cleanup
   const unsubRef = useRef(null)
 
   // ─── Current user normalised for chat components ──────────────────────────
@@ -82,20 +78,17 @@ const Chat = () => {
 
         const convIds = conversations.map(c => c.id)
 
-        // Batch-load all participant rows so we can identify DM partners
         const allParticipants = convIds.length
           ? await chatService.getParticipantsForConversations(convIds).catch(() => [])
           : []
 
         const dms = []
         const jams = []
-        // Build a map of user_id → minimal user object for display
         const usersMap = {}
+        const missingUserIds = new Set()
 
-        // Seed current user into map
         if (chatCurrentUser) usersMap[chatCurrentUser.id] = chatCurrentUser
 
-        // Enrich jam thread names from chat_jam table
         const jamConvIds = conversations.filter(c => c.jam_id).map(c => c.jam_id)
         const jamNames = jamConvIds.length
           ? await jamService.getJamNames(jamConvIds).catch(() => ({}))
@@ -108,7 +101,6 @@ const Chat = () => {
           )
 
           if (conv.jam_id) {
-            // ── Jam conversation ─────────────────────────────────────────
             jams.push({
               id: threadId,
               _convId: conv.id,
@@ -120,7 +112,6 @@ const Chat = () => {
               jamId: String(conv.jam_id),
             })
           } else {
-            // ── DM conversation ──────────────────────────────────────────
             const otherParticipant = participants.find(
               p => String(p.user_id) !== String(user.id)
             )
@@ -129,11 +120,10 @@ const Chat = () => {
               : null
 
             if (otherUserId && !usersMap[otherUserId]) {
-              // Placeholder profile — TODO: enrich by calling GET /api/profiles/{id}/
-              // once that endpoint is available on the Django backend.
+              missingUserIds.add(otherUserId) // Mark this user for fetching
               usersMap[otherUserId] = {
                 id: otherUserId,
-                name: `User #${otherUserId}`,
+                name: `Loading...`, 
                 avatar: null,
                 status: 'offline',
               }
@@ -149,14 +139,31 @@ const Chat = () => {
           }
         })
 
+        // ─── FETCH MISSING PROFILES DIRECTLY FROM DATABASE ───
+        const missingIdsArray = Array.from(missingUserIds)
+        if (missingIdsArray.length > 0) {
+          try {
+            const profiles = await chatService.getUsersProfiles(missingIdsArray)
+            
+            profiles.forEach(profile => {
+              const uid = String(profile.user_id)
+              usersMap[uid] = {
+                id: uid,
+                name: profile.display_name || `User #${uid}`,
+                avatar: profile.pfp || null,
+                status: 'offline'
+              }
+            })
+          } catch (err) {
+            console.error('[Chat] Error fetching profiles from database:', err)
+          }
+        }
+
         if (!cancelled) {
           setDmThreads(dms)
           setJamThreads(jams)
           setChatUsers(Object.values(usersMap))
 
-          // Auto-select first thread
-          const first = [...jams, ...dms][0]
-          if (first) setActiveThreadId(first.id)
         }
       })
       .catch((err) => {
@@ -170,17 +177,15 @@ const Chat = () => {
       })
 
     return () => { cancelled = true }
-  }, [isLoggedIn, user?.id])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, user?.id]) 
+  // ---------------------------------------------------------
+
 
   // ─── Auto-open or create DM when navigated from Friends page ─────────────
-  // Triggered when location.state.openDmWith is set (e.g. clicking "Chat" on
-  // a friend). Runs after conversations are loaded so we can check for an
-  // existing thread first before creating a new one.
   useEffect(() => {
     const target = location.state?.openDmWith
     if (!target?.id || !isLoggedIn || !user?.id || isLoadingConvs) return
 
-    // Check if a DM thread with this user already exists in loaded threads
     const existing = dmThreads.find(
       (t) => String(t.participantId) === String(target.id)
     )
@@ -190,7 +195,6 @@ const Chat = () => {
       return
     }
 
-    // No existing thread — create one via Supabase
     chatService.getOrCreateDMChat(user.id, target.id)
       .then((convId) => {
         const threadId = `c_${convId}`
@@ -208,7 +212,6 @@ const Chat = () => {
           status: 'offline',
         }
         setDmThreads((prev) => {
-          // Guard against duplicates if the effect fires twice
           if (prev.some((t) => t.id === threadId)) return prev
           return [...prev, newThread]
         })
@@ -221,7 +224,7 @@ const Chat = () => {
       .catch((err) => {
         console.error('[Chat] Failed to open DM with friend:', err)
       })
-  }, [location.state, isLoggedIn, user?.id, isLoadingConvs, dmThreads]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.state, isLoggedIn, user?.id, isLoadingConvs, dmThreads])
 
   // ─── Load messages + subscribe when active thread changes ─────────────────
   useEffect(() => {
@@ -231,7 +234,6 @@ const Chat = () => {
     const thread = allThreads.find(t => t.id === activeThreadId)
     if (!thread?._convId) return
 
-    // Unsubscribe from the previous thread
     unsubRef.current?.()
     unsubRef.current = null
 
@@ -253,13 +255,10 @@ const Chat = () => {
         if (!cancelled) setIsLoadingMsgs(false)
       })
 
-    // Subscribe to real-time inserts — the sender also receives their own message
-    // via this subscription, so we do NOT add an optimistic message on send.
     unsubRef.current = chatService.subscribeToMessages(thread._convId, (newRow) => {
       const msg = normalizeMessage(newRow)
       setMessagesByThread(prev => {
         const existing = prev[activeThreadId] ?? []
-        // Guard against duplicate delivery (subscription may fire after initial fetch)
         if (existing.some(m => m.id === msg.id)) return prev
         return { ...prev, [activeThreadId]: [...existing, msg] }
       })
@@ -270,9 +269,8 @@ const Chat = () => {
       unsubRef.current?.()
       unsubRef.current = null
     }
-  }, [activeThreadId, isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeThreadId, isLoggedIn]) 
 
-  // Cleanup subscription on unmount
   useEffect(() => () => unsubRef.current?.(), [])
 
   // ─── Handlers ────────────────────────────────────────────────────────────
@@ -292,7 +290,6 @@ const Chat = () => {
     setSendError(null)
     try {
       await chatService.sendMessage(thread._convId, user.id, text)
-      // Real-time subscription delivers the message to state; no local push needed.
     } catch (err) {
       console.error('[Chat] Failed to send message:', err)
       setSendError('Message failed to send. Please try again.')
@@ -361,7 +358,6 @@ const Chat = () => {
       className="flex overflow-hidden bg-[#141414]"
       style={{ height: 'calc(100vh - 4rem)' }}
     >
-      {/* Mobile backdrop */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 z-30 lg:hidden"
@@ -370,7 +366,6 @@ const Chat = () => {
         />
       )}
 
-      {/* Sidebar — fixed overlay on mobile, static on desktop */}
       <div
         className={[
           'fixed lg:static z-40 lg:z-auto',
@@ -390,12 +385,10 @@ const Chat = () => {
         />
       </div>
 
-      {/* Chat main area */}
       <div
         className="flex flex-col flex-1 overflow-hidden"
         style={{ backgroundColor: '#141414' }}
       >
-        {/* Mobile: menu button row */}
         <div className="flex items-center lg:hidden px-3 py-1.5 flex-shrink-0">
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -406,7 +399,6 @@ const Chat = () => {
           </button>
         </div>
 
-        {/* Error banner for conversation load */}
         {convError && (
           <div
             className="mx-4 mt-2 px-4 py-2 rounded-xl text-xs flex-shrink-0"
@@ -420,7 +412,6 @@ const Chat = () => {
           </div>
         )}
 
-        {/* No conversations yet */}
         {!activeThread && !isLoadingConvs && (
           <div className="flex-1 flex items-center justify-center">
             <p
@@ -434,7 +425,6 @@ const Chat = () => {
           </div>
         )}
 
-        {/* Active thread view */}
         {activeThread && (
           <>
             <ChatHeader
@@ -457,7 +447,6 @@ const Chat = () => {
 
             <TypingIndicator isTyping={isTyping} user={chatUsers[1] ?? null} />
 
-            {/* Send error */}
             {sendError && (
               <p
                 className="text-xs px-8 pb-1 text-center flex-shrink-0"
@@ -475,9 +464,6 @@ const Chat = () => {
         )}
       </div>
 
-      {/* Jam Info Modal
-          TODO: populate `jam` prop with real data from chat_jam table once
-          the jam detail query (name, bpm, key, description) is wired. */}
       <JamInfoModal
         jam={null}
         isOpen={isJamModalOpen}
