@@ -540,9 +540,7 @@ const Profile = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-dark/60 text-white flex flex-col">
-      <Navbar profilePic={profilePic} />
-
+    <div className="min-h-screen bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
       <main className="mx-auto w-full max-w-[1600px] flex flex-col gap-8 px-4 py-6 md:px-6">
         {/* Header — fixed height, never grows */}
         <section className="w-full shrink-0">
