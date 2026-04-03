@@ -76,12 +76,14 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5173',
     'http://localhost:5173',
     'https://soundmeet-production.up.railway.app',
+    'https://www.soundmeet.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     'https://soundmeet-production.up.railway.app',
     'http://127.0.0.1:5173',
     'http://localhost:5173',
+    'https://www.soundmeet.app',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
