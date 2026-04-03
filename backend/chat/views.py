@@ -31,7 +31,7 @@ def register_user(request):
         'username': user.username
     })
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def get_profile(request):
     profile, created = Profile.objects.get_or_create(
@@ -39,6 +39,40 @@ def get_profile(request):
         defaults={'display_name': request.user.username[:15]}
     )
     
+    if request.method == 'PATCH':
+        data = request.data
+        
+        if 'display_name' in data: profile.display_name = data['display_name']
+        if 'about' in data: profile.about = data['about']
+        if 'country' in data: profile.country = data['country']
+        if 'city' in data: profile.city = data['city']
+        if 'gender' in data: profile.gender = data['gender']
+        
+        if 'spectator' in data:
+            profile.spectator = str(data['spectator']).lower() == 'true'
+            
+        if 'age' in data:
+            profile.age = int(data['age']) if data['age'] else None
+            
+        if 'pfp' in request.FILES:
+            profile.pfp = request.FILES['pfp']
+            
+        profile.save()
+
+        def update_m2m(field_name, m2m_manager):
+            if field_name in data:
+                items = data.getlist(field_name) if hasattr(data, 'getlist') else data[field_name]
+                
+                if items == [''] or items == "":
+                    m2m_manager.clear()
+                else:
+                    valid_ids = [int(i) for i in items if str(i).isdigit()]
+                    m2m_manager.set(valid_ids)
+
+        update_m2m('instruments_liked', profile.instruments_liked)
+        update_m2m('genres_liked', profile.genres_liked)
+        update_m2m('vibes_liked', profile.vibes_liked)
+
     return Response({
         'id': request.user.id,
         'username': request.user.username,
