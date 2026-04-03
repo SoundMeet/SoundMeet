@@ -68,6 +68,43 @@ export const apiService = {
     return data;
   },
 
+  async getProfiles() {
+    const { data, error } = await supabase
+      .from('chat_profile')
+      .select(`
+        *,
+        instruments_liked:chat_profile_instruments_liked (
+          instrument:chat_instrument (id, name, family)
+        ),
+        genres_liked:chat_profile_genres_liked (
+          genre:chat_genre (id, name)
+        ),
+        vibes_liked:chat_profile_vibes_liked (
+          vibe:chat_vibe (id, name)
+        )
+      `)
+      .order('display_name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching profiles:', error);
+      throw error;
+    }
+
+    const flattenedData = data.map(profile => ({
+      ...profile,
+      instruments: profile.instruments_liked.map(link => link.instrument),
+      genres: profile.genres_liked.map(link => link.genre),
+      vibes: profile.vibes_liked.map(link => link.vibe),
+    }));
+
+    flattenedData.forEach(p => {
+      delete p.instruments_liked;
+      delete p.genres_liked;
+      delete p.vibes_liked;
+    });
+
+    return flattenedData;
+  },
 
   async getAllFormOptions() {
     try {
