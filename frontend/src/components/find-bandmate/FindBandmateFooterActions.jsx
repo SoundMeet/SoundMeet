@@ -64,7 +64,7 @@ const FindBandmateFooterActions = ({
           className="flex-1 py-3 rounded-full text-sm font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: gradient }}
         >
-          {isSubmitting ? "Posting…" : "Post Profile"}
+          {isSubmitting ? "Publishing…" : "Publish Listing"}
         </button>
       )}
     </div>

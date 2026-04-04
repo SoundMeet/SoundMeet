@@ -9,13 +9,14 @@ import StepIndicator from "../ui/StepIndicator";
 import { findBandmateOptions } from "../../data/mockFindBandmateOptions";
 import { buildFindBandmatePayload } from "../../utils/buildFindBandmatePayload";
 import { getFormTheme } from "../../utils/discovery";
+import { useAuth } from "../../injectables/Auth";
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { number: 1, label: "About You"   },
-  { number: 2, label: "Your Sound"  },
-  { number: 3, label: "Preferences" },
+  { number: 1, label: "Band / Project Basics" },
+  { number: 2, label: "Sound & Identity"       },
+  { number: 3, label: "The Opening"            },
 ];
 
 const THEME = getFormTheme("find_bandmate");
@@ -24,22 +25,32 @@ const THEME = getFormTheme("find_bandmate");
 
 const tagGroup = () => ({ selectedIds: [], customValues: [] });
 
-const INITIAL_FORM = {
-  displayName:        "",
-  city:               "",
-  genres:             tagGroup(),
-  instrumentsYouPlay: tagGroup(),
-  vibes:              tagGroup(),
-  skillLevel:         null,
-  rolesSeeking:       tagGroup(),
-  availability:       tagGroup(),
-  description:        "",
-  contactInfo:        "",
+const buildInitialForm = (user) => ({
+  // Step 1 — Band / Project Basics
+  bandProjectName: "",
+  postedByUserId:  user?.id   ?? null,
+  postedByName:    user?.username ?? user?.email ?? "",
+  cityArea:        "",
+  coverImage:      null,   // { file: File, previewUrl: string } | null
+  headline:        "",
+  aboutProject:    "",
 
-  // Media: { file: File, previewUrl: string } | null
-  // Backend: upload to storage, store URL as cover_image_url on the record.
-  coverImage: null,
-};
+  // Step 2 — Sound & Identity
+  genres:        tagGroup(),
+  vibe:          tagGroup(),
+  influences:    tagGroup(),
+  coversOriginals: null,
+  currentLineup: tagGroup(),
+  projectLevel:  null,
+
+  // Step 3 — The Opening
+  rolesNeeded:       tagGroup(),
+  skillLevelDesired: null,
+  availability:      tagGroup(),
+  commitmentLevel:   null,
+  whatLookingFor:    "",
+  contactInfo:       "",
+});
 
 // ─── Tag group handler factory ────────────────────────────────────────────────
 
@@ -78,14 +89,16 @@ const stepVariants = {
 // ─── FindBandmateForm ─────────────────────────────────────────────────────────
 
 /**
- * FindBandmateForm — owns all form state and step navigation.
+ * FindBandmateForm — owns all form state and step navigation for the
+ * "Find a Bandmate" band/project recruitment listing flow.
  *
  * Props:
  *   options  FindBandmateOptionSets — injectable (default: mockFindBandmateOptions)
  *   onClose  () => void
  */
 const FindBandmateForm = ({ options = findBandmateOptions, onClose }) => {
-  const [form,         setForm]         = useState(INITIAL_FORM);
+  const { user } = useAuth();
+  const [form,         setForm]         = useState(() => buildInitialForm(user));
   const [step,         setStep]         = useState(1);
   const [direction,    setDirection]    = useState(1);
   const [errors,       setErrors]       = useState({});
@@ -98,8 +111,8 @@ const FindBandmateForm = ({ options = findBandmateOptions, onClose }) => {
 
   const validateStep1 = () => {
     const newErrors = {};
-    if (!form.displayName.trim()) newErrors.displayName = "Name or alias is required";
-    if (!form.city.trim())        newErrors.city        = "City is required";
+    if (!form.bandProjectName.trim()) newErrors.bandProjectName = "Band or project name is required";
+    if (!form.cityArea.trim())        newErrors.cityArea        = "City or area is required";
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
@@ -129,7 +142,7 @@ const FindBandmateForm = ({ options = findBandmateOptions, onClose }) => {
   };
 
   const canAdvance = (() => {
-    if (step === 1) return !!form.displayName.trim() && !!form.city.trim();
+    if (step === 1) return !!form.bandProjectName.trim() && !!form.cityArea.trim();
     return true;
   })();
 
@@ -152,10 +165,11 @@ const FindBandmateForm = ({ options = findBandmateOptions, onClose }) => {
   // ── Tag handlers ───────────────────────────────────────────────────────────
 
   const tagHandlers = {
-    genres:             makeTagHandlers(setForm, "genres"),
-    instrumentsYouPlay: makeTagHandlers(setForm, "instrumentsYouPlay"),
-    vibes:              makeTagHandlers(setForm, "vibes"),
-    rolesSeeking:       makeTagHandlers(setForm, "rolesSeeking"),
+    genres:        makeTagHandlers(setForm, "genres"),
+    vibe:          makeTagHandlers(setForm, "vibe"),
+    influences:    makeTagHandlers(setForm, "influences"),
+    currentLineup: makeTagHandlers(setForm, "currentLineup"),
+    rolesNeeded:   makeTagHandlers(setForm, "rolesNeeded"),
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────

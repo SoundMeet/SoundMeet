@@ -1,17 +1,17 @@
 /**
  * utils/buildJoinBandPayload.js
  *
- * Transforms JoinBandForm state into a clean backend-ready payload.
+ * Transforms Join a Band listing form state into a backend-ready payload.
+ *
+ * Accepts a second `profile` argument for fields that are read from the user's
+ * existing SoundMeet profile rather than typed into the form.
  *
  * When the real endpoint is wired up, update field names here only —
  * the rest of the form code stays unchanged.
  */
 
-/**
- * Flattens a TagGroupState { selectedIds, customValues } into a plain string array.
- */
 const flattenTagGroup = (group) => [
-  ...(group?.selectedIds ?? []),
+  ...(group?.selectedIds  ?? []),
   ...(group?.customValues ?? []),
 ];
 
@@ -19,49 +19,106 @@ const trimOrNull = (val) => (typeof val === "string" ? val.trim() || null : null
 
 /**
  * @param {object} formValues — JoinBandForm state
- * @returns {object}          — Backend-ready band listing payload
+ * @param {object} profile    — { name, city, photoUrl } from the user's SoundMeet profile
+ * @returns {object}          — Backend-ready listing payload
  */
-export function buildJoinBandPayload(formValues) {
+export function buildJoinBandPayload(formValues, profile = {}) {
   const {
-    bandName,
-    genres,
+    // § 1 — About You (listing overrides)
+    artistName,
+    photo        = null,
     city,
-    rolesNeeded,
-    instrumentsNeeded,
-    vibes,
+    headline,
+    bio,
+
+    // § 2 — What You Play
+    primaryRole,
+    secondaryRoles,
+    instruments,
     skillLevel,
-    description,
-    contactInfo,
-    isPrivate,
-    coverImage = null,
+    yearsPlaying,
+    experience,
+    gear,
+    vocals,
+
+    // § 3 — Style & Fit
+    genres,
+    vibes,
+    influences,
+    coversOriginals,
+
+    // § 4 — Looking For
+    opportunityTypes,
+    commitment,
+    availability,
+    travelRadius,
+    paidStatus,
+
+    // § 5 — Links & Media
+    featuredLink,
+    audioLink,
+    videoLink,
+    instagram,
+    youtube,
+    spotifyOrWebsite,
+
+    // § 6 — Listing Preferences
+    listingStatus,
+    openTo,
+    collaborationScope,
+    // preferredContact and draftStatus intentionally omitted — not surfaced in this flow
   } = formValues;
 
-  const payload = {
-    // ── Core ──────────────────────────────────────────────────────────────────
-    band_name:   bandName.trim(),
-    city:        city.trim(),
-    description: trimOrNull(description),
-    contact_info: trimOrNull(contactInfo),
+  return {
+    // ── Identity ───────────────────────────────────────────────────────────────
+    // profile_name is the authoritative account name — never overridden by the form
+    profile_name: profile.name ?? null,
+    // display_name falls back to profile name when no artist name override is set
+    display_name: trimOrNull(artistName) ?? profile.name ?? null,
+    artist_name:  trimOrNull(artistName),
+    city:         city.trim() || profile.city || null,
+    headline:     trimOrNull(headline),
+    bio:          trimOrNull(bio),
 
-    // ── Taxonomy ──────────────────────────────────────────────────────────────
-    genres:             flattenTagGroup(genres),
-    roles_needed:       flattenTagGroup(rolesNeeded),
-    instruments_needed: flattenTagGroup(instrumentsNeeded),
-    vibes:              flattenTagGroup(vibes),
-    skill_level:        skillLevel ?? null,
+    // ── Media ──────────────────────────────────────────────────────────────────
+    // listing photo override takes priority; falls back to profile photo.
+    // In prod: upload listing photo to storage, then set photo_url to the returned URL.
+    photo_url: photo?.previewUrl ?? profile.photoUrl ?? null,
 
-    // ── Privacy ───────────────────────────────────────────────────────────────
-    is_private: isPrivate,
+    // ── What You Play ──────────────────────────────────────────────────────────
+    primary_role:    primaryRole   ?? null,
+    secondary_roles: flattenTagGroup(secondaryRoles),
+    instruments:     flattenTagGroup(instruments),
+    skill_level:     skillLevel    ?? null,
+    years_playing:   yearsPlaying  ?? null,
+    experience:      experience    ?? [],
+    gear:            trimOrNull(gear),
+    vocals:          vocals        ?? null,
 
-    // ── Media ─────────────────────────────────────────────────────────────────
-    // In prod: upload the file to storage first, then set cover_image_url to the returned URL.
-    // Backend field: cover_image_url (nullable URLField / text column).
-    cover_image_url: coverImage?.previewUrl ?? null,
+    // ── Style & Fit ────────────────────────────────────────────────────────────
+    genres:           flattenTagGroup(genres),
+    vibes:            flattenTagGroup(vibes),
+    influences:       flattenTagGroup(influences),
+    covers_originals: coversOriginals ?? null,
+
+    // ── Looking For ────────────────────────────────────────────────────────────
+    opportunity_types: opportunityTypes ?? [],
+    commitment:        commitment       ?? null,
+    availability:      availability     ?? [],
+    travel_radius:     travelRadius     ?? null,
+    paid_status:       paidStatus       ?? null,
+
+    // ── Links & Media ──────────────────────────────────────────────────────────
+    featured_link:       trimOrNull(featuredLink),
+    audio_link:          trimOrNull(audioLink),
+    video_link:          trimOrNull(videoLink),
+    instagram:           trimOrNull(instagram),
+    youtube:             trimOrNull(youtube),
+    spotify_or_website:  trimOrNull(spotifyOrWebsite),
+
+    // ── Listing Preferences ────────────────────────────────────────────────────
+    listing_status:      listingStatus      ?? null,
+    open_to:             openTo             ?? [],
+    collaboration_scope: collaborationScope ?? null,
   };
-
-  // TODO: await api.joinBand(payload);
-  // Update field names in this file only when the endpoint is ready.
-  console.log("payload:", payload);
-
-  return payload;
 }
