@@ -6,6 +6,7 @@
  *   totalSteps    number
  *   canAdvance    boolean
  *   isSubmitting  boolean
+ *   submitLabel   string   — label for the final submit button (e.g. "Publish Listing")
  *   gradientFrom  string   — hex, from FORM_THEMES
  *   gradientTo    string   — hex, from FORM_THEMES
  *   onCancel      () => void
@@ -18,6 +19,7 @@ const JoinBandFooterActions = ({
   totalSteps,
   canAdvance,
   isSubmitting,
+  submitLabel  = "Publish Listing",
   gradientFrom = "#8B5CF6",
   gradientTo   = "#7C3AED",
   onCancel,
@@ -64,7 +66,7 @@ const JoinBandFooterActions = ({
           className="flex-1 py-3 rounded-full text-sm font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: gradient }}
         >
-          {isSubmitting ? "Posting…" : "Post Listing"}
+          {isSubmitting ? "Posting…" : submitLabel}
         </button>
       )}
     </div>

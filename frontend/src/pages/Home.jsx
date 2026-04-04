@@ -40,7 +40,7 @@ const CATEGORY_HEADINGS = {
 };
 
 const Home = () => {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
 
   // ── Category filter ────────────────────────────────────────────────────────
@@ -650,7 +650,11 @@ const Home = () => {
           initialValues={editInitialValues}
         />
         <PromoteShowModal open={promoteShowModalOpen} onOpenChange={setPromoteShowModalOpen} />
-        <JoinBandModal open={joinBandModalOpen} onOpenChange={setJoinBandModalOpen} />
+        <JoinBandModal
+          open={joinBandModalOpen}
+          onOpenChange={setJoinBandModalOpen}
+          profile={user ? { name: user.display_name, city: user.city, photoUrl: user.pfp } : {}}
+        />
         <FindBandmateModal open={findBandmateModalOpen} onOpenChange={setFindBandmateModalOpen} />
       </div>
 

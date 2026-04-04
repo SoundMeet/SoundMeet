@@ -1,21 +1,27 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
-import BandBasicInfoSection from "./sections/BandBasicInfoSection";
-import BandRequirementsSection from "./sections/BandRequirementsSection";
-import BandContactSection from "./sections/BandContactSection";
-import JoinBandFooterActions from "./JoinBandFooterActions";
-import StepIndicator from "../ui/StepIndicator";
-import { joinBandOptions } from "../../data/mockJoinBandOptions";
-import { buildJoinBandPayload } from "../../utils/buildJoinBandPayload";
-import { getFormTheme } from "../../utils/discovery";
+import MusicianAboutSection       from "./sections/MusicianAboutSection";
+import MusicianWhatYouPlaySection from "./sections/MusicianWhatYouPlaySection";
+import MusicianStyleFitSection    from "./sections/MusicianStyleFitSection";
+import MusicianLookingForSection  from "./sections/MusicianLookingForSection";
+import MusicianLinksMediaSection  from "./sections/MusicianLinksMediaSection";
+import ListingPreferencesSection  from "./sections/ListingPreferencesSection";
+import JoinBandFooterActions      from "./JoinBandFooterActions";
+import StepIndicator              from "../ui/StepIndicator";
+import { joinBandOptions }        from "../../data/mockJoinBandOptions";
+import { buildJoinBandPayload }   from "../../utils/buildJoinBandPayload";
+import { getFormTheme }           from "../../utils/discovery";
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { number: 1, label: "Band Info"         },
-  { number: 2, label: "Requirements"      },
-  { number: 3, label: "Contact & Privacy" },
+  { number: 1, label: "About You"     },
+  { number: 2, label: "What You Play" },
+  { number: 3, label: "Style & Fit"   },
+  { number: 4, label: "Looking For"   },
+  { number: 5, label: "Links & Media" },
+  { number: 6, label: "Preferences"   },
 ];
 
 const THEME = getFormTheme("join_band");
@@ -24,29 +30,62 @@ const THEME = getFormTheme("join_band");
 
 const tagGroup = () => ({ selectedIds: [], customValues: [] });
 
-const INITIAL_FORM = {
-  bandName:          "",
-  genres:            tagGroup(),
-  city:              "",
-  rolesNeeded:       tagGroup(),
-  instrumentsNeeded: tagGroup(),
-  vibes:             tagGroup(),
-  skillLevel:        null,
-  description:       "",
-  contactInfo:       "",
-  isPrivate:         false,
+/**
+ * Build initial form state, prefilling profile-sourced values.
+ *
+ * @param {object} profile — { name, city, photoUrl } from the user's SoundMeet profile
+ */
+const makeInitialForm = (profile) => ({
+  // § 1 — About You (listing overrides on top of profile)
+  artistName: "",                   // optional display name override; falls back to profile.name
+  photo:      null,                 // { file, previewUrl } | null — overrides profile photo
+  city:       profile?.city ?? "",  // prefilled; required for local matching
+  headline:   "",
+  bio:        "",
 
-  // Media: { file: File, previewUrl: string } | null
-  // Backend: upload to storage, store URL as cover_image_url on the record.
-  coverImage: null,
-};
+  // § 2 — What You Play
+  primaryRole:    null,
+  secondaryRoles: tagGroup(),
+  instruments:    tagGroup(),
+  skillLevel:     null,
+  yearsPlaying:   null,
+  experience:     [],
+  gear:           "",
+  vocals:         null,
 
-// ─── Tag group handler factory ────────────────────────────────────────────────
+  // § 3 — Style & Fit
+  genres:          tagGroup(),
+  vibes:           tagGroup(),
+  influences:      tagGroup(),
+  coversOriginals: null,
+
+  // § 4 — Looking For
+  opportunityTypes: [],
+  commitment:       null,
+  availability:     [],
+  travelRadius:     null,
+  paidStatus:       null,
+
+  // § 5 — Links & Media
+  featuredLink:     "",
+  audioLink:        "",
+  videoLink:        "",
+  instagram:        "",
+  youtube:          "",
+  spotifyOrWebsite: "",
+
+  // § 6 — Listing Preferences
+  listingStatus:      null,
+  openTo:             [],
+  collaborationScope: null,
+});
+
+// ─── Tag handler factory ──────────────────────────────────────────────────────
 
 const makeTagHandlers = (setForm, field) => ({
   onTogglePreset: (id) =>
     setForm((prev) => {
-      const g = prev[field];
+      const g   = prev[field];
       const ids = g.selectedIds.includes(id)
         ? g.selectedIds.filter((i) => i !== id)
         : [...g.selectedIds, id];
@@ -78,14 +117,22 @@ const stepVariants = {
 // ─── JoinBandForm ─────────────────────────────────────────────────────────────
 
 /**
- * JoinBandForm — owns all form state and step navigation.
+ * JoinBandForm — Join a Band listing builder.
+ *
+ * This form creates a discoverable musician listing built on top of the
+ * user's existing SoundMeet profile. It is not a standalone profile creator.
  *
  * Props:
- *   options  JoinBandOptionSets — injectable (default: mockJoinBandOptions)
+ *   profile  { name, city, photoUrl }  — current user's SoundMeet profile data
+ *   options  JoinBandOptionSets        — injectable (default: mockJoinBandOptions)
  *   onClose  () => void
  */
-const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
-  const [form,         setForm]         = useState(INITIAL_FORM);
+const JoinBandForm = ({
+  profile = {},
+  options = joinBandOptions,
+  onClose,
+}) => {
+  const [form,         setForm]         = useState(() => makeInitialForm(profile));
   const [step,         setStep]         = useState(1);
   const [direction,    setDirection]    = useState(1);
   const [errors,       setErrors]       = useState({});
@@ -98,8 +145,7 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
 
   const validateStep1 = () => {
     const newErrors = {};
-    if (!form.bandName.trim()) newErrors.bandName = "Band name is required";
-    if (!form.city.trim())     newErrors.city     = "City is required";
+    if (!form.city.trim()) newErrors.city = "City is required for local matching";
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
@@ -107,11 +153,7 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   const goNext = () => {
-    let valid = false;
-    if (step === 1) valid = validateStep1();
-    if (step === 2) valid = true;
-    if (step === 3) valid = true;
-    if (!valid) return;
+    if (step === 1 && !validateStep1()) return;
     setDirection(1);
     setStep((s) => Math.min(s + 1, STEPS.length));
   };
@@ -121,29 +163,25 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
     setStep((s) => Math.max(s - 1, 1));
   };
 
-  // Jump directly to a previously visited step (from StepIndicator click)
   const goToStep = (n) => {
     if (n >= step) return;
     setDirection(-1);
     setStep(n);
   };
 
-  const canAdvance = (() => {
-    if (step === 1) return !!form.bandName.trim() && !!form.city.trim();
-    return true;
-  })();
+  const canAdvance = step !== 1 || !!form.city.trim();
 
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    const payload = buildJoinBandPayload(form);
+    const payload = buildJoinBandPayload(form, profile);
     try {
-      // TODO: wire up real API call — e.g. await api.joinBand(payload)
+      // TODO: wire up real API call — e.g. await api.createJoinBandListing(payload)
       await new Promise((r) => setTimeout(r, 900));
       onClose();
     } catch (err) {
-      console.error("Join band failed:", err);
+      console.error("Listing post failed:", err);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,10 +190,11 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
   // ── Tag handlers ───────────────────────────────────────────────────────────
 
   const tagHandlers = {
-    genres:            makeTagHandlers(setForm, "genres"),
-    rolesNeeded:       makeTagHandlers(setForm, "rolesNeeded"),
-    instrumentsNeeded: makeTagHandlers(setForm, "instrumentsNeeded"),
-    vibes:             makeTagHandlers(setForm, "vibes"),
+    secondaryRoles: makeTagHandlers(setForm, "secondaryRoles"),
+    instruments:    makeTagHandlers(setForm, "instruments"),
+    genres:         makeTagHandlers(setForm, "genres"),
+    vibes:          makeTagHandlers(setForm, "vibes"),
+    influences:     makeTagHandlers(setForm, "influences"),
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -191,8 +230,8 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
               className="w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10"
               style={{
                 background: "rgba(255,255,255,0.06)",
-                color: "rgba(229,226,225,0.45)",
-                fontSize: "16px",
+                color:      "rgba(229,226,225,0.45)",
+                fontSize:   "16px",
               }}
             >
               ✕
@@ -207,6 +246,7 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
         style={{ scrollbarWidth: "none" }}
       >
         <AnimatePresence mode="wait" custom={direction}>
+
           {step === 1 && (
             <motion.div
               key="step-1"
@@ -217,12 +257,11 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
               exit="exit"
               transition={{ duration: 0.2, ease: "easeInOut" }}
             >
-              <BandBasicInfoSection
+              <MusicianAboutSection
                 form={form}
                 errors={errors}
-                options={options}
+                profile={profile}
                 onChange={setField}
-                tagHandlers={tagHandlers}
                 accent={THEME.accent}
               />
             </motion.div>
@@ -238,7 +277,7 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
               exit="exit"
               transition={{ duration: 0.2, ease: "easeInOut" }}
             >
-              <BandRequirementsSection
+              <MusicianWhatYouPlaySection
                 form={form}
                 options={options}
                 onChange={setField}
@@ -258,15 +297,71 @@ const JoinBandForm = ({ options = joinBandOptions, onClose }) => {
               exit="exit"
               transition={{ duration: 0.2, ease: "easeInOut" }}
             >
-              <BandContactSection
+              <MusicianStyleFitSection
                 form={form}
+                options={options}
                 onChange={setField}
+                tagHandlers={tagHandlers}
                 accent={THEME.accent}
-                gradientFrom={THEME.gradientFrom}
-                gradientTo={THEME.gradientTo}
               />
             </motion.div>
           )}
+
+          {step === 4 && (
+            <motion.div
+              key="step-4"
+              custom={direction}
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+            >
+              <MusicianLookingForSection
+                form={form}
+                options={options}
+                onChange={setField}
+                accent={THEME.accent}
+              />
+            </motion.div>
+          )}
+
+          {step === 5 && (
+            <motion.div
+              key="step-5"
+              custom={direction}
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+            >
+              <MusicianLinksMediaSection
+                form={form}
+                onChange={setField}
+              />
+            </motion.div>
+          )}
+
+          {step === 6 && (
+            <motion.div
+              key="step-6"
+              custom={direction}
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+            >
+              <ListingPreferencesSection
+                form={form}
+                options={options}
+                onChange={setField}
+                accent={THEME.accent}
+              />
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </div>
 

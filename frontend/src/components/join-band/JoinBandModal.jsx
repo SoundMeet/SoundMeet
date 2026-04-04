@@ -11,11 +11,13 @@ import { joinBandOptions } from "../../data/mockJoinBandOptions";
  * Props:
  *   open         boolean
  *   onOpenChange (open: boolean) => void
- *   options      JoinBandOptionSets — injectable; defaults to mock data.
+ *   profile      { name, city, photoUrl }  — current user's SoundMeet profile data
+ *   options      JoinBandOptionSets        — injectable; defaults to mock data.
  */
 const JoinBandModal = ({
   open,
   onOpenChange,
+  profile = {},
   options = joinBandOptions,
 }) => (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -58,6 +60,7 @@ const JoinBandModal = ({
         >
           <JoinBandForm
             key={open ? "open" : "closed"}
+            profile={profile}
             options={options}
             onClose={() => onOpenChange(false)}
           />
