@@ -19,43 +19,63 @@ const trimOrNull = (val) => (typeof val === "string" ? val.trim() || null : null
 
 /**
  * @param {object} formValues — FindBandmateForm state
- * @returns {object}          — Backend-ready bandmate profile payload
+ * @returns {object}          — Backend-ready listing payload
  */
 export function buildFindBandmatePayload(formValues) {
   const {
-    displayName,
-    city,
-    genres,
-    instrumentsYouPlay,
-    vibes,
-    skillLevel,
-    rolesSeeking,
-    availability,
-    description,
-    contactInfo,
+    // Step 1 — Band / Project Basics
+    bandProjectName,
+    postedByUserId,
+    postedByName,
+    cityArea,
     coverImage = null,
+    headline,
+    aboutProject,
+
+    // Step 2 — Sound & Identity
+    genres,
+    vibe,
+    influences,
+    coversOriginals,
+    currentLineup,
+    projectLevel,
+
+    // Step 3 — The Opening
+    rolesNeeded,
+    skillLevelDesired,
+    availability,
+    commitmentLevel,
+    whatLookingFor,
+    contactInfo,
   } = formValues;
 
   const payload = {
-    // ── Core ──────────────────────────────────────────────────────────────────
-    display_name: displayName.trim(),
-    city:         city.trim(),
-    description:  trimOrNull(description),
-    contact_info: trimOrNull(contactInfo),
+    // ── Band / Project core ───────────────────────────────────────────────────
+    band_project_name: bandProjectName.trim(),
+    posted_by_user_id: postedByUserId ?? null,
+    posted_by_name:    trimOrNull(postedByName),
+    city_area:         cityArea.trim(),
+    headline:          trimOrNull(headline),
+    about_project:     trimOrNull(aboutProject),
 
-    // ── Music profile ─────────────────────────────────────────────────────────
-    genres:              flattenTagGroup(genres),
-    instruments_you_play: flattenTagGroup(instrumentsYouPlay),
-    vibes:               flattenTagGroup(vibes),
-    skill_level:         skillLevel ?? null,
+    // ── Sound & Identity ──────────────────────────────────────────────────────
+    genres:           flattenTagGroup(genres),
+    vibe:             flattenTagGroup(vibe),
+    influences:       flattenTagGroup(influences),
+    covers_originals: coversOriginals ?? null,
+    current_lineup:   flattenTagGroup(currentLineup),
+    project_level:    projectLevel ?? null,
 
-    // ── Preferences ───────────────────────────────────────────────────────────
-    roles_seeking: flattenTagGroup(rolesSeeking),
-    availability:  flattenTagGroup(availability),
+    // ── The Opening ───────────────────────────────────────────────────────────
+    roles_needed:        flattenTagGroup(rolesNeeded),
+    skill_level_desired: skillLevelDesired ?? null,
+    availability:        flattenTagGroup(availability),
+    commitment_level:    commitmentLevel ?? null,
+    what_looking_for:    trimOrNull(whatLookingFor),
+    contact_info:        trimOrNull(contactInfo),
 
     // ── Media ─────────────────────────────────────────────────────────────────
     // In prod: upload the file to storage first, then set cover_image_url to the returned URL.
-    // Backend field: cover_image_url (nullable URLField / text column).
     cover_image_url: coverImage?.previewUrl ?? null,
   };
 
