@@ -12,7 +12,18 @@ import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
 import { jamService } from '../services/jamService'
 
-// Converts a Supabase chat_message row into the shape expected by MessageList / MessageBubble.
+
+const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
+const BUCKET_URL = `${SUPABASE_URL}/storage/v1/object/public/media/`;
+function formatAvatarUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  
+  return `${BUCKET_URL}${cleanPath}`;
+}
+
 function normalizeMessage(row) {
   return {
     id: String(row.id),
@@ -150,7 +161,7 @@ const Chat = () => {
               usersMap[uid] = {
                 id: uid,
                 name: profile.display_name || `User #${uid}`,
-                avatar: profile.pfp || null,
+                avatar: formatAvatarUrl(profile.pfp),
                 status: 'offline'
               }
             })
@@ -207,8 +218,8 @@ const Chat = () => {
         }
         const newUser = {
           id: String(target.id),
-          name: target.displayName || target.username || `User #${target.id}`,
-          avatar: target.avatarUrl ?? null,
+          name: target.display_name || target.username || `User #${target.id}`,
+          avatar: formatAvatarUrl(target.pfp),
           status: 'offline',
         }
         setDmThreads((prev) => {

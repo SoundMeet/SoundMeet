@@ -4,7 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
-from .models import Profile
+from .models import Profile, Post
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -89,3 +89,26 @@ def get_profile(request):
         'vibes_liked': list(profile.vibes_liked.values('id', 'name')),
         'friends_count': profile.friends_count,
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_post(request):
+    content = request.data.get('content', '')
+    image = request.FILES.get('image', None)
+
+    if not content and not image:
+        return Response({'error': 'Post must contain text or an image.'}, status=400)
+
+    post = Post.objects.create(
+        author=request.user,
+        content=content,
+        image=image
+    )
+
+    return Response({
+        'id': post.id,
+        'content': post.content,
+        'image': post.image.url if post.image else None,
+        'author_id': post.author.id,
+        'created_at': post.created_at
+    }, status=201)
