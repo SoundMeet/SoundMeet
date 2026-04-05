@@ -39,6 +39,7 @@ const SwipeCard = ({ profile, onSwipe, isTop, index }) => {
         boxShadow: isTop ? cardGlow : "none",
         zIndex: index 
       }}
+      exit={{ x: dragX.get() > 0 ? 500 : -500, opacity: 0, scale: 0.5, transition: { duration: 0.3 } }}
       drag={isTop ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
@@ -210,15 +211,18 @@ export default function SoundMeetDiscovery() {
         
         <div className="relative w-full max-w-[400px] h-[70vh] flex items-center justify-center">
           <AnimatePresence>
-            {[...filteredProfiles].reverse().map((p, i) => (
-              <SwipeCard 
-                key={p.id} 
-                profile={p} 
-                index={filteredProfiles.length - 1 - i} 
-                isTop={i === 0} 
-                onSwipe={handleSwipe} 
-              />
-            ))}
+            {[...filteredProfiles].reverse().map((p, i) => {
+              const actualIndex = filteredProfiles.length - 1 - i;
+              return (
+                <SwipeCard 
+                  key={p.id} 
+                  profile={p} 
+                  index={i} 
+                  isTop={actualIndex === 0} 
+                  onSwipe={handleSwipe} 
+                />
+              );
+            })}
           </AnimatePresence>
           {filteredProfiles.length === 0 && (
             <div className="text-center opacity-30">
