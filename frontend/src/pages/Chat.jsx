@@ -12,9 +12,9 @@ import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
 import { jamService } from '../services/jamService'
 
+
 const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
 const BUCKET_URL = `${SUPABASE_URL}/storage/v1/object/public/media/`;
-
 function formatAvatarUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
