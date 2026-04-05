@@ -43,7 +43,7 @@ const SwipeCard = ({ profile, onSwipe, isTop, index }) => {
       drag={isTop ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
-      className="absolute w-[85vw] max-w-[380px] h-[70vh] max-h-[580px] bg-[#2A2A2A] rounded-[2rem] overflow-hidden cursor-grab active:cursor-grabbing select-none transition-all duration-500 ease-out border border-white/5"
+      className="absolute w-[85vw] max-w-[380px] h-[60vh] max-h-[500px] bg-[#2A2A2A] rounded-[2rem] overflow-hidden cursor-grab active:cursor-grabbing select-none transition-all duration-500 ease-out border border-white/5"
     >
       <div className="relative h-full w-full">
         <img src={profile.image} alt={profile.name} className="h-full w-full object-cover pointer-events-none" />
@@ -61,20 +61,20 @@ const SwipeCard = ({ profile, onSwipe, isTop, index }) => {
           </div>
         )}
 
-        <div className={`absolute bottom-0 p-10 w-full font-sora transition-opacity duration-300 ${isTop ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`absolute bottom-0 p-8 w-full font-sora transition-opacity duration-300 ${isTop ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-[28px] font-bold text-white tracking-tight">{profile.name}, {profile.age}</h2>
+            <h2 className="text-[24px] font-bold text-white tracking-tight">{profile.name}, {profile.age}</h2>
             <span className="flex items-center gap-1 text-[10px] font-black uppercase text-white/30 bg-white/5 px-2 py-1 rounded">
                 <MapPin size={10} /> {profile.distance}km
             </span>
           </div>
           
-          <div className="flex items-center gap-2 mb-4 text-[#DC2E73] text-[14px] font-medium italic">
+          <div className="flex items-center gap-2 mb-3 text-[#DC2E73] text-[13px] font-medium italic">
             <Music size={14} />
             <span className="truncate">"{profile.currentTrack}"</span>
           </div>
 
-          <div className="flex flex-col gap-1.5 mb-6 text-white/60 text-[12px] uppercase tracking-wider font-semibold">
+          <div className="flex flex-col gap-1.5 mb-4 text-white/60 text-[11px] uppercase tracking-wider font-semibold">
             <div className="flex items-center gap-2">
               <Mic2 size={12} className="text-[#DC2E73]" />
               <span>{profile.roles.join(" • ")}</span>
@@ -87,7 +87,7 @@ const SwipeCard = ({ profile, onSwipe, isTop, index }) => {
 
           <div className="flex gap-2 flex-wrap">
             {profile.genres.map(g => (
-              <span key={g} className="bg-[#DC2E73]/20 text-[#DC2E73] text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest border border-[#DC2E73]/30 backdrop-blur-md">
+              <span key={g} className="bg-[#DC2E73]/20 text-[#DC2E73] text-[9px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest border border-[#DC2E73]/30 backdrop-blur-md">
                 {g}
               </span>
             ))}
@@ -163,7 +163,7 @@ export default function SoundMeetDiscovery() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden">
-      <header className="h-24 flex items-center justify-center px-8 shrink-0 z-50">
+      <header className="h-20 flex items-center justify-center px-8 shrink-0 z-50">
         <div className="flex items-center gap-4 w-full max-w-[450px]">
           <div className="relative flex-1 group">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#DC2E73] transition-colors" />
@@ -209,7 +209,7 @@ export default function SoundMeetDiscovery() {
       <main className="flex-1 relative flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[#DC2E73]/5 blur-[120px] rounded-full pointer-events-none" />
         
-        <div className="relative w-full max-w-[400px] h-[70vh] flex items-center justify-center">
+        <div className="relative w-full max-w-[400px] h-[60vh] flex items-center justify-center">
           <AnimatePresence>
             {[...filteredProfiles].reverse().map((p, i) => {
               const actualIndex = filteredProfiles.length - 1 - i;
@@ -233,18 +233,18 @@ export default function SoundMeetDiscovery() {
         </div>
       </main>
 
-      <footer className="h-32 flex items-center justify-center gap-10 shrink-0 mb-4">
+      <footer className="h-28 flex items-center justify-center gap-10 shrink-0 mb-4">
         <button 
-          className="w-18 h-18 rounded-full bg-[#1C1B1B] flex items-center justify-center text-[#FB4040] border border-white/5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] active:scale-90 transition-all" 
+          className="w-16 h-16 rounded-full bg-[#1C1B1B] flex items-center justify-center text-[#FB4040] border border-white/5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] active:scale-90 transition-all" 
           onClick={() => filteredProfiles.length > 0 && handleSwipe(null, filteredProfiles[0].id)}
         >
-          <X size={32} />
+          <X size={28} />
         </button>
         <button 
-          className="w-18 h-18 rounded-full bg-[#1C1B1B] flex items-center justify-center text-[#DC2E73] border border-white/5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] active:scale-90 transition-all" 
+          className="w-16 h-16 rounded-full bg-[#1C1B1B] flex items-center justify-center text-[#DC2E73] border border-white/5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] active:scale-90 transition-all" 
           onClick={() => filteredProfiles.length > 0 && handleSwipe(null, filteredProfiles[0].id)}
         >
-          <Check size={32} />
+          <Check size={28} />
         </button>
       </footer>
     </div>
