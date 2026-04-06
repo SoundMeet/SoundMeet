@@ -57,6 +57,19 @@ def get_profile(request):
         defaults={'display_name': request.user.username[:15]}
     )
     
+    # Auto-mark existing users as onboarded so they aren't sent back to
+    # onboarding on every login. Any user who already has a display name
+    # or preferences set is considered to have completed onboarding.
+    if not profile.onboarding_complete:
+        has_prefs = (
+            profile.genres_liked.exists() or
+            profile.instruments_liked.exists() or
+            profile.display_name
+        )
+        if has_prefs:
+            profile.onboarding_complete = True
+            profile.save()
+
     if request.method == 'PATCH':
         data = request.data
         if 'display_name' in data: profile.display_name = data['display_name']
