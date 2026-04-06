@@ -69,6 +69,14 @@ class Profile(models.Model):
     gender = models.CharField(max_length=100, choices=genders.choices, blank=True)
     spectator = models.BooleanField(default=False)
 
+    # Music links
+    spotify = models.URLField(blank=True, null=True)
+    soundcloud = models.URLField(blank=True, null=True)
+    bandcamp = models.URLField(blank=True, null=True)
+    youtube = models.URLField(blank=True, null=True)
+    instagram = models.URLField(blank=True, null=True)
+    tiktok = models.URLField(blank=True, null=True)
+
     # Relationships
     instruments_liked = models.ManyToManyField(Instrument, related_name="profiles", blank=True)
     genres_liked = models.ManyToManyField(Genre, related_name="profiles", blank=True)

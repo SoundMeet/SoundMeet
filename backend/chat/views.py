@@ -17,6 +17,10 @@ def register_user(request):
     username = request.data.get('username')
     password = request.data.get('password')
     email = request.data.get('email')
+    age = request.data.get('age')
+    country = request.data.get('country', '')
+    city = request.data.get('city', '')
+    gender = request.data.get('gender', '')
 
     if not username or not password:
         return Response({'error': 'Username and password are required'}, status=400)
@@ -25,7 +29,18 @@ def register_user(request):
         return Response({'error': 'Username already taken'}, status=400)
 
     user = User.objects.create_user(username=username, email=email, password=password)
-    Profile.objects.create(user=user, display_name=username[:15])
+
+    profile = Profile.objects.create(
+        user=user,
+        display_name=username[:15],
+        country=country,
+        city=city,
+        gender=gender,
+    )
+    if age:
+        profile.age = int(age)
+        profile.save()
+
     token = Token.objects.create(user=user)
 
     return Response({
@@ -53,6 +68,20 @@ def get_profile(request):
             profile.spectator = str(data['spectator']).lower() == 'true'
         if 'age' in data:
             profile.age = int(data['age']) if data['age'] else None
+        # Music links
+        if 'spotify' in data:
+            profile.spotify = data['spotify'] or None
+        if 'soundcloud' in data:
+            profile.soundcloud = data['soundcloud'] or None
+        if 'bandcamp' in data:
+            profile.bandcamp = data['bandcamp'] or None
+        if 'youtube' in data:
+            profile.youtube = data['youtube'] or None
+        if 'instagram' in data:
+            profile.instagram = data['instagram'] or None
+        if 'tiktok' in data:
+            profile.tiktok = data['tiktok'] or None
+
         if 'pfp' in request.FILES:
             profile.pfp = request.FILES['pfp']
             
@@ -80,8 +109,15 @@ def get_profile(request):
         'pfp': profile.pfp.url if profile.pfp else None,
         'country': profile.country,
         'city': profile.city,
+        'state': profile.state,
         'age': profile.age,
         'gender': profile.gender,
+        'spotify': profile.spotify,
+        'soundcloud': profile.soundcloud,
+        'bandcamp': profile.bandcamp,
+        'youtube': profile.youtube,
+        'instagram': profile.instagram,
+        'tiktok': profile.tiktok,
         'instruments_liked': list(profile.instruments_liked.values('id', 'name', 'family')),
         'genres_liked': list(profile.genres_liked.values('id', 'name')),
         'vibes_liked': list(profile.vibes_liked.values('id', 'name')),
