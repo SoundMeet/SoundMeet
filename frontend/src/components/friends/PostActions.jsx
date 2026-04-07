@@ -1,16 +1,23 @@
 import { useState } from 'react'
 import { MdFavoriteBorder, MdFavorite, MdChatBubbleOutline } from 'react-icons/md'
+import { postService } from '../../injectables/postService'
 
-export function PostActions({ likes, comments, hasLiked, commentsOpen, onToggleComments }) {
+export function PostActions({ postId, userId, likes, comments, hasLiked, commentsOpen, onToggleComments }) {
   const [liked, setLiked] = useState(hasLiked)
   const [likeCount, setLikeCount] = useState(likes)
 
-  const toggleLike = () => {
-    setLiked((v) => {
-      const next = !v
-      setLikeCount((c) => (next ? c + 1 : c - 1))
-      return next
-    })
+  const toggleLike = async () => {
+    // Optimistic update
+    setLiked((v) => !v)
+    setLikeCount((c) => (liked ? c - 1 : c + 1))
+    try {
+      await postService.toggleLike(postId, userId, liked)
+    } catch (err) {
+      // Revert on failure
+      setLiked(liked)
+      setLikeCount(likeCount)
+      console.error('toggleLike failed:', err)
+    }
   }
 
   return (

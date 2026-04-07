@@ -3,7 +3,10 @@ import { AnimatePresence } from "framer-motion";
 import MapLocationSearchInput from "../fields/MapLocationSearchInput";
 import MapLocationPreview from "../fields/MapLocationPreview";
 import InfoTooltip from "../../ui/InfoTooltip";
-import { privacyOptions } from "../../../data/jamFormOptions";
+const privacyOptions = [
+  { id: "public",  label: "Public",  description: "Visible on the map. Anyone can join." },
+  { id: "private", label: "Private", description: "Hidden. Invite-only session." },
+];
 
 const SectionLabel = ({ children }) => (
   <p

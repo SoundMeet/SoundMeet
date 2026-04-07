@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom"
+import { Routes, Route, Navigate } from "react-router-dom"
+import { useEffect } from "react"
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
 import Meet from './pages/Meet.jsx'
@@ -10,10 +11,23 @@ import Feed from './pages/Feed.jsx'
 import Navbar from './components/Navbar.jsx'
 import GuestLocationGuard from './components/GuestLocationGuard.jsx'
 import AuthModal from './components/AuthModal.jsx'
-import { AuthModalProvider } from './context/AuthModalContext.jsx'
+import { AuthModalProvider, useAuthModal } from './context/AuthModalContext.jsx'
 import { NotificationsProvider } from './context/NotificationsContext.jsx'
 import { FriendsProvider } from './context/FriendsContext.jsx'
 import { useAuth } from './injectables/Auth.jsx'
+
+/** Redirects unauthenticated users to / and opens the login modal. */
+const PrivateRoute = ({ children }) => {
+  const { user } = useAuth()
+  const { openModal } = useAuthModal()
+
+  useEffect(() => {
+    if (!user) openModal('login')
+  }, [user])
+
+  if (!user) return <Navigate to="/" replace />
+  return children
+}
 
 const App = () => {
   const { isLoading } = useAuth()
@@ -40,7 +54,7 @@ const App = () => {
               <Route path="/meet" element={<Meet />} />
               <Route path="/jams" element={<MyJams />} />
               <Route path="/chat" element={<Chat />} />
-              <Route path="/feed" element={<Feed />} />
+              <Route path="/feed" element={<PrivateRoute><Feed /></PrivateRoute>} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

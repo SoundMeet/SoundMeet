@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion } from "framer-motion";
 import FindBandmateForm from "./FindBandmateForm";
-import { findBandmateOptions } from "../../data/mockFindBandmateOptions";
+import { useFormOptions } from "../../hooks/useFormOptions";
 
 /**
  * FindBandmateModal — Radix Dialog shell wrapping FindBandmateForm.
@@ -16,8 +16,9 @@ import { findBandmateOptions } from "../../data/mockFindBandmateOptions";
 const FindBandmateModal = ({
   open,
   onOpenChange,
-  options = findBandmateOptions,
-}) => (
+}) => {
+  const { options, isLoading } = useFormOptions()
+  return (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
       {/* Overlay */}
@@ -56,15 +57,18 @@ const FindBandmateModal = ({
               "0 0 60px rgba(229,226,225,0.03), 0 0 50px rgba(59,130,246,0.1), 0 -1px 0 rgba(59,130,246,0.07)",
           }}
         >
-          <FindBandmateForm
-            key={open ? "open" : "closed"}
-            options={options}
-            onClose={() => onOpenChange(false)}
-          />
+          {!isLoading && options && (
+            <FindBandmateForm
+              key={open ? "open" : "closed"}
+              options={options}
+              onClose={() => onOpenChange(false)}
+            />
+          )}
         </motion.div>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
-);
+  )
+}
 
 export default FindBandmateModal;

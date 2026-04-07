@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion } from "framer-motion";
 import CreateJamForm from "./CreateJamForm";
-import { createJamOptions } from "../../data/mockCreateJamOptions";
+import { useFormOptions } from "../../hooks/useFormOptions";
 
 /**
  * CreateJamModal — Radix Dialog shell wrapping CreateJamForm.
@@ -25,9 +25,10 @@ import { createJamOptions } from "../../data/mockCreateJamOptions";
 const CreateJamModal = ({
   open,
   onOpenChange,
-  options = createJamOptions,
   initialValues,
-}) => (
+}) => {
+  const { options, isLoading } = useFormOptions()
+  return (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
       {/* ── Overlay ────────────────────────────────────────────────────────── */}
@@ -94,16 +95,19 @@ const CreateJamModal = ({
            * Using `open` as the key unmounts + remounts the form on each open,
            * giving a clean slate without managing reset logic in the form.
            */}
-          <CreateJamForm
-            key={open ? "open" : "closed"}
-            options={options}
-            onClose={() => onOpenChange(false)}
-            initialValues={initialValues}
-          />
+          {!isLoading && options && (
+            <CreateJamForm
+              key={open ? "open" : "closed"}
+              options={options}
+              onClose={() => onOpenChange(false)}
+              initialValues={initialValues}
+            />
+          )}
         </motion.div>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
-);
+  )
+}
 
 export default CreateJamModal;

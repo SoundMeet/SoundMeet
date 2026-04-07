@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion } from "framer-motion";
 import PromoteShowForm from "./PromoteShowForm";
-import { promoteShowOptions } from "../../data/mockPromoteShowOptions";
+import { useFormOptions } from "../../hooks/useFormOptions";
 
 /**
  * PromoteShowModal — Radix Dialog shell wrapping PromoteShowForm.
@@ -16,8 +16,9 @@ import { promoteShowOptions } from "../../data/mockPromoteShowOptions";
 const PromoteShowModal = ({
   open,
   onOpenChange,
-  options = promoteShowOptions,
-}) => (
+}) => {
+  const { options, isLoading } = useFormOptions()
+  return (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
       {/* Overlay */}
@@ -61,15 +62,18 @@ const PromoteShowModal = ({
               "0 0 60px rgba(229,226,225,0.03), 0 0 50px rgba(220,46,115,0.1), 0 -1px 0 rgba(220,46,115,0.07)",
           }}
         >
-          <PromoteShowForm
-            key={open ? "open" : "closed"}
-            options={options}
-            onClose={() => onOpenChange(false)}
-          />
+          {!isLoading && options && (
+            <PromoteShowForm
+              key={open ? "open" : "closed"}
+              options={options}
+              onClose={() => onOpenChange(false)}
+            />
+          )}
         </motion.div>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
-);
+  )
+}
 
 export default PromoteShowModal;

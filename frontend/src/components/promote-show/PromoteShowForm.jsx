@@ -6,7 +6,6 @@ import ShowVenueSection from "./sections/ShowVenueSection";
 import ShowDetailsSection from "./sections/ShowDetailsSection";
 import PromoteShowFooterActions from "./PromoteShowFooterActions";
 import StepIndicator from "../ui/StepIndicator";
-import { promoteShowOptions } from "../../data/mockPromoteShowOptions";
 import { buildPromoteShowPayload } from "../../utils/buildPromoteShowPayload";
 import { getFormTheme } from "../../utils/discovery";
 
@@ -89,10 +88,10 @@ const stepVariants = {
  * PromoteShowForm — owns all form state and step navigation.
  *
  * Props:
- *   options  PromoteShowOptionSets — injectable (default: mockPromoteShowOptions)
+ *   options  PromoteShowOptionSets — provided by PromoteShowModal via useFormOptions()
  *   onClose  () => void
  */
-const PromoteShowForm = ({ options = promoteShowOptions, onClose }) => {
+const PromoteShowForm = ({ options, onClose }) => {
   const [form,         setForm]         = useState(INITIAL_FORM);
   const [step,         setStep]         = useState(1);
   const [direction,    setDirection]    = useState(1);

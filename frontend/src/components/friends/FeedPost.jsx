@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { MOCK_AUTHENTICATED_USER } from '../../data/mockUser'
+import { useAuth } from '../../injectables/Auth'
 import { PostHeader } from './PostHeader'
 import { PostTextBody } from './PostTextBody'
 import { PostAudioBody } from './PostAudioBody'
@@ -10,9 +10,10 @@ import { PostActions } from './PostActions'
 import { CommentSection } from './CommentSection'
 
 export function FeedPost({ post }) {
+  const { user } = useAuth()
   const { author, type, postType, media, jamRef, showRef, reviewRef, location, likes, comments, hasLiked, createdAt } = post
 
-  const isOwn = author.id === MOCK_AUTHENTICATED_USER.id
+  const isOwn = !!user && author.id === user.id
 
   // Local state so edits/deletes are self-contained
   const [content, setContent]         = useState(post.content)
@@ -108,6 +109,8 @@ export function FeedPost({ post }) {
       )}
 
       <PostActions
+        postId={post.id}
+        userId={user?.id}
         likes={likes}
         comments={commentCount}
         hasLiked={hasLiked}
@@ -117,7 +120,7 @@ export function FeedPost({ post }) {
 
       <AnimatePresence>
         {commentsOpen && (
-          <CommentSection postId={post.id} initialCount={commentCount} />
+          <CommentSection postId={post.id} existingComments={post._rawComments ?? []} />
         )}
       </AnimatePresence>
     </div>
