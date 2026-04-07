@@ -95,12 +95,8 @@ export const postService = {
   async addComment(postId, userId, content) {
     const { data, error } = await supabase
       .from('chat_comment')
-      .insert([{
-        post_id: postId,
-        author_id: userId,
-        content: content
-      }])
-      .select()
+      .insert([{ post_id: postId, author_id: userId, content }])
+      .select('id, content, created_at, author:author_id ( id, username )')
       .single();
 
     if (error) throw error;
