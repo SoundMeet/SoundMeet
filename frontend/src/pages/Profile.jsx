@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { useJams } from "../Context/JamContext";
-import JamCard from "../components/ProfileJamCardShareholder";
-import { isUpcoming, TRACKING_COLOR, ATTENDED_COLOR } from "../utils/jamUtils";
-import PillInput from "../components/PillInput";
+import { createPortal } from "react-dom";
+import { Link, useParams } from "react-router-dom";
+import { jamService } from "../services/jamService";
+import { apiService } from "../injectables/apiCalls";
 import CropperThings from "../components/CropperThings";
+import { useAuth } from "../injectables/Auth";
+import { useAuthModal } from "../context/AuthModalContext";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_SNIPPETS = 5;
@@ -103,10 +104,427 @@ function CardColorRow({ label, value, onChange }) {
   );
 }
 
+// ── PillToggleButton ──────────────────────────────────────────────────────────
+// Reusable toggleable pill used inside the picker modal.
+function PillToggleButton({ tag, selected, atMax, color, onToggle }) {
+  return (
+    <button
+      disabled={atMax}
+      onClick={onToggle}
+      className="rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150"
+      style={{
+        backgroundColor: selected ? color + "25" : "rgba(255,255,255,0.04)",
+        border: selected ? `1px solid ${color}88` : "1px solid rgba(255,255,255,0.08)",
+        color: selected ? color : "rgba(255,255,255,0.35)",
+        boxShadow: selected ? `0 0 12px ${color}33` : "none",
+        opacity: atMax ? 0.3 : 1,
+        cursor: atMax ? "not-allowed" : "pointer",
+      }}
+    >
+      {tag.name}
+    </button>
+  );
+}
+
+// ── PILL EMOJI MAP ─────────────────────────────────────────────────────────────
+// Maps tag text (lowercased) to an emoji. Falls back to a music note.
+const PILL_EMOJI_MAP = {
+  // Genres
+  jazz: "🎷", rock: "🎸", pop: "🎤", classical: "🎻", hiphop: "🎧",
+  "hip hop": "🎧", electronic: "🎛️", blues: "🎵", country: "🤠",
+  folk: "🪕", metal: "🤘", punk: "⚡", reggae: "🌴", soul: "❤️‍🔥",
+  rnb: "✨", "r&b": "✨", latin: "💃", funk: "🕺", gospel: "🙏",
+  ambient: "🌌", indie: "🌿", alternative: "🔀", techno: "🤖",
+  house: "🏠", drum: "🥁", bass: "🔊",
+  // Instruments
+  guitar: "🎸", piano: "🎹", violin: "🎻", drums: "🥁", saxophone: "🎷",
+  trumpet: "🎺", cello: "🎻", bass: "🎸", vocals: "🎤", singing: "🎤",
+  flute: "🪈", ukulele: "🪕", keyboard: "🎹", synth: "🎛️", harp: "🪗",
+  "bass guitar": "🎸", "electric guitar": "🎸", "acoustic guitar": "🪕",
+  // Vibes
+  chill: "😌", energetic: "⚡", mellow: "🌙", upbeat: "☀️", dark: "🖤",
+  romantic: "💕", melancholy: "🌧️", groovy: "🕺", intense: "🔥",
+  peaceful: "🕊️", nostalgic: "📼", experimental: "🧪", cinematic: "🎬",
+};
+
+function getPillEmoji(text) {
+  const lower = (text || "").toLowerCase();
+  for (const [key, emoji] of Object.entries(PILL_EMOJI_MAP)) {
+    if (lower.includes(key)) return emoji;
+  }
+  return "🎵";
+}
+
+// ── InterestsSidebar ──────────────────────────────────────────────────────────
+function InterestsSidebar({ pills, jams, user, city, country, availableToJam, onToggleAvailable, onReorderPills, isOwnProfile, cardColor, textOverride }) {
+  const totalJams    = jams.length;
+  const liveJams     = jams.filter(j => j.isLive).length;
+  const upcomingJams = jams.filter(j => !j.isLive).length;
+
+  const CATEGORIES = [
+    { key: "g", label: "Genres" },
+    { key: "i", label: "Instruments" },
+    { key: "v", label: "Vibes" },
+  ];
+
+  const grouped = CATEGORIES.map(cat => ({
+    ...cat,
+    pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_")),
+  })).filter(cat => cat.pills.length > 0);
+
+  const ungrouped = pills.filter(p => !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
+
+  const dark          = needsDarkText(cardColor.bg, textOverride);
+  const textPrimary   = dark ? "#111"             : "#fff";
+  const textSecondary = dark ? "#444"             : "#d4d4d4";
+  const textDim       = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
+  const dividerColor  = dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.18)";
+  const tileBg        = dark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.03)";
+  const tileBorder    = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
+
+  const locationStr = [city, country].filter(Boolean).join(", ");
+  const joinedRaw   = user?.date_joined ?? user?.created_at ?? user?.joined_at ?? null;
+  const memberSince = joinedRaw
+    ? new Date(joinedRaw).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    : null;
+
+  // ── Per-category drag state ──────────────────────────────────────────────
+  const [dragState, setDragState] = useState(null);
+  const dragStartY    = useRef(0);
+  const movedRef      = useRef(false);
+  const containerRefs = useRef({});
+
+  const handlePillDown = (e, catKey, localIdx) => {
+    if (!isOwnProfile || !onReorderPills) return;
+    e.preventDefault();
+    dragStartY.current = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+    movedRef.current   = false;
+    setDragState({ catKey, fromIdx: localIdx, overIdx: localIdx });
+  };
+
+  useEffect(() => {
+    if (!dragState) return;
+    const onMove = (e) => {
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      if (Math.abs(clientY - dragStartY.current) > 5) movedRef.current = true;
+      const container = containerRefs.current[dragState.catKey];
+      if (!container) return;
+      const items = container.querySelectorAll("[data-pill-item]");
+      let closest = dragState.overIdx;
+      let closestDist = Infinity;
+      items.forEach((el, i) => {
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(clientY - (rect.top + rect.height / 2));
+        if (dist < closestDist) { closestDist = dist; closest = i; }
+      });
+      setDragState(prev => prev ? { ...prev, overIdx: closest } : null);
+    };
+    const onUp = () => {
+      if (movedRef.current && dragState && dragState.fromIdx !== dragState.overIdx) {
+        const catPills   = pills.filter(p => typeof p.id === "string" && p.id.startsWith(dragState.catKey + "_"));
+        const reordered  = [...catPills];
+        const [moved]    = reordered.splice(dragState.fromIdx, 1);
+        reordered.splice(dragState.overIdx, 0, moved);
+        let reorderedCopy = [...reordered];
+        const newPills = pills.map(p => {
+          if (typeof p.id === "string" && p.id.startsWith(dragState.catKey + "_")) {
+            return reorderedCopy.shift();
+          }
+          return p;
+        });
+        onReorderPills(newPills);
+      }
+      setDragState(null);
+      movedRef.current = false;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup",   onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend",  onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup",   onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend",  onUp);
+    };
+  }, [dragState, pills, onReorderPills]);
+
+  const SectionDivider = () => (
+    <div style={{ height: "1px", background: dividerColor, margin: "0 20px" }} />
+  );
+  const SectionHeading = ({ children }) => (
+    <h2 className="text-2xl" style={{ color: textPrimary, transition: "color 0.4s ease" }}>{children}</h2>
+  );
+  const Tile = ({ left, right, accent }) => (
+    <div className="flex items-center justify-between rounded-xl px-3 py-2"
+      style={{ background: accent ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${accent ? "rgba(220,46,115,0.15)" : tileBorder}` }}>
+      <span className="text-sm" style={{ color: textSecondary }}>{left}</span>
+      <span className="text-sm font-bold" style={{ color: accent ? "#DC2E73" : textPrimary }}>{right}</span>
+    </div>
+  );
+
+  return (
+    <div className="w-[210px] shrink-0 flex flex-col">
+      <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col flex-1"
+        style={{
+          background: cardColor.bg, border: `1px solid ${cardColor.border}`,
+          boxShadow: `0 0 40px ${cardColor.glow}`, minHeight: "1295px",
+          transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+        }}
+      >
+
+        {/* ── INTERESTS ── */}
+        <div className="p-5 flex flex-col gap-3">
+          <SectionHeading>Interests</SectionHeading>
+
+          {/* Sound chips */}
+          {pills.length > 0 && (() => {
+            const chips = [
+              { key: "g", color: "#DC2E73" },
+              { key: "i", color: "#0891B2" },
+              { key: "v", color: "#7C3AED" },
+            ].map(cat => {
+              const match = pills.find(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_"));
+              return match ? { ...cat, text: match.text, emoji: getPillEmoji(match.text) } : null;
+            }).filter(Boolean);
+            if (chips.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1.5">
+                {chips.map(chip => (
+                  <span key={chip.key} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
+                    style={{ background: chip.color + "18", border: `1px solid ${chip.color}35`, color: chip.color }}>
+                    <span style={{ fontSize: "11px" }}>{chip.emoji}</span>
+                    <span className="truncate" style={{ maxWidth: "72px" }}>{chip.text}</span>
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
+
+          {pills.length === 0 ? (
+            <p className="text-sm" style={{ color: textSecondary }}>No interests added yet.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {grouped.map((cat, catIdx) => {
+                const isVibes = cat.key === "v";
+                return (
+                  <div key={cat.key} className="flex flex-col gap-1.5">
+                    <span className="text-sm font-semibold" style={{ color: textSecondary, transition: "color 0.4s ease" }}>
+                      {cat.label}
+                    </span>
+                    <div ref={el => { containerRefs.current[cat.key] = el; }} className="flex flex-col gap-1.5">
+                      {cat.pills.map((pill, localIdx) => {
+                        const isDragging = dragState?.catKey === cat.key && dragState.fromIdx === localIdx;
+                        const isOver     = dragState?.catKey === cat.key && dragState.overIdx === localIdx && dragState.fromIdx !== localIdx;
+                        const isTopVibe  = isVibes && localIdx < 3;
+                        return (
+                          <div key={pill.id ?? localIdx} data-pill-item
+                            style={{
+                              transition: dragState?.catKey === cat.key && !isDragging ? "transform 0.15s ease" : "none",
+                              transform: isOver ? (dragState.fromIdx < localIdx ? "translateY(4px)" : "translateY(-4px)") : "none",
+                              opacity: isDragging ? 0.35 : 1,
+                            }}
+                          >
+                            <div
+                              onMouseDown={e => handlePillDown(e, cat.key, localIdx)}
+                              onTouchStart={e => handlePillDown(e.touches[0], cat.key, localIdx)}
+                            className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${isOwnProfile ? "cursor-grab active:cursor-grabbing" : ""}`}
+                              style={{
+                                background: pill.color + "12", border: `1px solid ${pill.color}28`,
+                                boxShadow: isDragging ? `0 0 14px ${pill.color}44` : "none",
+                                transition: "box-shadow 0.15s ease",
+                              }}
+                            >
+                              <span className="shrink-0 flex items-center justify-center rounded-lg"
+                                style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
+                                {getPillEmoji(pill.text)}
+                              </span>
+                              <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>
+                                {pill.text}
+                              </span>
+                              {isTopVibe && (
+                                <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                                  style={{ background: pill.color + "22", border: `1px solid ${pill.color}40`, color: pill.color, letterSpacing: "0.02em" }}>
+                                  ★
+                                </span>
+                              )}
+                              {isOwnProfile && (
+                                <svg width="7" height="11" viewBox="0 0 7 11" fill="none" style={{ opacity: 0.22, flexShrink: 0, color: textPrimary }}>
+                                  <circle cx="1.5" cy="1.5" r="1.1" fill="currentColor"/>
+                                  <circle cx="5.5" cy="1.5" r="1.1" fill="currentColor"/>
+                                  <circle cx="1.5" cy="5.5" r="1.1" fill="currentColor"/>
+                                  <circle cx="5.5" cy="5.5" r="1.1" fill="currentColor"/>
+                                  <circle cx="1.5" cy="9.5" r="1.1" fill="currentColor"/>
+                                  <circle cx="5.5" cy="9.5" r="1.1" fill="currentColor"/>
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {isVibes && cat.pills.length > 0 && (
+                      <p className="text-[10px] font-medium mt-0.5" style={{ color: textDim }}>
+                        ★ Top {Math.min(3, cat.pills.length)} shown as top interests
+                      </p>
+                    )}
+                    {catIdx < grouped.length - 1 && (
+                      <div className="mt-0.5" style={{ height: "1px", background: dividerColor }} />
+                    )}
+                  </div>
+                );
+              })}
+              {ungrouped.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {grouped.length > 0 && <div style={{ height: "1px", background: dividerColor }} />}
+                  {ungrouped.map((pill, i) => (
+                    <div key={pill.id ?? i} className="flex items-center gap-2 rounded-xl px-2.5 py-2"
+                      style={{ background: pill.color + "12", border: `1px solid ${pill.color}28` }}>
+                      <span className="shrink-0 flex items-center justify-center rounded-lg"
+                        style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
+                        {getPillEmoji(pill.text)}
+                      </span>
+                      <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>{pill.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <SectionDivider />
+
+        {/* ── PROFILE ── */}
+        <div className="p-5 flex flex-col gap-3">
+          <SectionHeading>Profile</SectionHeading>
+          <div className="flex flex-col gap-2">
+            {locationStr && (
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
+                <span style={{ fontSize: "13px" }}>📍</span>
+                <span className="text-sm truncate" style={{ color: textSecondary }}>{locationStr}</span>
+              </div>
+            )}
+            {memberSince && (
+              <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: "13px" }}>🗓️</span>
+                  <span className="text-sm" style={{ color: textSecondary }}>Joined</span>
+                </div>
+                <span className="text-sm font-bold" style={{ color: textPrimary }}>{memberSince}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: "13px" }}>🎵</span>
+                <span className="text-sm" style={{ color: textSecondary }}>Interests</span>
+              </div>
+              <span className="text-sm font-bold" style={{ color: textPrimary }}>{pills.length}</span>
+            </div>
+          </div>
+        </div>
+
+        <SectionDivider />
+
+        {/* ── STATS ── */}
+        <div className="p-5 flex flex-col gap-3">
+          <SectionHeading>Stats</SectionHeading>
+          <div className="flex flex-col gap-2">
+            <Tile left={<><span style={{marginRight:6}}>🎸</span>Total Jams</>}  right={totalJams}    accent={true} />
+            <Tile left={<><span style={{marginRight:6}}>🔴</span>Live now</>}    right={liveJams}     accent={false} />
+            <Tile left={<><span style={{marginRight:6}}>📅</span>Upcoming</>}    right={upcomingJams} accent={false} />
+          </div>
+        </div>
+
+        <SectionDivider />
+
+        {/* ── AVAILABILITY TOGGLE ── */}
+        <div className="px-5 py-4">
+          {isOwnProfile ? (
+            <button onClick={onToggleAvailable}
+              className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200"
+              style={{ background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}` }}>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
+                  <span className="relative inline-flex rounded-full h-2 w-2"
+                    style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
+                </span>
+                <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
+                  {availableToJam ? "Open to Jam" : "Not Available"}
+                </span>
+              </div>
+              <div className="relative w-8 h-4 rounded-full transition-colors duration-200 shrink-0"
+                style={{ background: availableToJam ? "rgba(220,46,115,0.30)" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)") }}>
+                <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
+                  style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)"), left: availableToJam ? "calc(100% - 14px)" : "2px" }} />
+              </div>
+            </button>
+          ) : (
+            // Read-only availability indicator for other users' profiles
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+              style={{ background: availableToJam ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.25)" : tileBorder}` }}>
+              <span className="relative flex h-2 w-2 shrink-0">
+                {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
+                <span className="relative inline-flex rounded-full h-2 w-2"
+                  style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
+              </span>
+              <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
+                {availableToJam ? "Open to Jam" : "Not Available"}
+              </span>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const Profile = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Name & Location");
   const [nameHover, setNameHover] = useState(false);
+
+  // ── Route param — /profile/:username ─────────────────────────────────────
+  // If a username is present in the URL we're viewing someone else's profile.
+  // If not, we're viewing our own. isOwnProfile gates all edit affordances.
+  const { username: routeUsername } = useParams();
+  const { user: loggedInUser, isLoggedIn } = useAuth();
+  const { openModal } = useAuthModal();
+
+  // viewedUser — the profile being displayed. Starts as the logged-in user,
+  // then gets replaced by the fetched profile when viewing someone else.
+  const [viewedUser, setViewedUser]       = useState(null);
+  const [viewedUserLoading, setViewedUserLoading] = useState(!!routeUsername);
+
+  // Derive isOwnProfile once we know both sides
+  const isOwnProfile = !routeUsername || (loggedInUser?.username === routeUsername);
+
+  // The user object we actually seed the profile from
+  const user = isOwnProfile ? loggedInUser : viewedUser;
+
+  // Fetch the viewed user when a username param is present and it's not our own
+  useEffect(() => {
+    if (!routeUsername || isOwnProfile) {
+      setViewedUserLoading(false);
+      return;
+    }
+    setViewedUserLoading(true);
+    // ── BACKEND: replace this stub with your real user-by-username endpoint ──
+    // Expected shape: same as the logged-in `user` object from useAuth.
+    // e.g. apiService.getUserByUsername(routeUsername)
+    apiService.getUserByUsername(routeUsername)
+      .then(data => setViewedUser(data))
+      .catch(err => {
+        console.error("Failed to load profile:", err);
+        setViewedUser(null);
+      })
+      .finally(() => setViewedUserLoading(false));
+  }, [routeUsername, isOwnProfile]);
 
   // selectedJam holds the jam object the user clicked, or null when the
   // stub is closed. Driving open/closed from data (the jam itself) rather
@@ -115,21 +533,98 @@ const Profile = () => {
 
   const [profilePic, setProfilePic] = useState(null);
   const [banner,     setBanner]     = useState(null);
-  const [about,      setAbout]      = useState("This is the location of the Bio");
+  const [about,      setAbout]      = useState("");
+  const [headline,   setHeadline]   = useState("");
   const [aboutPhoto, setAboutPhoto] = useState(null);
-  const [name,       setName]       = useState("Your Name");
-  const [location,   setLocation]   = useState("Location");
+  const [name,       setName]       = useState("");
+  const [location,   setLocation]   = useState("");
+  const [city,       setCity]       = useState("");
+  const [country,    setCountry]    = useState("");
 
-  // pills – array of { text, color } objects shown on the banner strip
-  // and managed in the Pills edit section.
-  const [pills, setPills] = useState([
-    { text: "Jazz",     color: "#DC2E73" },
-    { text: "Guitar",   color: "#7C3AED" },
-    { text: "Lo-fi",    color: "#0891B2" },
-    { text: "Bassist",  color: "#DC2E73" },
-    { text: "Soul",     color: "#7C3AED" },
-    { text: "Producer", color: "#0891B2" },
-  ]);
+  // Availability toggle — local state, shown in the Interests sidebar
+  const [availableToJam, setAvailableToJam] = useState(false);
+
+  // pills – seeded from user.genres_liked, instruments_liked, vibes_liked
+  const [pills, setPills] = useState([]);
+
+  // ── Pill picker state ─────────────────────────────────────────────────────
+  const [allTags, setAllTags] = useState([]);
+  const [selectedTagIds, setSelectedTagIds] = useState(new Set());
+  const [pillPickerOpen, setPillPickerOpen] = useState(false);
+  const [pillViewerOpen, setPillViewerOpen] = useState(false);
+  const [tagsLoading, setTagsLoading] = useState(false);
+
+  const PILL_COLORS = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
+  const MAX_PILLS = 9;
+
+  // Toggle a tag in the picker — single source of truth, rebuilds pills from selection
+  const toggleTag = (tag) => {
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag.uid)) {
+        next.delete(tag.uid);
+      } else {
+        if (next.size >= MAX_PILLS) return prev;
+        next.add(tag.uid);
+      }
+      const newPills = allTags
+        .filter((t) => next.has(t.uid))
+        .map((t) => ({
+          id: t.uid,
+          text: t.name,
+          color: PILL_COLORS[t.id % PILL_COLORS.length],
+        }));
+      setPills(newPills);
+      return next;
+    });
+  };
+
+  // Seed local state from the authenticated user object whenever it resolves.
+  // city + country are joined into "City, Country" format matching the location field.
+  useEffect(() => {
+    if (!user) return;
+    setName(user.display_name || user.username || "");
+    const parts = [user.city, user.country].filter(Boolean);
+    setLocation(parts.join(", "));
+    setCity(user.city || "");
+    setCountry(user.country || "");
+    setAbout(user.about || "");
+    setHeadline(user.headline || "");
+    setAvailableToJam(user.available_to_jam ?? false);
+    if (user.pfp) setProfilePic(user.pfp);
+
+    // Seed pills from genres, instruments, and vibes — color stable per tag.id
+    const colors = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
+    const userTags = [
+      ...(user.genres_liked ?? []).map(t => ({ ...t, uid: `g_${t.id}` })),
+      ...(user.instruments_liked ?? []).map(t => ({ ...t, uid: `i_${t.id}` })),
+      ...(user.vibes_liked ?? []).map(t => ({ ...t, uid: `v_${t.id}` })),
+    ];
+    if (userTags.length > 0) {
+      setPills(userTags.map((tag) => ({
+        id: tag.uid,
+        text: tag.name,
+        color: colors[tag.id % colors.length],
+      })));
+      setSelectedTagIds(new Set(userTags.map((t) => t.uid)));
+    }
+
+    // Seed visual theme from stored profile_theme JSON if the backend provides it.
+    // profile_theme shape: { cardColors, jamCardColor, cardTextOverrides, bannerDark }
+    if (user.profile_theme) {
+      try {
+        const theme = typeof user.profile_theme === "string"
+          ? JSON.parse(user.profile_theme)
+          : user.profile_theme;
+        if (theme.cardColors)       setCardColors(prev => ({ ...prev, ...theme.cardColors }));
+        if (theme.jamCardColor)     setJamCardColor(theme.jamCardColor);
+        if (theme.cardTextOverrides) setCardTextOverrides(prev => ({ ...prev, ...theme.cardTextOverrides }));
+        if (typeof theme.bannerDark === "boolean") setBannerDark(theme.bannerDark);
+      } catch (e) {
+        console.warn("Failed to parse profile_theme:", e);
+      }
+    }
+  }, [user]);
 
   // bannerDark – true when the banner image is dark enough that text
   // should be white. Auto-detected from pixel sampling in saveCroppedBanner,
@@ -143,9 +638,13 @@ const Profile = () => {
     musicSnips: DEFAULT_CARD_COLOR,
     jams:       DEFAULT_CARD_COLOR,
     posts:      DEFAULT_CARD_COLOR,
+    interests:  DEFAULT_CARD_COLOR,
   });
   const setCardColor = (card, color) =>
     setCardColors((prev) => ({ ...prev, [card]: color }));
+
+  // jamCardColor — background swatch for the individual jam row cards inside the Jams container
+  const [jamCardColor, setJamCardColor] = useState(CARD_COLORS[0]);
 
   // cardTextOverrides – manual light/dark text override per card.
   // null = auto-detect from luminance. true = force dark text. false = force light text.
@@ -154,22 +653,19 @@ const Profile = () => {
     musicSnips: null,
     jams:       null,
     posts:      null,
+    interests:  null,
   });
   const toggleCardTextOverride = (card, autoDark) => {
-    // Cycle: auto → opposite of auto → auto
     setCardTextOverrides((prev) => {
       if (prev[card] === null) return { ...prev, [card]: !autoDark };
       return { ...prev, [card]: null };
     });
   };
 
-  // globalTextOverride – drives the two-button text color control.
-  // null = auto per card. false = force light text all cards. true = force dark text all cards.
   const [globalTextOverride, setGlobalTextOverride] = useState(null);
   const setGlobalText = (val) => {
     setGlobalTextOverride(val);
-    // Push the same value into all per-card overrides so needsDarkText is consistent
-    setCardTextOverrides({ aboutMe: val, musicSnips: val, jams: val, posts: val });
+    setCardTextOverrides({ aboutMe: val, musicSnips: val, jams: val, posts: val, interests: val });
   };
 
   // toast – transient notification string, null when hidden.
@@ -220,63 +716,39 @@ const Profile = () => {
   const jamMovedRef                     = useRef(false);
 
   // ── Posts state ───────────────────────────────────────────────────────────
-  const [posts, setPosts]                   = useState([]);
-  const [selectedPost, setSelectedPost]     = useState(null);
-  const [postModalOpen, setPostModalOpen]   = useState(false);
-  const [newPost, setNewPost]               = useState({ title: "", jamName: "", username: "", description: "", image: null });
-
-  // ── Post drag state — horizontal swipe UP to delete (same pattern as jams)
-  const [postDragging, setPostDragging]     = useState(null);
-  const [postDragY,    setPostDragY]        = useState(0);
-  const postDragStartYRef                   = useRef(0);
-  const postLastDragYRef                    = useRef(0);
-  const postMovedRef                        = useRef(false);
-  const POST_DRAG_THRESHOLD                 = 100;
-
-  const addPost = (post) => setPosts((prev) => [{ ...post, id: Date.now() }, ...prev]);
-  const removePost = (id) => setPosts((prev) => prev.filter((p) => p.id !== id));
-
-  const handlePostDragStart = (postId, event) => {
-    const clientY = event.touches?.[0]?.clientY ?? event.clientY;
-    postDragStartYRef.current = clientY;
-    postLastDragYRef.current  = 0;
-    postMovedRef.current      = false;
-    setPostDragging(postId);
-    setPostDragY(0);
-  };
-
-  const handlePostDragMove = (event) => {
-    if (postDragging === null) return;
-    const clientY  = event.touches?.[0]?.clientY ?? event.clientY;
-    const distance = clientY - postDragStartYRef.current;
-    // Only allow upward drag (negative values)
-    const clamped  = Math.min(distance, 0);
-    if (Math.abs(clamped) > 6) postMovedRef.current = true;
-    postLastDragYRef.current = clamped;
-    setPostDragY(clamped);
-  };
-
-  const handlePostDragEnd = () => {
-    if (postDragging === null) return;
-    const postId    = postDragging;
-    const finalDist = postLastDragYRef.current;
-    setPostDragging(null);
-    setPostDragY(0);
-    if (Math.abs(finalDist) >= POST_DRAG_THRESHOLD) {
-      if (selectedPost?.id === postId) setSelectedPost(null);
-      removePost(postId);
-    }
-  };
-
   const audioRef = useRef(null);
 
   const dragStartXRef = useRef(0);
   const lastDragXRef = useRef(0);
   const movedRef = useRef(false);
 
-  // We destructure jams AND removeJam — Profile reads jams for display,
-  // and calls removeJam when a drag passes the delete threshold.
-  const { jams, removeJam } = useJams();
+  // ── Jams state — fetched from jamService, capped at 9, local-only removal ──
+  const [jams, setJams] = useState([]);
+  const [jamsLoading, setJamsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setJamsLoading(true);
+    Promise.all([
+      jamService.getMyAttendingJams(user.id, null),
+      jamService.getMyCreatedJams(user.id, null),
+    ])
+      .then(([attending, created]) => {
+        const seen = new Set();
+        const merged = [...attending, ...created].filter((j) => {
+          if (seen.has(j.id)) return false;
+          seen.add(j.id);
+          return true; // keep past jams — they render greyed
+        });
+        const order = { live: 0, tonight: 1, tomorrow: 2, week: 3, future: 4, past: 5 };
+        merged.sort((a, b) => (order[a.timeSlot] ?? 5) - (order[b.timeSlot] ?? 5));
+        setJams(merged.slice(0, 9));
+      })
+      .catch(console.error)
+      .finally(() => setJamsLoading(false));
+  }, [user?.id]);
+
+  const removeJam = (jamId) => setJams((prev) => prev.filter((j) => j.id !== jamId));
 
   const revokeObjectUrl = (url) => {
     if (typeof url === "string" && url.startsWith("blob:")) {
@@ -497,24 +969,6 @@ const Profile = () => {
   }, [jamDragging]);
 
   useEffect(() => {
-    if (postDragging === null) return;
-    const onMouseMove = (e) => handlePostDragMove(e);
-    const onMouseUp   = ()  => handlePostDragEnd();
-    const onTouchMove = (e) => handlePostDragMove(e);
-    const onTouchEnd  = ()  => handlePostDragEnd();
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup",   onMouseUp);
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    window.addEventListener("touchend",  onTouchEnd);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup",   onMouseUp);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend",  onTouchEnd);
-    };
-  }, [postDragging]);
-
-  useEffect(() => {
     return () => {
       stopPlayback();
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -539,89 +993,122 @@ const Profile = () => {
     "Card Colors",
   ];
 
+  // Lock body scroll whenever any modal is open so the page can't scroll behind it.
+  const anyModalOpen = editOpen || snippetModalOpen || pillPickerOpen || pillViewerOpen || !!selectedJam;
+  useEffect(() => {
+    document.body.style.overflow = anyModalOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [anyModalOpen]);
+
+  // Show a spinner while fetching another user's profile
+  if (viewedUserLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-900/50">
+        <div className="w-8 h-8 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // If we tried to load a user by username and got nothing, show a 404-style message
+  if (routeUsername && !isOwnProfile && !viewedUser) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-neutral-900/50 text-white">
+        <p className="text-2xl font-semibold">Profile not found</p>
+        <p className="text-sm text-white/40">No user with username @{routeUsername}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
-      <main className="mx-auto w-full max-w-[1600px] flex flex-col gap-8 px-4 py-6 md:px-6">
-        {/* Header — fixed height, never grows */}
-        <section className="w-full shrink-0">
-          <div
-            className="relative flex h-[260px] w-full items-center overflow-visible rounded-3xl bg-neutral-200 px-6 md:px-10"
-            onMouseEnter={() => setNameHover(true)}
-            onMouseLeave={() => setNameHover(false)}
-            style={{
-              backgroundImage: banner ? `url(${banner})` : undefined,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              boxShadow: (() => {
-                const glows = [
-                  cardColors.aboutMe.glow,
-                  cardColors.musicSnips.glow,
-                  cardColors.jams.glow,
-                  cardColors.posts.glow,
-                ];
-                const accent = glows.find(g => !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0")) ?? "rgba(236,72,153,0.8)";
-                return `0 0 15px ${accent}, 0 10px 40px rgba(0,0,0,0.8)`;
-              })(),
-              transition: "box-shadow 0.4s ease",
-            }}
-          >
-            {/* Single invisible button covers the whole banner — no dead spots */}
-            <button
-              onClick={() => setEditOpen(true)}
-              className="absolute inset-0 z-30 cursor-pointer opacity-0"
-              aria-label="Open profile editor"
-            />
+      <main className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-6">
 
-            <div className="relative z-10 flex items-center">
-              <div
-                className="h-[180px] w-[180px] rounded-full border-4 border-white/70 bg-cover bg-center shadow-lg md:h-[210px] md:w-[210px]"
-                style={{
-                  backgroundImage: profilePic ? `url(${profilePic})` : undefined,
-                  backgroundColor: profilePic ? "transparent" : "#db2777",
-                }}
-              />
+        {/* ── Top-level layout: [left+center content area] + [sidebar] ── */}
+        <div className="flex gap-4 items-start">
 
-              {/* Name + location — icons fade in when banner is hovered */}
-              <div className="ml-5 md:ml-8">
-                <div className="flex items-center gap-2">
-                  <h1 className={`text-2xl font-semibold md:text-3xl ${bannerDark ? "text-white" : "text-black"}`}>
-                    {name}
-                  </h1>
-                  <svg
-                    width="14" height="14" viewBox="0 0 13 13" fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    style={{ opacity: nameHover ? 1 : 0, transition: "opacity 0.25s ease", flexShrink: 0 }}
-                  >
-                    <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke={bannerDark ? "white" : "#333"} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className={`text-sm md:text-base ${bannerDark ? "text-white/80" : "text-neutral-700"}`}>
-                    {location}
-                  </p>
-                  <svg
-                    width="11" height="11" viewBox="0 0 13 13" fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    style={{ opacity: nameHover ? 1 : 0, transition: "opacity 0.25s ease", flexShrink: 0 }}
-                  >
-                    <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke={bannerDark ? "rgba(255,255,255,0.7)" : "#555"} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+          {/* ── LEFT+CENTER CONTENT AREA ── */}
+          <div className="flex flex-col gap-4 flex-1 min-w-0">
+
+            {/* Banner — scoped to left+center only */}
+            <div
+              className="relative flex h-[260px] w-full items-center overflow-visible rounded-2xl bg-neutral-200 px-6 md:px-10"
+              onMouseEnter={() => setNameHover(true)}
+              onMouseLeave={() => setNameHover(false)}
+              style={{
+                backgroundImage: banner ? `url(${banner})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                boxShadow: (() => {
+                  const allGlows = [
+                    cardColors.aboutMe.glow,
+                    cardColors.musicSnips.glow,
+                    cardColors.jams.glow,
+                    cardColors.posts.glow,
+                    cardColors.interests.glow,
+                  ];
+                  // Count non-black glows; pick the most frequent colored one
+                  const colored = allGlows.filter(g =>
+                    !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0")
+                  );
+                  const freq = {};
+                  colored.forEach(g => { freq[g] = (freq[g] || 0) + 1; });
+                  const dominant = colored.sort((a, b) => (freq[b] || 0) - (freq[a] || 0))[0]
+                    ?? "rgba(220,46,115,0.6)";
+                  return `0 0 20px ${dominant}, 0 10px 40px rgba(0,0,0,0.8)`;
+                })(),
+                transition: "box-shadow 0.4s ease",
+              }}
+            >
+              {isOwnProfile && (
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="absolute inset-0 z-30 cursor-pointer opacity-0"
+                  aria-label="Open profile editor"
+                />
+              )}
+              <div className="relative z-10 flex items-center">
+                <div
+                  className="h-[180px] w-[180px] rounded-full border-4 border-white/70 bg-cover bg-center shadow-lg md:h-[210px] md:w-[210px]"
+                  style={{
+                    backgroundImage: profilePic ? `url(${profilePic})` : undefined,
+                    backgroundColor: profilePic ? "transparent" : "#db2777",
+                  }}
+                />
+                <div className="ml-5 md:ml-8">
+                  <div className="flex items-center gap-2">
+                    <h1 className={`text-2xl font-semibold md:text-3xl ${bannerDark ? "text-white" : "text-black"}`}>
+                      {name}
+                    </h1>
+                    {user?.username && (
+                      <span className="text-xs" style={{ color: bannerDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.40)" }}>
+                        @{user.username}
+                      </span>
+                    )}
+                    <svg width="14" height="14" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"
+                      style={{ opacity: nameHover ? 1 : 0, transition: "opacity 0.25s ease", flexShrink: 0 }}>
+                      <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke={bannerDark ? "white" : "#333"} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className={`text-sm md:text-base ${bannerDark ? "text-white/80" : "text-neutral-700"}`}>{location}</p>
+                    <svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"
+                      style={{ opacity: nameHover ? 1 : 0, transition: "opacity 0.25s ease", flexShrink: 0 }}>
+                      <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke={bannerDark ? "rgba(255,255,255,0.7)" : "#555"} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>
 
-          </div>
-        </section>
-
-        {/* ── Two-column grid — scrolls naturally with the page ── */}
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[430px_minmax(0,1fr)]">
+            {/* ── Two-column content grid below banner ── */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
 
           {/* ── LEFT COLUMN ── */}
           <div className="flex flex-col gap-4">
 
             {/* About Me container */}
             <div
-              className="h-[500px] rounded-3xl p-5 backdrop-blur-md flex flex-col gap-4"
+              className="h-[500px] rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
               style={{
                 background: cardColors.aboutMe.bg,
                 border: `1px solid ${cardColors.aboutMe.border}`,
@@ -629,31 +1116,6 @@ const Profile = () => {
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
-
-              {/* Pills strip at the top — shrink-0 so it never gets compressed */}
-              {pills.length > 0 && (
-                <div className="shrink-0 pill-fade w-full overflow-hidden rounded-full px-3 py-2 bg-white/5 border border-white/10">
-                  <div
-                    className="pill-track gap-2"
-                    style={{ animation: `pill-scroll ${pills.length * 3.8}s cubic-bezier(0.37, 0, 0.63, 1) infinite` }}
-                  >
-                    {[...pills, ...pills].map((pill, i) => (
-                      <span
-                        key={i}
-                        className="shrink-0 rounded-full px-4 py-1 text-sm font-medium whitespace-nowrap"
-                        style={{
-                          backgroundColor: pill.color,
-                          border: `1px solid ${pill.color}cc`,
-                          color: "#fff",
-                          boxShadow: `0 0 0 1px ${pill.color}55, 0 2px 8px ${pill.color}66, 0 0 16px ${pill.color}33`,
-                        }}
-                      >
-                        {pill.text}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* About Me heading + bio + optional rotated photo */}
               <div className="flex flex-1 gap-4 min-h-0">
@@ -666,12 +1128,50 @@ const Profile = () => {
                   >
                     About Me
                   </h2>
-                  <p
-                    className="text-sm leading-relaxed break-words"
-                    style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
-                  >
-                    {about}
-                  </p>
+
+                  {/* Headline subsection */}
+                  <div className="shrink-0">
+                    <p
+                      className="text-sm font-semibold mb-0.5"
+                      style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
+                    >
+                      Headline
+                    </p>
+                    {headline ? (
+                      <p
+                        className="text-sm leading-relaxed break-words"
+                        style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
+                      >
+                        {headline}
+                      </p>
+                    ) : (
+                      <p
+                        className="text-sm italic"
+                        style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", transition: "color 0.4s ease" }}
+                      >
+                        Add your headline!
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Divider between headline and bio */}
+                  <div className="shrink-0" style={{ height: "1px", background: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)" }} />
+
+                  {about ? (
+                    <p
+                      className="text-sm leading-relaxed break-words"
+                      style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
+                    >
+                      {about}
+                    </p>
+                  ) : (
+                    <p
+                      className="text-sm leading-relaxed italic"
+                      style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", transition: "color 0.4s ease" }}
+                    >
+                      (bio goes here)
+                    </p>
+                  )}
                 </div>
 
                 {/* Rotated photo — only shown when the user has picked one */}
@@ -692,12 +1192,9 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Divider */}
-            <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-full" />
-
             {/* Your Music Snips container */}
             <div
-              className="h-[500px] rounded-3xl p-5 backdrop-blur-md flex flex-col gap-4"
+              className="h-[500px] rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
               style={{
                 background: cardColors.musicSnips.bg,
                 border: `1px solid ${cardColors.musicSnips.border}`,
@@ -712,7 +1209,7 @@ const Profile = () => {
                 >
                   Your Music Snips
                 </h2>
-                {snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
+                {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
                   <button
                     onClick={() => setSnippetModalOpen(true)}
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-r from-[#D33280] to-[#EA65C2] text-xl text-black transition hover:scale-110 shadow-[0_12px_50px_rgba(60,20,20,0.3)]"
@@ -724,12 +1221,16 @@ const Profile = () => {
 
               <div className="flex flex-col gap-4">
                 {snippets.length === 0 ? (
-                  <button
-                    onClick={() => setSnippetModalOpen(true)}
-                    className="rounded-2xl border border-dashed border-neutral-600 bg-neutral-800 py-8 text-center text-neutral-400 transition hover:bg-neutral-700"
-                  >
-                    Add your first snippet
-                  </button>
+                  isOwnProfile ? (
+                    <button
+                      onClick={() => setSnippetModalOpen(true)}
+                      className="rounded-2xl border border-dashed border-neutral-600 bg-neutral-800 py-8 text-center text-neutral-400 transition hover:bg-neutral-700"
+                    >
+                      Add your first snippet
+                    </button>
+                  ) : (
+                    <p className="text-center py-8 text-sm text-neutral-600">No snippets yet.</p>
+                  )
                 ) : (
                   snippets.map((snippet, index) => {
                     const isDragging = dragging === index;
@@ -817,7 +1318,7 @@ const Profile = () => {
 
             {/* Jams Attended container */}
             <div
-              className="h-[500px] rounded-3xl p-6 backdrop-blur-md flex flex-col gap-4"
+              className="h-[500px] rounded-2xl p-6 backdrop-blur-md flex flex-col gap-4"
               style={{
                 background: cardColors.jams.bg,
                 border: `1px solid ${cardColors.jams.border}`,
@@ -834,7 +1335,11 @@ const Profile = () => {
                 </h2>
               </div>
 
-              {jams.length === 0 ? (
+              {jamsLoading ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+                </div>
+              ) : jams.length === 0 ? (
                 <Link
                   to="/jams"
                   className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm cursor-pointer"
@@ -844,161 +1349,135 @@ const Profile = () => {
                     color: needsDarkText(cardColors.jams.bg, cardTextOverrides.jams) ? "#666" : "#a3a3a3",
                   }}
                 >
-                  No jams yet. Create one!
+                  No jams yet. Find one!
                 </Link>
               ) : (
                 <div className="flex flex-col gap-3 overflow-y-auto hide-scrollbar flex-1 min-h-0 pr-1">
-                  {[...jams].sort((a, b) => isUpcoming(b.date) - isUpcoming(a.date)).map((jam) => (
-                    <JamCard
-                      key={jam.id}
-                      jam={jam}
-                      onSelect={setSelectedJam}
-                      dragHandlers={{
-                        onMouseDown:  (e) => handleJamDragStart(jam.id, e),
-                        onTouchStart: (e) => handleJamDragStart(jam.id, e),
-                      }}
-                      isDragging={jamDragging === jam.id}
-                      dragX={jamDragX}
-                      movedRef={jamMovedRef}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+                  {jams.map((jam) => {
+                    const isDragging = jamDragging === jam.id;
+                    const offsetX    = isDragging ? jamDragX : 0;
+                    const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
 
-            {/* Divider */}
-            <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-full" />
+                    // Past jams render fully greyed — kept in list for history
+                    const isPast = jam.timeSlot === "past";
 
-            {/* Posts container */}
-            <div
-              className="h-[500px] rounded-3xl p-6 backdrop-blur-md flex flex-col gap-4"
-              style={{
-                background: cardColors.posts.bg,
-                border: `1px solid ${cardColors.posts.border}`,
-                boxShadow: `0 0 40px ${cardColors.posts.glow}`,
-                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
-              }}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between shrink-0">
-                <h2
-                  className="text-2xl"
-                  style={{ color: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "#111" : "#fff", transition: "color 0.4s ease" }}
-                >
-                  Posts
-                </h2>
-                {posts.length > 0 && (
-                  <button
-                    onClick={() => setPostModalOpen(true)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 border border-white/20 text-white text-xl hover:bg-[#DC2E73] hover:border-[#DC2E73] transition-all duration-200 cursor-pointer"
-                  >
-                    +
-                  </button>
-                )}
-              </div>
+                    // Accent colors — desaturate to grey if past
+                    const accentPink = isPast ? "rgba(255,255,255,0.25)" : "#DC2E73";
+                    const accentGold = isPast ? "rgba(255,255,255,0.20)" : "#ca8a04";
+                    const noteColor  = isPast ? "rgba(255,255,255,0.18)" : jam.isLive ? accentPink : accentGold;
 
-              {/* Empty state */}
-              {posts.length === 0 ? (
-                <button
-                  onClick={() => setPostModalOpen(true)}
-                  className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm cursor-pointer"
-                  style={{
-                    borderColor: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "rgba(0,0,0,0.2)" : "#404040",
-                    background: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "rgba(0,0,0,0.05)" : "rgba(23,23,23,0.5)",
-                    color: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "#666" : "#a3a3a3",
-                  }}
-                >
-                  No posts yet. Create one!
-                </button>
-              ) : (
-                /* Horizontal scroll row */
-                <div className="flex flex-row gap-3 overflow-x-auto hide-scrollbar flex-1 min-w-0 pb-1">
-                  {posts.map((post) => {
-                    const isDragging    = postDragging === post.id;
-                    const offsetY       = isDragging ? postDragY : 0;
-                    const dragProgress  = Math.min(Math.abs(offsetY) / POST_DRAG_THRESHOLD, 1);
+                    // Text luminance blend — keep the pink/gold hue but lighten/darken
+                    // based on the jam card background so text stays readable.
+                    // bgLum: 0 = very dark, 255 = very light
+                    const bgLum = bgLuminance(jamCardColor.bg);
+                    // Blend factor: 0 on dark bg (no change), 1 on light bg (crush toward dark)
+                    const blendTowardDark = Math.max(0, (bgLum - 80) / 175); // ramps from lum=80 to lum=255
+                    // For pink #DC2E73 → darkened version #7a1940, for gold #ca8a04 → #6b4902
+                    // We express as rgba overlay: mix the accent with a dark tint
+                    const titleColorLive    = isPast ? `rgba(180,180,180,${0.4 - blendTowardDark * 0.15})`
+                      : `color-mix(in srgb, #DC2E73 ${Math.round(100 - blendTowardDark * 45)}%, #000)`;
+                    const titleColorUpcoming = isPast ? `rgba(160,160,160,${0.35 - blendTowardDark * 0.1})`
+                      : `color-mix(in srgb, #ca8a04 ${Math.round(100 - blendTowardDark * 45)}%, #000)`;
+                    const titleColor = jam.isLive ? titleColorLive : titleColorUpcoming;
+
+                    const subtitleAlpha = isPast ? 0.22 : (0.35 + blendTowardDark * 0.3);
+                    const subtitleColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${subtitleAlpha})`;
+
+                    const dateColorLive     = isPast ? `rgba(160,160,160,0.35)`
+                      : `color-mix(in srgb, #DC2E73 ${Math.round(90 - blendTowardDark * 40)}%, #000)`;
+                    const dateColorUpcoming = isPast ? `rgba(140,140,140,0.28)`
+                      : bgLum > 140
+                        ? `color-mix(in srgb, #ca8a04 ${Math.round(90 - blendTowardDark * 40)}%, #000)`
+                        : `color-mix(in srgb, #ca8a04 85%, rgba(255,255,255,0.0))`;
+                    const dateColor = jam.isLive ? dateColorLive : dateColorUpcoming;
+
+                    const lockColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.18 : (0.4 - blendTowardDark * 0.2)})`;
+                    const dividerColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.06 : 0.12})`;
+
+                    // Card background — blend jamCardColor over the existing dark gradient
+                    const cardBg = jamCardColor.label === "Dark"
+                      ? (isPast ? "linear-gradient(135deg,#181818 60%,#1f1f1f 100%)" : "linear-gradient(135deg,#1e1e1e 60%,#2a2a2a 100%)")
+                      : jamCardColor.bg;
+
+                    const cardBorder = isPast
+                      ? `1px solid rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},0.06)`
+                      : jam.isLive
+                        ? `1px solid color-mix(in srgb, rgba(220,46,115,0.35) 100%, ${jamCardColor.border})`
+                        : `1px solid color-mix(in srgb, rgba(202,138,4,0.25) 100%, ${jamCardColor.border})`;
 
                     return (
-                      <div key={post.id} className="relative shrink-0 w-[200px]">
+                      <div key={jam.id} className="relative">
+                        {isDragging && dragProgress > 0.45 && (
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-5 z-10">
+                            <span className="text-xs font-medium text-red-300">Release to delete</span>
+                          </div>
+                        )}
+                        {isDragging && (
+                          <div className="pointer-events-none absolute inset-0 rounded-full bg-red-500/10 z-0" />
+                        )}
 
-                        {/* Drag overlay */}
-                        <div className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden z-10">
-                          {isDragging && (
-                            <div className="absolute inset-0 rounded-2xl bg-red-500/20" style={{ opacity: dragProgress }} />
-                          )}
-                          {isDragging && dragProgress > 0.45 && (
-                            <div className="absolute inset-0 flex items-end justify-center pb-4">
-                              <span className="text-xs font-medium text-red-300">Release to delete</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Post card — portrait ratio */}
-                        <button
-                          onMouseDown={(e) => handlePostDragStart(post.id, e)}
-                          onTouchStart={(e) => handlePostDragStart(post.id, e)}
-                          draggable={false}
-                          onDragStart={(e) => e.preventDefault()}
-                          onClick={() => {
-                            if (!postMovedRef.current) setSelectedPost(post);
-                            postMovedRef.current = false;
-                          }}
-                          className="w-full text-left rounded-2xl bg-neutral-800 border border-white/10 overflow-hidden flex flex-col cursor-pointer"
+                        <div
+                          onMouseDown={(e) => handleJamDragStart(jam.id, e)}
+                          onTouchStart={(e) => handleJamDragStart(jam.id, e)}
+                          onClick={() => { if (!jamMovedRef.current) setSelectedJam(jam); jamMovedRef.current = false; }}
+                          className="relative z-10 flex items-center cursor-pointer select-none"
                           style={{
-                            height: "340px",
-                            userSelect: "none",
-                            WebkitUserSelect: "none",
-                            touchAction: "pan-x",
-                            transform: `translateY(${offsetY}px) rotate(${offsetY * 0.01}deg)`,
-                            opacity: isDragging ? 1 - Math.abs(offsetY) / 240 : 1,
-                            transition: isDragging ? "none" : "transform 0.25s ease, opacity 0.25s ease, box-shadow 0.4s ease",
-                            boxShadow: `0 0 20px ${cardColors.posts.glow}, 0 4px 24px rgba(0,0,0,0.4)`,
+                            background: cardBg,
+                            borderRadius: "20px",
+                            border: cardBorder,
+                            padding: "18px 20px",
+                            boxShadow: isPast
+                              ? "0 4px 12px -2px rgba(0,0,0,0.3)"
+                              : jam.isLive
+                                ? "0 0 0 1px rgba(220,46,115,0.1), 0 12px 28px -4px rgba(220,46,115,0.15), 0 6px 12px -2px rgba(0,0,0,0.5)"
+                                : "0 0 0 1px rgba(202,138,4,0.08), 0 12px 28px -4px rgba(202,138,4,0.12), 0 6px 12px -2px rgba(0,0,0,0.5)",
+                            transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
+                            opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : isPast ? 0.6 : 1,
+                            transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
                           }}
                         >
-                          {/* Header bar */}
-                          <div className="bg-neutral-900 px-3 py-2 flex items-start justify-between gap-2 shrink-0">
-                            <span
-                              className="text-white text-xs font-semibold leading-tight flex-1 min-w-0"
-                              style={{
-                                overflow: "hidden",
-                                whiteSpace: "nowrap",
-                                maskImage: "linear-gradient(to right, black 60%, transparent 100%)",
-                                WebkitMaskImage: "linear-gradient(to right, black 60%, transparent 100%)",
-                              }}
-                            >
-                              {post.title}
-                            </span>
-                            <div className="text-right shrink-0">
-                              <p className="text-[10px] text-neutral-400 leading-tight">In {post.jamName}</p>
-                              <p className="text-[10px] text-neutral-500 leading-tight">({post.username})</p>
-                            </div>
+                          <div className="flex items-center justify-center shrink-0" style={{ width: "44px" }}>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                              <path d="M9 18V5l12-2v13" stroke={noteColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                              <circle cx="6" cy="18" r="3" fill={noteColor}/>
+                              <circle cx="18" cy="16" r="3" fill={noteColor}/>
+                            </svg>
                           </div>
 
-                          {/* Image area */}
-                          <div
-                            className="flex-1 bg-neutral-700 flex items-center justify-center overflow-hidden"
-                            style={{
-                              backgroundImage: post.image ? `url(${post.image})` : undefined,
-                              backgroundSize: "cover",
-                              backgroundPosition: "center",
-                            }}
-                          >
-                            {!post.image && (
-                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#555" strokeWidth="1.5"/>
-                                <circle cx="8.5" cy="8.5" r="1.5" fill="#555"/>
-                                <path d="M21 15l-5-5L5 21" stroke="#555" strokeWidth="1.5" strokeLinecap="round"/>
+                          <div style={{ width: "1px", height: "40px", background: dividerColor, margin: "0 16px", flexShrink: 0 }} />
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate" style={{ fontSize: "15px", margin: 0, color: titleColor }}>
+                              {jam.title}
+                            </p>
+                            <p className="truncate" style={{ fontSize: "11px", margin: "3px 0 0", color: subtitleColor }}>
+                              {[jam.genre, jam.vibe].filter(Boolean).join(" · ")}
+                            </p>
+                            <p className="font-semibold" style={{ fontSize: "11px", margin: "3px 0 0", color: dateColor }}>
+                              {isPast ? "Past"
+                                : jam.isLive ? "Live Now"
+                                : jam.timeSlot === "tonight" ? "Tonight"
+                                : jam.timeSlot === "tomorrow" ? "Tomorrow"
+                                : jam.timeSlot === "week" ? "This Week"
+                                : "Upcoming"}
+                              {jam.dateTime ? ` · ${jam.dateTime}` : ""}
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 flex items-center justify-center" style={{ width: "44px" }}>
+                            {jam.isPrivate ? (
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <rect x="3" y="11" width="18" height="11" rx="2" stroke={lockColor} strokeWidth="1.8"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke={lockColor} strokeWidth="1.8" strokeLinecap="round"/>
+                              </svg>
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <rect x="3" y="11" width="18" height="11" rx="2" stroke={lockColor} strokeWidth="1.8"/>
+                                <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke={lockColor} strokeWidth="1.8" strokeLinecap="round"/>
                               </svg>
                             )}
                           </div>
-
-                          {/* Description */}
-                          <div className="bg-neutral-800 px-3 py-2 shrink-0">
-                            <p className="text-xs text-neutral-400 line-clamp-2 leading-relaxed">
-                              {post.description || "No description."}
-                            </p>
-                          </div>
-                        </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1006,324 +1485,439 @@ const Profile = () => {
               )}
             </div>
 
+            {/* Friends container — posts scrapped, links to friends page */}
+            <div
+              className="h-[500px] rounded-2xl p-6 backdrop-blur-md flex flex-col gap-4"
+              style={{
+                background: cardColors.posts.bg,
+                border: `1px solid ${cardColors.posts.border}`,
+                boxShadow: `0 0 40px ${cardColors.posts.glow}`,
+                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+              }}
+            >
+              <div className="flex items-center justify-between shrink-0">
+                <h2
+                  className="text-2xl"
+                  style={{ color: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "#111" : "#fff", transition: "color 0.4s ease" }}
+                >
+                  Post
+                </h2>
+              </div>
+              <Link
+                to="/feed"
+                className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm cursor-pointer"
+                style={{
+                  borderColor: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "rgba(0,0,0,0.2)" : "#404040",
+                  background: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "rgba(0,0,0,0.05)" : "rgba(23,23,23,0.5)",
+                  color: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "#666" : "#a3a3a3",
+                }}
+              >
+                Find your friends
+              </Link>
+            </div>
+
           </div>{/* end RIGHT COLUMN */}
 
-        </section>
+            </div>{/* end two-column content grid */}
+          </div>{/* end LEFT+CENTER CONTENT AREA */}
+
+          {/* ── INTERESTS SIDEBAR ── */}
+          <InterestsSidebar
+            pills={pills}
+            jams={jams}
+            user={user}
+            city={city}
+            country={country}
+            availableToJam={availableToJam}
+            onToggleAvailable={isOwnProfile ? () => setAvailableToJam(v => !v) : null}
+            onReorderPills={isOwnProfile ? (newPills) => setPills(newPills) : null}
+            isOwnProfile={isOwnProfile}
+            cardColor={cardColors.interests}
+            textOverride={cardTextOverrides.interests}
+          />
+
+        </div>{/* end top-level flex row */}
       </main>
 
-      {/* ── Jam Stub Modal ────────────────────────────────────────────────────
-       *
-       * Lifted out of the jams panel and promoted to a fixed full-screen modal
-       * so it can blur the entire page behind it and close reliably on backdrop click.
-       *
-       * selectedJam drives open/closed — null = closed, jam object = open.
-       * The accent color and status are derived fresh from the jam's date
-       * via the shared isUpcoming() from jamUtils.js.
-       *
-       * Animation: stubSlideIn keyframe defined in index.css slides the card
-       * in from the left. It fires automatically on mount because React creates
-       * a new DOM element each time selectedJam changes from null → a jam.
-       * ──────────────────────────────────────────────────────────────────────── */}
+      {createPortal(
+        <>
+          {/* ── Jam Stub Modal ────────────────────────────────────────────────────
+           *
+           * Lifted out of the jams panel and promoted to a fixed full-screen modal
+           * so it can blur the entire page behind it and close reliably on backdrop click.
+           *
+           * selectedJam drives open/closed — null = closed, jam object = open.
+           * The accent color and status are derived fresh from the jam's date
+           * via the shared isUpcoming() from jamUtils.js.
+           *
+           * Animation: stubSlideIn keyframe defined in index.css slides the card
+           * in from the left. It fires automatically on mount because React creates
+           * a new DOM element each time selectedJam changes from null → a jam.
+           * ──────────────────────────────────────────────────────────────────────── */}
       {selectedJam && (() => {
-        const stubTracking = isUpcoming(selectedJam.date);
-        const accentColor  = stubTracking ? TRACKING_COLOR : ATTENDED_COLOR;
-        const stubDate     = new Date(selectedJam.date).toLocaleDateString("en-US", {
-          weekday: "long", month: "long", day: "numeric", year: "numeric",
-        });
+        const live       = selectedJam.isLive;
+        const accent     = live ? "#DC2E73" : "#ca8a04";
+        const accentDim  = live ? "rgba(220,46,115,0.18)" : "rgba(202,138,4,0.14)";
+        const accentBorder = live ? "rgba(220,46,115,0.30)" : "rgba(202,138,4,0.25)";
+
+        const statusLabel = live ? "Live Now"
+          : selectedJam.timeSlot === "tonight"  ? "Tonight"
+          : selectedJam.timeSlot === "tomorrow" ? "Tomorrow"
+          : selectedJam.timeSlot === "week"     ? "This Week"
+          : "Upcoming";
+
+        // Tag rows — genre gets 🎵, vibe gets 🌊 as fallback emojis
+        const tags = [
+          selectedJam.genre && { label: selectedJam.genre, emoji: getPillEmoji(selectedJam.genre), color: live ? "#DC2E73" : "#ca8a04" },
+          selectedJam.vibe  && { label: selectedJam.vibe,  emoji: getPillEmoji(selectedJam.vibe),  color: "#7c3aed" },
+        ].filter(Boolean);
+
+        // Extra optional fields the API may return
+        const host        = selectedJam.host        ?? selectedJam.creator?.display_name ?? selectedJam.creator?.username ?? null;
+        const location    = selectedJam.location    ?? selectedJam.venue ?? null;
+        const attendees   = selectedJam.attendees   ?? selectedJam.attendee_count ?? null;
+        const maxAttendees= selectedJam.maxAttendees ?? selectedJam.max_attendees ?? null;
+        const instruments = Array.isArray(selectedJam.instruments)
+          ? selectedJam.instruments.map(i => typeof i === "string" ? i : i?.name).filter(Boolean)
+          : null;
 
         return (
-          <div className="fixed inset-0 z-[1500] flex items-center justify-center">
+          <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4">
+            <div onClick={() => setSelectedJam(null)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
-            {/* Blurred backdrop — clicking it closes the stub */}
             <div
-              onClick={() => setSelectedJam(null)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-md"
-            />
-
-            {/* Modal card */}
-            <div
-              className="relative z-10 w-[600px] max-w-[94vw] rounded-3xl p-8 flex flex-col gap-6"
+              className="relative z-10 w-[560px] max-w-[96vw] rounded-3xl overflow-hidden flex flex-col"
               style={{
-                backgroundColor: "#141414",
-                border: `1px solid ${accentColor}44`,
-                boxShadow: `0 0 0 1px ${accentColor}22, 0 0 60px ${accentColor}33, 0 24px 80px rgba(0,0,0,0.8)`,
-                animation: "stubSlideIn 0.3s cubic-bezier(0.4,0,0.2,1) forwards",
+                backgroundColor: "#0f0f0f",
+                border: `1px solid ${accentBorder}`,
+                boxShadow: `0 0 0 1px ${accentBorder}, 0 0 80px ${accentDim}, 0 32px 80px rgba(0,0,0,0.9)`,
+                animation: "stubSlideIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards",
               }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
             >
-              {/* Accent glow bar at the top of the card */}
+              {/* ── Header band ── */}
               <div
-                className="h-1 w-20 rounded-full"
+                className="relative px-7 pt-7 pb-6 flex flex-col gap-3"
                 style={{
-                  background: `linear-gradient(to right, ${accentColor}, ${accentColor}44)`,
-                  boxShadow: `0 0 12px ${accentColor}88`,
+                  background: `linear-gradient(160deg, ${accentDim} 0%, rgba(0,0,0,0) 60%)`,
+                  borderBottom: `1px solid ${accentBorder}`,
                 }}
-              />
+              >
+                {/* Status pill + close */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {live && (
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: accent }} />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: accent }} />
+                      </span>
+                    )}
+                    <span
+                      className="text-xs font-semibold px-3 py-1 rounded-full tracking-wide"
+                      style={{ background: accentDim, border: `1px solid ${accentBorder}`, color: accent }}
+                    >
+                      {statusLabel}
+                    </span>
+                    <span className="text-xs text-white/30">
+                      {selectedJam.isPrivate ? "🔒 Private" : "🔓 Public"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedJam(null)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
+                  >
+                    ✕
+                  </button>
+                </div>
 
-              {/* Name + description */}
-              <div className="flex flex-col gap-2">
-                <h2
-                  className="text-3xl font-bold leading-tight"
-                  style={{ color: accentColor }}
-                >
-                  {selectedJam.name}
+                {/* Title */}
+                <h2 className="text-3xl font-bold leading-tight" style={{ color: accent }}>
+                  {selectedJam.title}
                 </h2>
-                <p className="text-sm text-white/60">{selectedJam.description}</p>
-              </div>
 
-              {/* Info rows */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="flex flex-col gap-1">
-                  <p className="text-[10px] uppercase tracking-widest text-white/30">Location</p>
-                  <p className="text-white text-sm">{selectedJam.location}</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-[10px] uppercase tracking-widest text-white/30">Date</p>
-                  <p className="text-white text-sm">{stubDate}</p>
-                </div>
-              </div>
-
-              {/* Tags */}
-              {selectedJam.tags?.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <p className="text-[10px] uppercase tracking-widest text-white/30">Tags</p>
+                {/* Genre + vibe tags inline */}
+                {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {selectedJam.tags.map((tag) => (
+                    {tags.map((tag, i) => (
                       <span
-                        key={tag}
-                        className="px-3 py-1 rounded-full text-xs font-medium"
+                        key={i}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
                         style={{
-                          backgroundColor: accentColor + "22",
-                          border: `1px solid ${accentColor}66`,
-                          color: "#fff",
-                          boxShadow: `0 0 8px ${accentColor}33`,
+                          background: tag.color + "18",
+                          border: `1px solid ${tag.color}40`,
+                          color: tag.color,
                         }}
                       >
-                        {tag}
+                        <span>{tag.emoji}</span>
+                        {tag.label}
                       </span>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* ── Body ── */}
+              <div className="px-7 py-5 flex flex-col gap-5">
+
+                {/* Description */}
+                {selectedJam.description && (
+                  <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
+                    {selectedJam.description}
+                  </p>
+                )}
+
+                {/* Info grid — always show date/time, show extras if present */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Date / Time */}
+                  <div
+                    className="flex flex-col gap-1 rounded-2xl px-4 py-3"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                  >
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>When</span>
+                    <span className="text-sm font-medium text-white">{selectedJam.dateTime ?? statusLabel}</span>
+                  </div>
+
+                  {/* Access */}
+                  <div
+                    className="flex flex-col gap-1 rounded-2xl px-4 py-3"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                  >
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Access</span>
+                    <span className="text-sm font-medium text-white">{selectedJam.isPrivate ? "Private" : "Public"}</span>
+                  </div>
+
+                  {/* Host — if available */}
+                  {host && (
+                    <div
+                      className="flex flex-col gap-1 rounded-2xl px-4 py-3"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                    >
+                      <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Host</span>
+                      <span className="text-sm font-medium text-white truncate">{host}</span>
+                    </div>
+                  )}
+
+                  {/* Location — if available */}
+                  {location && (
+                    <div
+                      className="flex flex-col gap-1 rounded-2xl px-4 py-3"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                    >
+                      <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Location</span>
+                      <span className="text-sm font-medium text-white truncate">{location}</span>
+                    </div>
+                  )}
+
+                  {/* Attendees — if available */}
+                  {attendees !== null && (
+                    <div
+                      className="flex flex-col gap-1 rounded-2xl px-4 py-3"
+                      style={{ background: accentDim, border: `1px solid ${accentBorder}` }}
+                    >
+                      <span className="text-[10px] uppercase tracking-widest" style={{ color: accent + "99" }}>Attending</span>
+                      <span className="text-sm font-bold" style={{ color: accent }}>
+                        {attendees}{maxAttendees ? ` / ${maxAttendees}` : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {/* Footer: status badge + close hint */}
-              <div className="flex items-center justify-between mt-2">
-                <span
-                  className="px-5 py-1.5 rounded-full text-xs font-semibold tracking-wide"
-                  style={{
-                    backgroundColor: accentColor,
-                    color: stubTracking ? "#000" : "#fff",
-                    boxShadow: `0 0 16px ${accentColor}66`,
-                  }}
-                >
-                  {stubTracking ? "Tracking" : "Attended"}
+                {/* Instruments row — if available */}
+                {instruments && instruments.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Instruments</span>
+                    <div className="flex flex-wrap gap-2">
+                      {instruments.map((inst, i) => (
+                        <span
+                          key={i}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                          style={{
+                            background: "rgba(8,145,178,0.12)",
+                            border: "1px solid rgba(8,145,178,0.30)",
+                            color: "#38bdf8",
+                          }}
+                        >
+                          <span>{getPillEmoji(inst)}</span>
+                          {inst}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* ── Footer ── */}
+              <div
+                className="px-7 py-4 flex items-center justify-between"
+                style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}
+              >
+                <span className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
+                  #{selectedJam.id?.toString().slice(-6) ?? "—"}
                 </span>
-
-                {/* Subtle close hint — clicking anywhere outside also closes */}
-                <p className="text-xs text-white/20">click outside to close</p>
+                <div className="text-base">
+                  {live ? "🎸🔥🎶" : "🎵✨🎹"}
+                </div>
               </div>
             </div>
           </div>
         );
       })()}
 
-      {/* ── Post Stub Modal ─────────────────────────────────────────────────── */}
-      {selectedPost && (
-        <div className="fixed inset-0 z-[1500] flex items-center justify-center">
+      {/* ── Pill Viewer Modal ─────────────────────────────────────────────────
+       * Read-only view of selected pills — accessible to anyone viewing the profile.
+       * Opens when user clicks the scrolling pill strip on the About Me card.
+       * ──────────────────────────────────────────────────────────────────── */}
+      {pillViewerOpen && pills.length > 0 && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center">
           <div
-            onClick={() => setSelectedPost(null)}
+            onClick={() => setPillViewerOpen(false)}
             className="absolute inset-0 bg-black/60 backdrop-blur-md"
           />
           <div
-            className="relative z-10 max-w-[94vw] rounded-3xl overflow-hidden flex flex-col"
-            style={{
-              width: "340px",
-              backgroundColor: "#141414",
-              border: "1px solid rgba(255,255,255,0.1)",
-              boxShadow: "0 0 60px rgba(220,46,115,0.2), 0 24px 80px rgba(0,0,0,0.8)",
-              animation: "stubSlideIn 0.3s cubic-bezier(0.4,0,0.2,1) forwards",
-            }}
+            className="relative z-10 w-[480px] max-w-[94vw] rounded-3xl bg-neutral-900 p-6 flex flex-col gap-5"
             onClick={(e) => e.stopPropagation()}
+            style={{ border: "1px solid rgba(255,255,255,0.08)" }}
           >
-            {/* Header */}
-            <div className="bg-neutral-900 px-5 py-4 flex items-start justify-between gap-3">
-              <h2 className="text-white text-base font-bold leading-tight flex-1">
-                {selectedPost.title}
-              </h2>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-neutral-400">In {selectedPost.jamName}</p>
-                <p className="text-xs text-neutral-500">({selectedPost.username})</p>
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Their Sound</h3>
+              <p className="text-xs text-neutral-600">{pills.length} tags</p>
             </div>
 
-            {/* Image */}
-            <div
-              className="w-full bg-neutral-700 flex items-center justify-center"
-              style={{
-                height: "280px",
-                backgroundImage: selectedPost.image ? `url(${selectedPost.image})` : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
+            <div className="flex flex-wrap gap-2">
+              {pills.map((pill, i) => (
+                <span
+                  key={i}
+                  className="rounded-full px-4 py-1.5 text-sm font-medium"
+                  style={{
+                    backgroundColor: pill.color + "22",
+                    border: `1px solid ${pill.color}88`,
+                    color: pill.color,
+                    boxShadow: `0 0 12px ${pill.color}33`,
+                  }}
+                >
+                  {pill.text}
+                </span>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setPillViewerOpen(false)}
+              className="w-full rounded-xl bg-white/5 border border-white/10 py-2.5 text-sm text-white/60 hover:bg-white/10 transition cursor-pointer"
             >
-              {!selectedPost.image && (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="#555" strokeWidth="1.5"/>
-                  <circle cx="8.5" cy="8.5" r="1.5" fill="#555"/>
-                  <path d="M21 15l-5-5L5 21" stroke="#555" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              )}
-            </div>
-
-            {/* Description */}
-            <div className="px-5 py-4 flex flex-col gap-3">
-              <p className="text-sm text-neutral-300 leading-relaxed">
-                {selectedPost.description || "No description."}
-              </p>
-              <p className="text-xs text-white/20 text-right">click outside to close</p>
-            </div>
+              Close
+            </button>
           </div>
         </div>
       )}
 
-      {/* ── Post Creation Modal ─────────────────────────────────────────────── */}
-      {postModalOpen && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center">
+      {/* ── Pill Picker Modal ─────────────────────────────────────────────────
+       * Opens centered over the edit modal when user taps the pills strip.
+       * Shows all available genres, instruments, and vibes as toggleable pills.
+       * Selected ones glow, unselected ones are dim. Max 9 can be selected.
+       * ──────────────────────────────────────────────────────────────────── */}
+      {pillPickerOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center">
           <div
-            onClick={() => setPostModalOpen(false)}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setPillPickerOpen(false)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
           <div
-            className="relative z-[3001] w-[420px] max-w-[94vw] rounded-2xl bg-neutral-900 p-6 flex flex-col gap-5"
+            className="relative z-10 w-[560px] max-w-[94vw] rounded-3xl bg-neutral-900 flex flex-col"
             onClick={(e) => e.stopPropagation()}
+            style={{ border: "1px solid rgba(255,255,255,0.08)", maxHeight: "70vh" }}
           >
-            <h2 className="text-xl font-semibold text-white">Create Post</h2>
-
-            {/* Title */}
-            <div>
-              <p className="mb-1.5 text-sm text-neutral-400">Post Title</p>
-              <input
-                type="text"
-                placeholder="What's this post about?"
-                value={newPost.title}
-                onChange={(e) => { if (e.target.value.length <= 20) setNewPost((p) => ({ ...p, title: e.target.value })); }}
-                className="w-full rounded-lg bg-neutral-800 px-3 py-2.5 text-sm text-white placeholder-neutral-500 outline-none border border-transparent focus:border-[#DC2E73]/50"
-              />
-            </div>
-
-            {/* Jam picker + username row */}
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <p className="mb-1.5 text-sm text-neutral-400">Jam</p>
-                {/* Backend: replace jams with the user's attended jams from API */}
-                <select
-                  value={newPost.jamName}
-                  onChange={(e) => setNewPost((p) => ({ ...p, jamName: e.target.value }))}
-                  className="w-full rounded-lg bg-neutral-800 px-3 py-2.5 text-sm text-white outline-none border border-transparent focus:border-[#DC2E73]/50 cursor-pointer"
-                  style={{ appearance: "none" }}
-                >
-                  <option value="" disabled>Pick a jam...</option>
-                  {jams.map((j) => (
-                    <option key={j.id} value={j.name}>{j.name}</option>
-                  ))}
-                </select>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <div>
+                <h3 className="text-base font-semibold text-white">Your Sound</h3>
+                <p className="text-xs text-neutral-600 mt-0.5">Pick up to {MAX_PILLS} tags that describe your music</p>
               </div>
-              <div className="flex-1">
-                <p className="mb-1.5 text-sm text-neutral-400">
-                  Username
-                  <span className="ml-1.5 text-[10px] text-neutral-600 font-normal">auto-filled</span>
-                </p>
-                {/* Backend: pre-fill from auth session — currentUser.username */}
-                <div className="w-full rounded-lg bg-neutral-800/50 px-3 py-2.5 text-sm text-neutral-500 border border-neutral-700 border-dashed flex items-center gap-1.5">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <circle cx="5" cy="3.5" r="2" stroke="#555" strokeWidth="1.2"/>
-                    <path d="M1 9c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#555" strokeWidth="1.2" strokeLinecap="round"/>
-                  </svg>
-                  <span>@username</span>
-                </div>
+              <span
+                className="text-xs px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(255,255,255,0.06)", color: selectedTagIds.size >= MAX_PILLS ? "#DC2E73" : "rgba(255,255,255,0.4)" }}
+              >
+                {selectedTagIds.size}/{MAX_PILLS}
+              </span>
+            </div>
+
+            {/* Tag grid — scrollable */}
+            {tagsLoading ? (
+              <div className="flex flex-1 items-center justify-center py-16">
+                <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
               </div>
-            </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-4 flex flex-col gap-5">
+                {/* Genres */}
+                {allTags.filter(t => t.uid.startsWith("g_")).length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-600">Genres</p>
+                    <div className="flex flex-wrap gap-2">
+                      {allTags.filter(t => t.uid.startsWith("g_")).map((tag) => {
+                        const selected = selectedTagIds.has(tag.uid);
+                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
+                        const color = PILL_COLORS[tag.id % PILL_COLORS.length];
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                      })}
+                    </div>
+                  </div>
+                )}
 
-            {/* Description */}
-            <div>
-              <p className="mb-1.5 text-sm text-neutral-400">Description</p>
-              <textarea
-                placeholder="Short description..."
-                value={newPost.description}
-                maxLength={200}
-                onChange={(e) => setNewPost((p) => ({ ...p, description: e.target.value }))}
-                className="w-full rounded-lg bg-neutral-800 px-3 py-2.5 text-sm text-white placeholder-neutral-500 outline-none border border-transparent focus:border-[#DC2E73]/50 resize-none min-h-[80px]"
-              />
-              <p className="text-xs text-neutral-600 text-right mt-1">{newPost.description.length}/200</p>
-            </div>
+                {/* Instruments */}
+                {allTags.filter(t => t.uid.startsWith("i_")).length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-600">Instruments</p>
+                    <div className="flex flex-wrap gap-2">
+                      {allTags.filter(t => t.uid.startsWith("i_")).map((tag) => {
+                        const selected = selectedTagIds.has(tag.uid);
+                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
+                        const color = PILL_COLORS[tag.id % PILL_COLORS.length];
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                      })}
+                    </div>
+                  </div>
+                )}
 
-            {/* Image upload */}
-            <div>
-              <p className="mb-1.5 text-sm text-neutral-400">Image <span className="text-neutral-600">(optional)</span></p>
-              <input
-                type="file"
-                accept="image/*"
-                id="postImageUpload"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  openCrop("portrait", file);
-                  e.target.value = "";
-                }}
-              />
-              <label
-                htmlFor="postImageUpload"
-                className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3 text-neutral-300 transition-all duration-200 hover:border-transparent hover:bg-[#DC2E73] hover:text-white"
-                style={newPost.image ? {
-                  backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${newPost.image})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  borderColor: "transparent",
-                } : {}}
-              >
-                <i className="fa-solid fa-image text-sm" />
-                <span className="text-sm font-medium">{newPost.image ? "Change Image" : "Upload Image"}</span>
-              </label>
-            </div>
+                {/* Vibes */}
+                {allTags.filter(t => t.uid.startsWith("v_")).length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-600">Vibes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {allTags.filter(t => t.uid.startsWith("v_")).map((tag) => {
+                        const selected = selectedTagIds.has(tag.uid);
+                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
+                        const color = PILL_COLORS[tag.id % PILL_COLORS.length];
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Actions */}
-            <div className="flex justify-between pt-1">
+            {/* Footer */}
+            <div className="px-6 pb-5 pt-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
               <button
-                onClick={() => {
-                  setPostModalOpen(false);
-                  setNewPost({ title: "", jamName: "", username: "", description: "", image: null });
-                }}
-                className="rounded-lg bg-neutral-700 px-4 py-2 text-sm hover:bg-neutral-600 transition cursor-pointer"
+                onClick={() => setPillPickerOpen(false)}
+                className="w-full rounded-xl bg-[#DC2E73] py-2.5 text-sm font-semibold text-white hover:bg-pink-500 transition cursor-pointer"
               >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!newPost.title.trim()) { showToast("Post needs a title."); return; }
-                  addPost(newPost);
-                  setPostModalOpen(false);
-                  setNewPost({ title: "", jamName: "", username: "", description: "", image: null });
-                }}
-                className="rounded-lg bg-[#DC2E73] px-4 py-2 text-sm hover:bg-pink-500 transition cursor-pointer text-white"
-              >
-                Post
+                Done
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Modal */}
-      {editOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+      {/* Edit Modal — only rendered for own profile */}
+      {isOwnProfile && editOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
           <div
             onClick={() => setEditOpen(false)}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
 
           <div
-            className="relative z-[1000] flex w-[900px] max-w-[94vw] flex-col gap-6 rounded-3xl bg-neutral-900 p-6 text-white shadow-xl md:flex-row"
+            className="relative z-[1000] flex w-[900px] max-w-[94vw] max-h-[90vh] flex-col gap-6 rounded-3xl bg-neutral-900 p-6 text-white shadow-xl md:flex-row overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-full md:w-[250px]">
@@ -1359,27 +1953,58 @@ const Profile = () => {
 
             <div className="min-h-[320px] flex-1 rounded-2xl border border-white/10 bg-white/5 p-5">
               {activeSection === "Name & Location" && (
-                <div className="space-y-4">
-                  <div>
+                <div className="flex flex-col gap-5">
+                  {/* Display name */}
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-neutral-500 uppercase tracking-widest">Display name</p>
                     <input
                       value={name}
-                      onChange={(e) => {
-                        if (e.target.value.length <= 15) setName(e.target.value);
-                      }}
-                      className="w-full rounded-lg bg-white p-3 text-black"
-                      placeholder="Name"
+                      onChange={(e) => { if (e.target.value.length <= 15) setName(e.target.value); }}
+                      className="w-full rounded-xl bg-neutral-800 px-4 py-3 text-sm text-white placeholder-neutral-600 outline-none border border-transparent focus:border-[#DC2E73]/40 transition-colors"
+                      placeholder="Your name"
+                      maxLength={15}
                     />
+                    <p className="text-xs text-neutral-600 text-right">{name.length}/15</p>
                   </div>
 
-                  <div>
-                    <input
-                      value={location}
-                      onChange={(e) => {
-                        if (e.target.value.length <= 14) setLocation(e.target.value);
-                      }}
-                      className="w-full rounded-lg bg-white p-3 text-black"
-                      placeholder="Location"
-                    />
+                  {/* City + Country side by side */}
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-neutral-500 uppercase tracking-widest">Location</p>
+                    <div className="flex gap-3">
+                      <div className="flex-1 flex flex-col gap-1">
+                        <input
+                          value={city}
+                          onChange={(e) => {
+                            if (e.target.value.length > 15) return;
+                            setCity(e.target.value);
+                            const parts = [e.target.value, country].filter(Boolean);
+                            setLocation(parts.join(", "));
+                          }}
+                          className="w-full rounded-xl bg-neutral-800 px-4 py-3 text-sm text-white placeholder-neutral-600 outline-none border border-transparent focus:border-[#DC2E73]/40 transition-colors"
+                          placeholder="City"
+                          maxLength={15}
+                        />
+                        <p className="text-xs text-neutral-600 text-right">{city.length}/15</p>
+                      </div>
+                      <div className="flex-1 flex flex-col gap-1">
+                        <input
+                          value={country}
+                          onChange={(e) => {
+                            if (e.target.value.length > 15) return;
+                            setCountry(e.target.value);
+                            const parts = [city, e.target.value].filter(Boolean);
+                            setLocation(parts.join(", "));
+                          }}
+                          className="w-full rounded-xl bg-neutral-800 px-4 py-3 text-sm text-white placeholder-neutral-600 outline-none border border-transparent focus:border-[#DC2E73]/40 transition-colors"
+                          placeholder="Country"
+                          maxLength={15}
+                        />
+                        <p className="text-xs text-neutral-600 text-right">{country.length}/15</p>
+                      </div>
+                    </div>
+                    {location && (
+                      <p className="text-xs text-neutral-600">Shows as: {location}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1465,16 +2090,30 @@ const Profile = () => {
 
               {activeSection === "About Me" && (
                 <div className="flex flex-col gap-4">
+                  {/* Headline input */}
+                  <div>
+                    <p className="mb-1.5 text-sm text-neutral-400">Headline</p>
+                    <input
+                      type="text"
+                      value={headline}
+                      maxLength={20}
+                      onChange={(e) => setHeadline(e.target.value)}
+                      placeholder="Add your headline!"
+                      className="w-full rounded-lg bg-neutral-800 px-3 py-2.5 text-sm text-white placeholder-neutral-600 outline-none border border-transparent focus:border-[#DC2E73]/40 transition-colors"
+                    />
+                    <p className="mt-1 text-xs text-neutral-400">{headline.length}/20 characters</p>
+                  </div>
+
                   {/* Bio textarea */}
                   <div>
                     <p className="mb-1.5 text-sm text-neutral-400">Bio</p>
                     <textarea
                       value={about}
-                      maxLength={300}
+                      maxLength={200}
                       onChange={(e) => setAbout(e.target.value)}
                       className="min-h-[120px] w-full resize-none rounded-lg bg-neutral-800 p-3 text-sm"
                     />
-                    <p className="mt-1 text-xs text-neutral-400">{about.length}/300 characters</p>
+                    <p className="mt-1 text-xs text-neutral-400">{about.length}/200 characters</p>
                   </div>
 
                   {/* Photo upload — side by side with preview when set */}
@@ -1529,41 +2168,80 @@ const Profile = () => {
               )}
 
               {activeSection === "Pills" && (
-                <div className="space-y-4">
-                  <p className="text-sm text-neutral-400">
-                    Add tags that describe your sound. Click a pill to remove it.
+                <div className="flex flex-col gap-4" style={{ height: "280px" }}>
+                  <p className="text-xs text-neutral-500">
+                    {pills.length}/{MAX_PILLS} selected — click the strip to edit
                   </p>
-                  <div className="flex flex-wrap gap-2 min-h-[48px]">
-                    {pills.map((pill, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setPills((prev) => prev.filter((_, idx) => idx !== i))}
-                        className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm text-white transition group"
-                        style={{
-                          backgroundColor: pill.color + "22",
-                          border: `1px solid ${pill.color}cc`,
-                          boxShadow: `0 0 0 1px ${pill.color}44, 0 2px 10px ${pill.color}55`,
-                        }}
-                      >
-                        {pill.text}
-                        <span className="text-white/40 group-hover:text-white/80 text-xs leading-none">✕</span>
-                      </button>
-                    ))}
-                    {pills.length === 0 && (
-                      <p className="text-xs text-neutral-600 self-center">No pills yet, you can add some below.</p>
+
+                  {/* Scrollable strip of selected pills — click to open picker */}
+                  <button
+                    onClick={async () => {
+                      setPillPickerOpen(true);
+                      if (allTags.length === 0) {
+                        setTagsLoading(true);
+                        try {
+                          const { genres, instruments, vibes } = await apiService.getAllFormOptions();
+                          const fetched = [
+                            ...(genres ?? []).map(t => ({ ...t, uid: `g_${t.id}` })),
+                            ...(instruments ?? []).map(t => ({ ...t, uid: `i_${t.id}` })),
+                            ...(vibes ?? []).map(t => ({ ...t, uid: `v_${t.id}` })),
+                          ];
+                          setAllTags(fetched);
+                          const currentIds = new Set(pills.map((p) => p.id).filter(Boolean));
+                          setSelectedTagIds(currentIds);
+                        } catch (e) {
+                          console.error("Failed to fetch tags:", e);
+                        } finally {
+                          setTagsLoading(false);
+                        }
+                      } else {
+                        const currentIds = new Set(pills.map((p) => p.id).filter(Boolean));
+                        setSelectedTagIds(currentIds);
+                      }
+                    }}
+                    className="w-full hide-scrollbar rounded-2xl bg-neutral-800/60 border border-white/10 px-4 py-3 flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors"
+                    style={{ height: "52px", overflow: "hidden" }}
+                  >
+                    {pills.length === 0 ? (
+                      <span className="text-xs text-neutral-600 shrink-0">Tap to pick your sound...</span>
+                    ) : (
+                      <>
+                        {pills.slice(0, 4).map((pill, i) => (
+                          <span
+                            key={i}
+                            className="shrink-0 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap"
+                            style={{
+                              backgroundColor: pill.color + "22",
+                              border: `1px solid ${pill.color}88`,
+                              color: pill.color,
+                              boxShadow: `0 0 8px ${pill.color}33`,
+                            }}
+                          >
+                            {pill.text}
+                          </span>
+                        ))}
+                        {pills.length > 4 && (
+                          <span
+                            className="shrink-0 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap"
+                            style={{
+                              backgroundColor: "rgba(255,255,255,0.06)",
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              color: "rgba(255,255,255,0.4)",
+                            }}
+                          >
+                            +{pills.length - 4} more
+                          </span>
+                        )}
+                      </>
                     )}
-                  </div>
-                  {pills.length < 10 && (
-                    <PillInput onAdd={(pill) => setPills((prev) => [...prev, pill])} />
-                  )}
-                  <p className="text-xs text-neutral-600">{pills.length}/10 pills</p>
+                  </button>
                 </div>
               )}
 
               {activeSection === "Card Colors" && (
                 <div className="flex flex-col gap-1">
 
-                  {/* Four compact rows */}
+                  {/* Five compact rows */}
                   <CardColorRow
                     label="About Me"
                     value={cardColors.aboutMe}
@@ -1583,10 +2261,58 @@ const Profile = () => {
                   />
                   <div className="h-px bg-white/[0.06]" />
                   <CardColorRow
-                    label="Posts"
+                    label="Jam Cards"
+                    value={jamCardColor}
+                    onChange={(c) => setJamCardColor(c)}
+                  />
+                  <div className="h-px bg-white/[0.06]" />
+                  <CardColorRow
+                    label="Friends"
                     value={cardColors.posts}
                     onChange={(c) => setCardColor("posts", c)}
                   />
+                  <div className="h-px bg-white/[0.06]" />
+                  <CardColorRow
+                    label="Interests"
+                    value={cardColors.interests}
+                    onChange={(c) => setCardColor("interests", c)}
+                  />
+                  {/* Interests text override */}
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-neutral-400 w-28 shrink-0">Interests text</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setCardTextOverrides(p => ({ ...p, interests: null }))}
+                        className="text-[10px] font-medium px-2 py-0.5 rounded transition-all duration-150"
+                        style={{
+                          background: cardTextOverrides.interests === null ? "rgba(255,255,255,0.15)" : "transparent",
+                          color: cardTextOverrides.interests === null ? "#fff" : "#555",
+                          border: "1px solid",
+                          borderColor: cardTextOverrides.interests === null ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)",
+                        }}
+                      >Auto</button>
+                      <button
+                        onClick={() => setCardTextOverrides(p => ({ ...p, interests: true }))}
+                        title="Dark text"
+                        className="w-6 h-6 rounded transition-all duration-150 hover:scale-110"
+                        style={{
+                          background: "#111",
+                          outline: cardTextOverrides.interests === true ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
+                          outlineOffset: cardTextOverrides.interests === true ? "2px" : "0",
+                        }}
+                      />
+                      <button
+                        onClick={() => setCardTextOverrides(p => ({ ...p, interests: false }))}
+                        title="Light text"
+                        className="w-6 h-6 rounded transition-all duration-150 hover:scale-110"
+                        style={{
+                          background: "#e5e5e5",
+                          outline: cardTextOverrides.interests === false ? "2px solid #DC2E73" : "1px solid rgba(255,255,255,0.15)",
+                          outlineOffset: cardTextOverrides.interests === false ? "2px" : "0",
+                        }}
+                      />
+                    </div>
+                  </div>
 
                   {/* Global text color toggle */}
                   <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between">
@@ -1637,12 +2363,73 @@ const Profile = () => {
                 </div>
               )}
 
-              <button
-                onClick={() => setEditOpen(false)}
-                className="mt-6 rounded-full bg-pink-600 px-4 py-2 cursor-pointer"
-              >
-                Close
-              </button>
+              {/*
+               * ── SAVE ─────────────────────────────────────────────────────
+               * handleSave collects every editable variable and calls
+               * updateProfile() from useAuth. Variables marked [NEW] need
+               * matching fields added to the profile model before they persist.
+               *
+               * Call this from the Save button below. ─────────────────────── */}
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={async () => {
+                    // ── Derive pill order arrays from current pills state ─────
+                    // Pills are ordered — the index matters for "Top Interests"
+                    // on the sidebar. Preserve that order when saving.
+                    const orderedGenreIds      = pills.filter(p => p.id?.startsWith("g_")).map(p => +p.id.slice(2));
+                    const orderedInstrumentIds = pills.filter(p => p.id?.startsWith("i_")).map(p => +p.id.slice(2));
+                    const orderedVibeIds       = pills.filter(p => p.id?.startsWith("v_")).map(p => +p.id.slice(2));
+
+                    // ── Visual theme — stored as a single JSON blob ───────────
+                    // [NEW] Add `profile_theme` JSONField to the profile model.
+                    const profile_theme = {
+                      cardColors,        // { aboutMe, musicSnips, jams, posts, interests }
+                      jamCardColor,      // swatch object for individual jam row cards
+                      cardTextOverrides, // { aboutMe, musicSnips, jams, posts, interests }
+                      bannerDark,        // boolean — light text on banner
+                    };
+
+                    try {
+                      // ── BACKEND: call your updateProfile() from useAuth ───────
+                      // Uncomment and adjust field names to match your API:
+                      //
+                      // const { updateProfile } = useAuth(); // add to destructure above
+                      // await updateProfile({
+                      //
+                      //   // ── Already wired ─────────────────────────────────
+                      //   display_name:       name,          // string, max 15 chars
+                      //   city:               city,          // string, max 15 chars
+                      //   country:            country,       // string, max 15 chars
+                      //   about:              about,         // string, max 200 chars
+                      //   pfp:                profilePic,    // dataURL → convert to File before PATCH
+                      //   genres_liked:       orderedGenreIds,
+                      //   instruments_liked:  orderedInstrumentIds,
+                      //   vibes_liked:        orderedVibeIds,
+                      //
+                      //   // ── [NEW] Fields needing model additions ──────────
+                      //   headline:           headline,      // string, max 20 chars
+                      //   available_to_jam:   availableToJam, // boolean
+                      //   banner:             banner,        // dataURL → image field
+                      //   about_photo:        aboutPhoto,    // dataURL → image field
+                      //   profile_theme:      JSON.stringify(profile_theme), // JSONField
+                      // });
+
+                      setEditOpen(false);
+                    } catch (err) {
+                      console.error("Failed to save profile:", err);
+                    }
+                  }}
+                  className="flex-1 rounded-full bg-[#DC2E73] px-4 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-pink-500 transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditOpen(false)}
+                  className="rounded-full bg-neutral-700 px-4 py-2 text-sm text-white cursor-pointer hover:bg-neutral-600 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1836,6 +2623,9 @@ const Profile = () => {
           </div>
         )}
       </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 };
