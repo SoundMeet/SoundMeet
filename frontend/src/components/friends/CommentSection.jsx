@@ -85,9 +85,13 @@ function normalizeComment(c) {
   }
 }
 
-export function CommentSection({ postId, existingComments = [] }) {
+export function CommentSection({ postId, existingComments = [], onCommentAdded, onCommentDeleted }) {
   const { user } = useAuth()
-  const [comments, setComments] = useState(() => existingComments.map(normalizeComment))
+  const [comments, setComments] = useState(() => {
+    const normalized = existingComments.map(normalizeComment);
+    console.log('[CommentSection] initial comments state for post', postId, ':', normalized);
+    return normalized;
+  })
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
   const canSubmit = text.trim().length > 0
@@ -115,12 +119,30 @@ export function CommentSection({ postId, existingComments = [] }) {
       content:   body,
       createdAt: new Date().toISOString(),
     }
+    console.log('[CommentSection] before submit — comments:', comments)
     setComments((prev) => [...prev, optimistic])
     try {
       const saved = await postService.addComment(postId, user.id, body)
-      setComments((prev) => prev.map((c) => c.id === optimistic.id ? normalizeComment(saved) : c))
+      // Build the confirmed comment from user data we already have — avoids
+      // relying on a Supabase join in the insert response which can fail under RLS.
+      const confirmed = {
+        id:        saved.id,
+        author: {
+          id:          user.id,
+          displayName: user.display_name ?? user.username ?? 'You',
+          avatarUrl:   user.pfp ?? null,
+        },
+        content:   saved.content,
+        createdAt: saved.created_at,
+      }
+      setComments((prev) => {
+        const next = prev.map((c) => c.id === optimistic.id ? confirmed : c)
+        console.log('[CommentSection] after save — comments:', next)
+        return next
+      })
+      onCommentAdded?.()
     } catch (err) {
-      console.error('addComment failed:', err)
+      console.error('[CommentSection] addComment failed:', err)
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id))
     }
   }
@@ -133,8 +155,10 @@ export function CommentSection({ postId, existingComments = [] }) {
     }
   }
 
-  const deleteComment = (id) =>
+  const deleteComment = (id) => {
     setComments((prev) => prev.filter((c) => c.id !== id))
+    onCommentDeleted?.()
+  }
 
   return (
     <motion.div

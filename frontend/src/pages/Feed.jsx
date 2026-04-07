@@ -6,7 +6,7 @@ import { UserSearchModal } from '../components/friends/UserSearchModal'
 
 const FEED_TABS = [
   { key: 'forYou',    label: 'For you' },
-  { key: 'following', label: 'Following' },
+  { key: 'following', label: 'Friends' },
 ]
 
 const Friends = () => {

@@ -21,7 +21,7 @@ export function FeedPost({ post }) {
   const [isEditing, setIsEditing]     = useState(false)
   const [editText, setEditText]       = useState(post.content)
   const [commentsOpen, setComments]   = useState(false)
-  const [commentCount] = useState(comments)
+  const [commentCount, setCommentCount] = useState(comments)
   const editRef = useRef(null)
 
   if (deleted) return null
@@ -120,7 +120,12 @@ export function FeedPost({ post }) {
 
       <AnimatePresence>
         {commentsOpen && (
-          <CommentSection postId={post.id} existingComments={post._rawComments ?? []} />
+          <CommentSection
+            postId={post.id}
+            existingComments={post._rawComments ?? []}
+            onCommentAdded={() => setCommentCount((c) => c + 1)}
+            onCommentDeleted={() => setCommentCount((c) => Math.max(0, c - 1))}
+          />
         )}
       </AnimatePresence>
     </div>
