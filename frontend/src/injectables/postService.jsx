@@ -93,13 +93,34 @@ export const postService = {
   },
 
   async addComment(postId, userId, content) {
+    const payload = { post_id: postId, author_id: userId, content };
+    console.log('[addComment] outgoing payload:', payload);
     const { data, error } = await supabase
       .from('chat_comment')
-      .insert([{ post_id: postId, author_id: userId, content }])
-      .select('id, content, created_at, author:author_id ( id, username )')
+      .insert([payload])
+      .select('id, content, created_at, author_id')
       .single();
 
+    console.log('[addComment] insert response — data:', data, ' error:', error);
     if (error) throw error;
     return data;
+  },
+
+  async getCommentsForPost(postId) {
+    console.log('[getCommentsForPost] fetching for post_id:', postId);
+    const { data, error } = await supabase
+      .from('chat_comment')
+      .select(`
+        id,
+        content,
+        created_at,
+        author:author_id ( id, username )
+      `)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+
+    console.log('[getCommentsForPost] result — data:', data, ' error:', error);
+    if (error) throw error;
+    return data ?? [];
   }
 };
