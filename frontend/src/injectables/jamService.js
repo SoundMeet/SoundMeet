@@ -131,6 +131,7 @@ export function normalizeJamRow(row, userLocation = null) {
     vibe: vibeName,
     vibes: vibeName ? [vibeName] : [],
     previewPills: [genreName, vibeName].filter(Boolean),
+    tags: [genreName, vibeName].filter(Boolean),
 
     // ── Timing ───────────────────────────────────────────────────────────────
     dateTime: formattedDate,
