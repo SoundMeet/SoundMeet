@@ -3,15 +3,6 @@
  *
  * Reusable auth modal shell. Renders at the app root level (in App.jsx)
  * and is controlled via AuthModalContext.
- *
- * Features:
- *   – Login / Sign Up tab switcher
- *   – Framer Motion enter/exit animation
- *   – Backdrop click to close
- *   – Escape key to close
- *   – Body scroll lock when open
- *   – Animated view transitions (slide left/right)
- *   – Fully keyboard accessible (aria-modal, role=dialog)
  */
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -31,22 +22,16 @@ const PANEL_STYLE = {
 export default function AuthModal() {
   const { isOpen, view, closeModal, switchView } = useAuthModal()
 
-  // Escape key
   useEffect(() => {
     if (!isOpen) return
-    const handler = (e) => {
-      if (e.key === 'Escape') closeModal()
-    }
+    const handler = (e) => { if (e.key === 'Escape') closeModal() }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [isOpen, closeModal])
 
-  // Body scroll lock
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => {
-      document.body.style.overflow = ''
-    }
+    return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
   return (
@@ -60,10 +45,7 @@ export default function AuthModal() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          // Close on backdrop click
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) closeModal()
-          }}
+          onPointerDown={(e) => { if (e.target === e.currentTarget) closeModal() }}
         >
           <motion.div
             key="auth-panel"
@@ -71,15 +53,14 @@ export default function AuthModal() {
             aria-modal="true"
             aria-label={view === 'login' ? 'Log in to SoundMeet' : 'Create a SoundMeet account'}
             className="w-full max-w-sm"
+            style={PANEL_STYLE}
             initial={{ opacity: 0, scale: 0.95, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 14 }}
             transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-            style={PANEL_STYLE}
           >
-            {/* ── Header ─────────────────────────────────────────────────── */}
+            {/* ── Header ── */}
             <div className="px-6 pt-6 pb-4 flex items-center justify-between">
-              {/* Tab switcher */}
               <div
                 className="flex gap-1 p-1 rounded-xl"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
@@ -87,7 +68,7 @@ export default function AuthModal() {
                 aria-label="Auth mode"
               >
                 {[
-                  { id: 'login', label: 'Log in' },
+                  { id: 'login',  label: 'Log in'  },
                   { id: 'signup', label: 'Sign up' },
                 ].map((tab) => (
                   <button
@@ -101,16 +82,13 @@ export default function AuthModal() {
                       fontFamily: 'Sora, sans-serif',
                       background: view === tab.id ? '#DC2E73' : 'transparent',
                       color: view === tab.id ? '#fff' : 'rgba(255,255,255,0.38)',
-                      boxShadow:
-                        view === tab.id ? '0 0 12px rgba(220,46,115,0.3)' : 'none',
+                      boxShadow: view === tab.id ? '0 0 12px rgba(220,46,115,0.3)' : 'none',
                     }}
                   >
                     {tab.label}
                   </button>
                 ))}
               </div>
-
-              {/* Close button */}
               <button
                 type="button"
                 onClick={closeModal}
@@ -122,25 +100,19 @@ export default function AuthModal() {
               </button>
             </div>
 
-            {/* ── Title ──────────────────────────────────────────────────── */}
+            {/* ── Title ── */}
             <div className="px-6 pb-4">
-              <h2
-                className="text-lg font-bold text-white"
-                style={{ fontFamily: 'Sora, sans-serif' }}
-              >
+              <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>
                 {view === 'login' ? 'Welcome back' : 'Join SoundMeet'}
               </h2>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'Sora, sans-serif' }}
-              >
+              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'Sora, sans-serif' }}>
                 {view === 'login'
                   ? 'Log in to your account to continue.'
                   : 'Create your account and find your sound.'}
               </p>
             </div>
 
-            {/* ── Form (animated view swap) ──────────────────────────────── */}
+            {/* ── Form ── */}
             <div className="px-6 pb-6 overflow-hidden">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div

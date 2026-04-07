@@ -32,6 +32,17 @@ import Onboarding from "./pages/Onboarding";
 
 
 
+const OnboardingGuard = ({ children }) => {
+  const { isLoggedIn, user, isLoading } = useAuth()
+  // Wait for auth to finish resolving before making any redirect decision
+  if (isLoading) return null
+  // Only redirect logged-in users who haven't finished onboarding
+  if (isLoggedIn && user && !user.onboarding_complete) {
+    return <Navigate to="/onboarding" replace />
+  }
+  return children
+}
+
 const App = () => {
   const { isLoading } = useAuth()
 
@@ -43,7 +54,6 @@ const App = () => {
       </div>
     )
   }
-
   return (
     <NotificationsProvider>
       <FriendsProvider>
@@ -53,13 +63,13 @@ const App = () => {
               <Navbar />
             </div>
             <Routes>
-              <Route path="/" element={<GuestLocationGuard><Home /></GuestLocationGuard>} />
-              <Route path="/meet" element={<Meet />} />
-              <Route path="/jams" element={<MyJams />} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/feed" element={<PrivateRoute><Feed /></PrivateRoute>} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/" element={<OnboardingGuard><GuestLocationGuard><Home /></GuestLocationGuard></OnboardingGuard>} />
+              <Route path="/meet" element={<OnboardingGuard><Meet /></OnboardingGuard>} />
+              <Route path="/jams" element={<OnboardingGuard><MyJams /></OnboardingGuard>} />
+              <Route path="/chat" element={<OnboardingGuard><Chat /></OnboardingGuard>} />
+              <Route path="/feed" element={<OnboardingGuard><PrivateRoute><Feed /></PrivateRoute></OnboardingGuard>} />
+              <Route path="/profile" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
+              <Route path="/settings" element={<OnboardingGuard><Settings /></OnboardingGuard>} />
               <Route path="*" element={<NotFound />} />
               <Route path="/onboarding" element={<Onboarding />} />
       </Routes>

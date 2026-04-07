@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import MapComponent from "../components/MapComponent";
 import GlowSwitch from "../components/GlowSwitch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,6 +43,14 @@ const CATEGORY_HEADINGS = {
 const Home = () => {
   const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
+  const navigate = useNavigate();
+
+  // Redirect to onboarding if not yet completed
+  useEffect(() => {
+    if (isLoggedIn && user && !user.onboarding_complete) {
+      navigate("/onboarding", { replace: true });
+    }
+  }, [isLoggedIn, user]);
 
   // ── Category filter ────────────────────────────────────────────────────────
   // Empty array = "All" (no restriction). Populated = specific categories selected.
