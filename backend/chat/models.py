@@ -2,6 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.auth.models import User
 import uuid
 
+
 class Instrument(models.Model):
     class families(models.TextChoices):
         STRINGS = 'STRINGS'
@@ -9,12 +10,13 @@ class Instrument(models.Model):
         BRASS = 'BRASS'
         PERCUSSION = 'PERCUSSION'
         NULL = 'NULL'
-        
+
     name = models.CharField(max_length=100, unique=True)
     family = models.CharField(choices=families.choices, default=families.NULL)
 
     def __str__(self):
         return self.name
+
 
 class Genre(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -44,6 +46,12 @@ class Artist(models.Model):
     name = models.CharField(blank=True, max_length=100)
     picture = models.URLField(blank=True, null=True)
     genre = models.ManyToManyField(Genre)
+
+    def __str__(self):
+        return self.name
+
+class Vibe(models.Model):
+    name = models.CharField(blank=True, max_length=100, unique=True)
 
     def __str__(self):
         return self.name
@@ -90,6 +98,7 @@ class Profile(models.Model):
     def __str__(self):
         return self.user.username
 
+
 class Jam(models.Model):
     class JamTypes(models.TextChoices):
         OPEN_JAM = 'OPEN JAM'
@@ -118,7 +127,6 @@ class Jam(models.Model):
     access = models.BooleanField(default=False, help_text="True means public, False means private")
     max_attendees = models.PositiveIntegerField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
-    
     users_attending = models.ManyToManyField(User, blank=True, related_name="attending_jams")
     spectators = models.ManyToManyField(User, blank=True, related_name="spectating_jams")
     
@@ -158,6 +166,7 @@ class Band(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class BandmateListing(models.Model):
     class Statuses(models.TextChoices):
@@ -206,6 +215,7 @@ class Conversation(models.Model):
         if self.show: return f"Show Chat: {self.show.name}"
         return f"DM: {self.id}"
 
+
 class Message(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
@@ -216,7 +226,7 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['timestamp']
-    
+
     def __str__(self):
         return f"{self.sender.username}: {self.content[:20]}..."
     
