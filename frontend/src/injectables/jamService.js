@@ -5,7 +5,7 @@
  * Normalizes raw `chat_jam` rows into the discovery item shape used by
  * every component in the app (map pins, cards, modals, MyJams tabs).
  */
-import { supabase } from '../injectables/supaBaseClient';
+import { supabase } from './supaBaseClient';
 import { parseEWKBPoint, toWKTPoint } from '../utils/parseGeography';
 import { DISCOVERY_COLORS } from '../utils/discovery';
 
@@ -116,7 +116,7 @@ export function normalizeJamRow(row, userLocation = null) {
 
     // ── Display ───────────────────────────────────────────────────────────────
     title: row.name,
-    subtitle: genreName ?? 'Jam Session',
+    subtitle: [genreName, vibeName].filter(Boolean).join(' · ') || 'Jam Session',
     neighborhood: null,
     summary: row.description ?? '',
     description: row.description ?? '',
@@ -129,6 +129,7 @@ export function normalizeJamRow(row, userLocation = null) {
     // ── Taxonomy ──────────────────────────────────────────────────────────────
     genre: genreName,
     vibe: vibeName,
+    vibes: vibeName ? [vibeName] : [],
     previewPills: [genreName, vibeName].filter(Boolean),
 
     // ── Timing ───────────────────────────────────────────────────────────────
@@ -280,6 +281,19 @@ export const jamService = {
         ? toWKTPoint(form.selectedPlace.latitude, form.selectedPlace.longitude)
         : null;
 
+    // form.genres.presetIds are DB IDs from useFormOptions (strings) — chat_jam takes a single FK
+    const genreId = form.isOpenToAllGenres
+      ? null
+      : form.genres?.presetIds?.[0]
+        ? parseInt(form.genres.presetIds[0], 10)
+        : null;
+
+    const vibeId = form.isOpenToAllVibes
+      ? null
+      : form.vibes?.presetIds?.[0]
+        ? parseInt(form.vibes.presetIds[0], 10)
+        : null;
+
     const row = {
       name: form.title.trim(),
       date_time: dateTime,
@@ -287,6 +301,8 @@ export const jamService = {
       access: !form.isPrivate, // true = public
       admin_id: userId,
       location,
+      genre_id: genreId,
+      vibe_id: vibeId,
     };
 
     const { data, error } = await supabase
@@ -296,6 +312,14 @@ export const jamService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async deleteJam(jamId) {
+    const { error } = await supabase
+      .from('chat_jam')
+      .delete()
+      .eq('id', jamId);
+    if (error) throw error;
   },
 
   /**

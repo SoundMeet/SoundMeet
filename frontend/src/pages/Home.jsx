@@ -22,7 +22,7 @@ import {
   DEFAULT_SORT,
   DEFAULT_MORE_FILTERS,
 } from "../utils/discoverFilters";
-import { jamService, normalizeJamRow } from "../services/jamService";
+import { jamService, normalizeJamRow } from "../injectables/jamService";
 import DiscoveryCard from "../components/discover/DiscoveryCard";
 import EventDetailModal from "../components/event-detail/EventDetailModal";
 import {
@@ -188,10 +188,14 @@ const Home = () => {
     setCreateJamModalOpen(true);
   };
 
-  const handleDiscoveryDelete = (item) => {
+  const handleDiscoveryDelete = async (item) => {
     closeDiscoveryModal();
-    console.log("Delete jam:", item.id);
-    // TODO: await api.deleteJam(item.id)
+    try {
+      await jamService.deleteJam(item.id);
+      setRawJamRows((prev) => prev.filter((j) => String(j.id) !== String(item.id)));
+    } catch (err) {
+      console.error('Delete jam failed:', err);
+    }
   };
 
   // Opens JoinJamModal from EventDetailModal footer action

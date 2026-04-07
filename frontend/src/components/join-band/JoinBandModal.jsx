@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion } from "framer-motion";
 import JoinBandForm from "./JoinBandForm";
-import { joinBandOptions } from "../../data/mockJoinBandOptions";
+import { useFormOptions } from "../../hooks/useFormOptions";
 
 /**
  * JoinBandModal — Radix Dialog shell wrapping JoinBandForm.
@@ -18,8 +18,9 @@ const JoinBandModal = ({
   open,
   onOpenChange,
   profile = {},
-  options = joinBandOptions,
-}) => (
+}) => {
+  const { options, isLoading } = useFormOptions()
+  return (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
       {/* Overlay */}
@@ -58,16 +59,19 @@ const JoinBandModal = ({
               "0 0 60px rgba(229,226,225,0.03), 0 0 50px rgba(168,85,247,0.1), 0 -1px 0 rgba(168,85,247,0.07)",
           }}
         >
-          <JoinBandForm
-            key={open ? "open" : "closed"}
-            profile={profile}
-            options={options}
-            onClose={() => onOpenChange(false)}
-          />
+          {!isLoading && options && (
+            <JoinBandForm
+              key={open ? "open" : "closed"}
+              profile={profile}
+              options={options}
+              onClose={() => onOpenChange(false)}
+            />
+          )}
         </motion.div>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
-);
+  )
+}
 
 export default JoinBandModal;

@@ -1,32 +1,8 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdSend, MdDeleteOutline } from 'react-icons/md'
-import { MOCK_AUTHENTICATED_USER } from '../../data/mockUser'
-import { mockFriends } from '../../data/mockFriendsData'
-
-const SAMPLE_TEXTS = [
-  "This is fire! 🔥",
-  "Count me in for the next one!",
-  "Love this vibe, keep it coming 🎶",
-  "Amazing — when's the next session?",
-  "This is exactly what I needed to hear today.",
-  "The groove on this is unreal 🙌",
-  "Incredible work, seriously.",
-  "I'm in! What time?",
-  "We need more of this energy.",
-  "Absolutely legendary.",
-  "This slaps so hard.",
-]
-
-function generateSeedComments(postId, count) {
-  const friends = mockFriends.slice(0, Math.min(count, mockFriends.length))
-  return friends.map((f, i) => ({
-    id: `${postId}-seed-${i}`,
-    author: { id: f.id, displayName: f.displayName, avatarUrl: f.avatarUrl },
-    content: SAMPLE_TEXTS[i % SAMPLE_TEXTS.length],
-    createdAt: new Date(Date.now() - (friends.length - i) * 3_600_000).toISOString(),
-  }))
-}
+import { useAuth } from '../../injectables/Auth'
+import { postService } from '../../injectables/postService'
 
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -96,10 +72,22 @@ function Comment({ comment, canDelete, onDelete }) {
   )
 }
 
-export function CommentSection({ postId, initialCount }) {
-  const [comments, setComments] = useState(() =>
-    generateSeedComments(postId, Math.min(initialCount, 4))
-  )
+function normalizeComment(c) {
+  return {
+    id:        c.id,
+    author: {
+      id:          c.author?.id,
+      displayName: c.author?.username ?? 'Unknown',
+      avatarUrl:   null,
+    },
+    content:   c.content,
+    createdAt: c.created_at,
+  }
+}
+
+export function CommentSection({ postId, existingComments = [] }) {
+  const { user } = useAuth()
+  const [comments, setComments] = useState(() => existingComments.map(normalizeComment))
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
   const canSubmit = text.trim().length > 0
@@ -111,23 +99,30 @@ export function CommentSection({ postId, initialCount }) {
     el.style.height = `${el.scrollHeight}px`
   }
 
-  const handleSubmit = () => {
-    if (!canSubmit) return
-    setComments((prev) => [
-      ...prev,
-      {
-        id: `new-${Date.now()}`,
-        author: {
-          id: MOCK_AUTHENTICATED_USER.id,
-          displayName: MOCK_AUTHENTICATED_USER.name,
-          avatarUrl: MOCK_AUTHENTICATED_USER.avatarUrl,
-        },
-        content: text.trim(),
-        createdAt: new Date().toISOString(),
-      },
-    ])
+  const handleSubmit = async () => {
+    if (!canSubmit || !user?.id) return
+    const body = text.trim()
     setText('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    // Optimistic
+    const optimistic = {
+      id: `opt-${Date.now()}`,
+      author: {
+        id:          user.id,
+        displayName: user.display_name ?? user.username ?? 'You',
+        avatarUrl:   user.pfp ?? null,
+      },
+      content:   body,
+      createdAt: new Date().toISOString(),
+    }
+    setComments((prev) => [...prev, optimistic])
+    try {
+      const saved = await postService.addComment(postId, user.id, body)
+      setComments((prev) => prev.map((c) => c.id === optimistic.id ? normalizeComment(saved) : c))
+    } catch (err) {
+      console.error('addComment failed:', err)
+      setComments((prev) => prev.filter((c) => c.id !== optimistic.id))
+    }
   }
 
   const handleKeyDown = (e) => {
@@ -161,7 +156,7 @@ export function CommentSection({ postId, initialCount }) {
                 <Comment
                   key={c.id}
                   comment={c}
-                  canDelete={c.author.id === MOCK_AUTHENTICATED_USER.id}
+                  canDelete={!!user && c.author.id === user.id}
                   onDelete={() => deleteComment(c.id)}
                 />
               ))}
@@ -176,7 +171,7 @@ export function CommentSection({ postId, initialCount }) {
             className="w-7 h-7 rounded-full flex-shrink-0 mt-1 flex items-center justify-center text-[10px] font-bold text-white"
             style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.5), rgba(251,64,64,0.3))' }}
           >
-            {MOCK_AUTHENTICATED_USER.name?.[0]}
+            {(user?.display_name ?? user?.username ?? 'Y')?.[0]}
           </div>
 
           <div

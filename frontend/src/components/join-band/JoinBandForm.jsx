@@ -9,7 +9,6 @@ import MusicianLinksMediaSection  from "./sections/MusicianLinksMediaSection";
 import ListingPreferencesSection  from "./sections/ListingPreferencesSection";
 import JoinBandFooterActions      from "./JoinBandFooterActions";
 import StepIndicator              from "../ui/StepIndicator";
-import { joinBandOptions }        from "../../data/mockJoinBandOptions";
 import { buildJoinBandPayload }   from "../../utils/buildJoinBandPayload";
 import { getFormTheme }           from "../../utils/discovery";
 
@@ -124,12 +123,12 @@ const stepVariants = {
  *
  * Props:
  *   profile  { name, city, photoUrl }  — current user's SoundMeet profile data
- *   options  JoinBandOptionSets        — injectable (default: mockJoinBandOptions)
+ *   options  JoinBandOptionSets        — provided by JoinBandModal via useFormOptions()
  *   onClose  () => void
  */
 const JoinBandForm = ({
   profile = {},
-  options = joinBandOptions,
+  options,
   onClose,
 }) => {
   const [form,         setForm]         = useState(() => makeInitialForm(profile));

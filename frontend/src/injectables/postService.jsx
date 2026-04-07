@@ -1,8 +1,42 @@
 import { supabase } from './supaBaseClient';
 import { apiFetch } from './Auth';
 
+// ─── Shape normalizer ─────────────────────────────────────────────────────────
+
+function toFeedPost(row, currentUserId) {
+  const profile = row.author?.chat_profile ?? {}
+  return {
+    id:        row.id,
+    author: {
+      id:          row.author?.id,
+      displayName: profile.display_name ?? row.author?.username ?? 'Unknown',
+      username:    row.author?.username ? `@${row.author.username}` : '',
+      avatarUrl:   profile.pfp ?? null,
+    },
+    type:      row.image ? 'photo' : 'text',
+    postType:  'text',
+    content:   row.content ?? '',
+    media:     row.image ? { images: [row.image] } : null,
+    jamRef:    null,
+    showRef:   null,
+    reviewRef: null,
+    location:  null,
+    likes:     row.likes?.length ?? 0,
+    comments:  row.comments?.length ?? 0,
+    shares:    0,
+    hasLiked:  currentUserId
+      ? (row.likes ?? []).some((l) => String(l.user_id) === String(currentUserId))
+      : false,
+    createdAt: row.created_at,
+    tags:      [],
+    _rawComments: row.comments ?? [],
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
 export const postService = {
-  
+
   async createNewPost(content, imageFile) {
     const form = new FormData();
     if (content) form.append("content", content);
@@ -14,7 +48,7 @@ export const postService = {
     });
   },
 
-  async getFeed() {
+  async getFeed(currentUserId) {
     const { data, error } = await supabase
       .from('chat_post')
       .select(`
@@ -38,7 +72,7 @@ export const postService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return data.map((row) => toFeedPost(row, currentUserId));
   },
 
   async toggleLike(postId, userId, isCurrentlyLiked) {

@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { FriendsSidebar } from '../components/friends/FriendsSidebar'
 import { FeedSection } from '../components/friends/FeedSection'
 import { UserSearchModal } from '../components/friends/UserSearchModal'
-import { useAuth } from '../injectables/Auth'
 
 const FEED_TABS = [
   { key: 'forYou',    label: 'For you' },
@@ -11,7 +10,6 @@ const FEED_TABS = [
 ]
 
 const Friends = () => {
-  const { isLoggedIn } = useAuth()
   const [searchOpen, setSearchOpen] = useState(false)
   const [feedTab, setFeedTab] = useState('forYou')
 
@@ -20,26 +18,7 @@ const Friends = () => {
       className="flex relative"
       style={{ height: 'calc(100vh - 64px)', background: '#111', overflow: 'hidden' }}
     >
-      {/* Coming soon overlay for logged-in users */}
-      {isLoggedIn && (
-        <div
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
-          style={{ background: 'rgba(17,17,17,0.85)', backdropFilter: 'blur(12px)' }}
-        >
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
-            style={{ background: 'rgba(220,46,115,0.12)', border: '1px solid rgba(220,46,115,0.2)' }}
-          >
-            🎶
-          </div>
-          <div className="text-center">
-            <p className="text-white font-semibold text-base mb-1">Friends &amp; Feed</p>
-            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.38)', fontFamily: 'Sora, sans-serif' }}>
-              Coming soon
-            </p>
-          </div>
-        </div>
-      )}
+
       {/* Left sidebar */}
       <aside
         className="hidden lg:flex flex-col w-[280px] flex-shrink-0 h-full overflow-y-auto p-4"

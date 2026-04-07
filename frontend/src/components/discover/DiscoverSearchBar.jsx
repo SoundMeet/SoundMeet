@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import { buildSearchIndex, searchDiscoverEntities } from "../../utils/searchDiscoverEntities";
-import { mockDiscoveryFeed } from "../../data/mockDiscovery";
 import SearchResultsDropdown from "./SearchResultsDropdown";
 
 const DEBOUNCE_MS = 180;
@@ -56,7 +55,7 @@ const DiscoverSearchBar = ({
   value = "",
   onChange,
   onResultSelect,
-  allItems = mockDiscoveryFeed,
+  allItems = [],
   placeholder = "Search jams, bands, places…",
 }) => {
   const [internalQuery, setInternalQuery] = useState(value);

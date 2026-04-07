@@ -5,11 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import JoinTypeSelector from "./JoinTypeSelector";
 import JoinJamSuccessState from "./JoinJamSuccessState";
 import SearchableTagPicker from "../ui/SearchableTagPicker";
-import {
-  defaultInstrumentOptions,
-  defaultRoleOptions,
-  defaultEquipmentOptions,
-} from "../../data/joinJamOptions";
+import { useFormOptions } from "../../hooks/useFormOptions";
 import { buildJoinJamPayload } from "../../utils/buildJoinJamPayload";
 import { downloadJamCalendarEvent } from "../../utils/generateJamIcs";
 
@@ -98,6 +94,7 @@ const JoinJamModal = ({
   onSubmit,
   onSuccessNavigateToMyJams,
 }) => {
+  const { options } = useFormOptions()
   const [form, setForm] = useState(INITIAL_FORM);
   // "form" | "submitting" | "success" | "error"
   const [phase, setPhase] = useState("form");
@@ -109,19 +106,21 @@ const JoinJamModal = ({
   const isSuccess = phase === "success";
   const canSubmit = form.attendanceType !== null && !isSubmitting;
 
-  // Prefer jam-provided options; fall back to defaults
+  // Prefer jam-provided options; fall back to DB options
   const instrumentOptions =
     jam?.instrumentsNeeded?.length > 0
       ? jam.instrumentsNeeded
-      : defaultInstrumentOptions;
+      : (options?.instruments ?? []);
 
   const roleOptions =
-    jam?.rolesNeeded?.length > 0 ? jam.rolesNeeded : defaultRoleOptions;
+    jam?.rolesNeeded?.length > 0
+      ? jam.rolesNeeded
+      : (options?.roles ?? []);
 
   const equipmentOptions =
     jam?.equipmentNeeded?.length > 0
       ? jam.equipmentNeeded
-      : defaultEquipmentOptions;
+      : (options?.equipmentNeeded ?? []);
 
   // Reset when modal closes (after exit animation)
   useEffect(() => {

@@ -6,7 +6,6 @@ import BandmateMusicSection from "./sections/BandmateMusicSection";
 import BandmatePreferencesSection from "./sections/BandmatePreferencesSection";
 import FindBandmateFooterActions from "./FindBandmateFooterActions";
 import StepIndicator from "../ui/StepIndicator";
-import { findBandmateOptions } from "../../data/mockFindBandmateOptions";
 import { buildFindBandmatePayload } from "../../utils/buildFindBandmatePayload";
 import { getFormTheme } from "../../utils/discovery";
 import { useAuth } from "../../injectables/Auth";
@@ -93,10 +92,10 @@ const stepVariants = {
  * "Find a Bandmate" band/project recruitment listing flow.
  *
  * Props:
- *   options  FindBandmateOptionSets — injectable (default: mockFindBandmateOptions)
+ *   options  FindBandmateOptionSets — provided by FindBandmateModal via useFormOptions()
  *   onClose  () => void
  */
-const FindBandmateForm = ({ options = findBandmateOptions, onClose }) => {
+const FindBandmateForm = ({ options, onClose }) => {
   const { user } = useAuth();
   const [form,         setForm]         = useState(() => buildInitialForm(user));
   const [step,         setStep]         = useState(1);
