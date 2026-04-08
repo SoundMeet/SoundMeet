@@ -254,11 +254,14 @@ class FriendRequest(models.Model):
 
 class Notification(models.Model):
     class NotificationTypes(models.TextChoices):
-        FRIEND_REQUEST = 'FRIEND_REQUEST'
+        FRIEND_REQUEST  = 'FRIEND_REQUEST'
         FRIEND_ACCEPTED = 'FRIEND_ACCEPTED'
-        SHOW_REMINDER = 'SHOW_REMINDER'
-        BAND_CANDIDATE = 'BAND_CANDIDATE'
-        BAND_UPDATE = 'BAND_UPDATE'
+        SHOW_REMINDER   = 'SHOW_REMINDER'
+        BAND_CANDIDATE  = 'BAND_CANDIDATE'
+        BAND_UPDATE     = 'BAND_UPDATE'
+        POST_LIKE       = 'POST_LIKE'
+        POST_COMMENT    = 'POST_COMMENT'
+        JAM_INVITE      = 'JAM_INVITE'
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
     notification_type = models.CharField(max_length=20, choices=NotificationTypes.choices)

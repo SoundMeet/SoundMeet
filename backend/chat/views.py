@@ -113,6 +113,7 @@ def create_post(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def create_comment(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     content = request.data.get('content', '').strip()
@@ -120,12 +121,91 @@ def create_comment(request, post_id):
         return Response({'error': 'Content is required'}, status=400)
 
     comment = Comment.objects.create(post=post, author=request.user, content=content)
+
+    # Notify the post author — skip self-comments
+    if post.author != request.user:
+        Notification.objects.create(
+            user=post.author,
+            notification_type='POST_COMMENT',
+            message=f"{request.user.profile.display_name} commented on your post.",
+            reference_id=post.id,
+            metadata={'commenter_id': request.user.id, 'comment_id': comment.id},
+        )
+
     return Response({
         'id': comment.id,
         'content': comment.content,
         'created_at': comment.created_at,
         'author_id': comment.author.id,
     }, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def like_notify(request, post_id):
+    """
+    Called by the frontend after a successful like (Supabase already wrote the row).
+    Only job: create a POST_LIKE notification for the post author.
+    The like data itself is managed by Supabase direct writes.
+    """
+    post = get_object_or_404(Post, id=post_id)
+
+    if post.author == request.user:
+        return Response({'status': 'skipped'})
+
+    try:
+        already_notified = Notification.objects.filter(
+            user=post.author,
+            notification_type='POST_LIKE',
+            reference_id=post.id,
+            metadata__contains={'liker_id': request.user.id},
+        ).exists()
+        if not already_notified:
+            Notification.objects.create(
+                user=post.author,
+                notification_type='POST_LIKE',
+                message=f"{request.user.profile.display_name} liked your post.",
+                reference_id=post.id,
+                metadata={'liker_id': request.user.id},
+            )
+    except Exception:
+        pass
+
+    return Response({'status': 'ok'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def invite_to_jam(request, jam_id):
+    """Jam admin invites a user to join their jam. Sends a JAM_INVITE notification."""
+    jam = get_object_or_404(Jam, id=jam_id, admin=request.user)
+    target_user_id = request.data.get('user_id')
+    if not target_user_id:
+        return Response({'error': 'user_id is required'}, status=400)
+
+    target_user = get_object_or_404(User, id=target_user_id)
+
+    if target_user == request.user:
+        return Response({'error': 'Cannot invite yourself'}, status=400)
+
+    # Deduplicate: only one pending invite notification per (jam, target)
+    already_invited = Notification.objects.filter(
+        user=target_user,
+        notification_type='JAM_INVITE',
+        reference_id=jam.id,
+    ).exists()
+
+    if not already_invited:
+        Notification.objects.create(
+            user=target_user,
+            notification_type='JAM_INVITE',
+            message=f"{request.user.profile.display_name} invited you to join {jam.name}.",
+            reference_id=jam.id,
+            metadata={'inviter_id': request.user.id, 'jam_name': jam.name},
+        )
+
+    return Response({'status': 'Invited'})
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

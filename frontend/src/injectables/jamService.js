@@ -12,13 +12,10 @@ import { apiFetch } from './Auth'; // <-- Added for Django backend calls
 
 // ─── Shared select clause ─────────────────────────────────────────────────────
 
-// NOTE: Since you upgraded Genre and Vibe to ManyToMany fields in Django, 
-// after you migrate, you may need to update this select to fetch through the M2M tables 
-// e.g., `genres:chat_jam_genre( genre:chat_genre(id, name) )`
 const JAM_SELECT = `
   id, name, location, date_time, description, access, admin_id,
-  genre:genre_id (id, name),
-  vibe:vibe_id (id, name)
+  genres:chat_jam_genre( genre:genre_id(id, name) ),
+  vibes:chat_jam_vibe( vibe:vibe_id(id, name) )
 `;
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -82,10 +79,9 @@ export function normalizeJamRow(row, userLocation = null) {
   const coords = parseEWKBPoint(row.location);
   const isPublic = row.access === true;
   
-  // Note: If you update JAM_SELECT for the M2M arrays, you'll need to map the first item here
-  const genreName = row.genre?.name ?? null;
-  const vibeName = row.vibe?.name ?? null;
-  
+  const genreNames = (row.genres ?? []).map((g) => g.genre?.name).filter(Boolean);
+  const vibeNames = (row.vibes ?? []).map((v) => v.vibe?.name).filter(Boolean);
+
   const formattedDate = formatDateTime(row.date_time);
   const timeSlot = computeTimeSlot(row.date_time);
 
@@ -104,18 +100,19 @@ export function normalizeJamRow(row, userLocation = null) {
     type: 'jam',
     entityKind: 'jam_session',
     title: row.name,
-    subtitle: [genreName, vibeName].filter(Boolean).join(' · ') || 'Jam Session',
+    subtitle: [...genreNames, ...vibeNames].join(' · ') || 'Jam Session',
     neighborhood: null,
     summary: row.description ?? '',
     description: row.description ?? '',
     coordinates: coords,
     locationVisibility: coords ? 'exact' : null,
     approximateRadiusMeters: null,
-    genre: genreName,
-    vibe: vibeName,
-    vibes: vibeName ? [vibeName] : [],
-    previewPills: [genreName, vibeName].filter(Boolean),
-    tags: [genreName, vibeName].filter(Boolean),
+    genre: genreNames[0] ?? null,
+    genres: genreNames,
+    vibe: vibeNames[0] ?? null,
+    vibes: vibeNames,
+    previewPills: [...genreNames, ...vibeNames],
+    tags: [...genreNames, ...vibeNames],
     dateTime: formattedDate,
     date: formattedDate,
     metaSecondary: formattedDate ?? 'Open session',
@@ -123,7 +120,7 @@ export function normalizeJamRow(row, userLocation = null) {
     isLive: timeSlot === 'live',
     distanceMiles,
     metaPrimary: [
-      genreName,
+      genreNames.join(', ') || null,
       distanceMiles != null ? `${distanceMiles.toFixed(1)} mi` : null,
     ]
       .filter(Boolean)
@@ -273,5 +270,16 @@ export const jamService = {
       .in('id', jamIds);
     if (error) return {};
     return Object.fromEntries((data ?? []).map((r) => [String(r.id), r.name]));
+  },
+
+  /**
+   * Invite a user to a jam. Only the jam admin should call this.
+   * Django creates a JAM_INVITE notification for the target user.
+   */
+  async inviteUserToJam(jamId, targetUserId) {
+    return await apiFetch(`api/jams/${jamId}/invite/`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: targetUserId }),
+    });
   },
 };

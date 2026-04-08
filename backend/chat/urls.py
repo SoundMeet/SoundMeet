@@ -14,8 +14,10 @@ urlpatterns = [
     path('api/profiles/me/', views.get_profile, name='get_profile'),
 
     path('api/posts/create/', views.create_post, name='create_post'),
+    path('api/posts/<int:post_id>/like/', views.like_notify, name='like_notify'),
     path('api/posts/<int:post_id>/comments/', views.create_comment, name='create_comment'),
     path('api/jams/create/', views.create_jam, name='create_jam'),
+    path('api/jams/<int:jam_id>/invite/', views.invite_to_jam, name='invite_to_jam'),
     path('api/shows/create/', views.create_show, name='create_show'),
     path('api/bands/create/', views.create_band, name='create_band'),
 

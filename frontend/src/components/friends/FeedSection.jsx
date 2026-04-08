@@ -4,6 +4,7 @@ import { MdSearch, MdMusicNote, MdHeadphones, MdStars, MdPhotoCamera, MdClose, M
 import { postService } from '../../injectables/postService'
 import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
 import { useAuth } from '../../injectables/Auth'
+import { useFriends } from '../../context/FriendsContext'
 import { FeedPost } from './FeedPost'
 import { PostComposerModal } from './composer/PostComposerModal'
 import { ClipComposerBody } from './composer/ClipComposerBody'
@@ -354,8 +355,10 @@ function PostComposer({ author, onOpen, onPost }) {
 
 // ─── FeedSection ──────────────────────────────────────────────────────────────
 
-export function FeedSection() {
+export function FeedSection({ feedTab = 'forYou' }) {
   const { user } = useAuth()
+  const { friends } = useFriends()
+  const friendIds = new Set(friends.map((f) => String(f.id)))
 
   const author = {
     id:          user?.id          ?? 'guest',
@@ -460,7 +463,10 @@ export function FeedSection() {
   // ── Filtered feed ────────────────────────────────────────────────────────
 
   const displayed = posts.filter(
-    (p) => matchesFilter(p, activeFilter) && matchesSearch(p, searchQuery)
+    (p) =>
+      matchesFilter(p, activeFilter) &&
+      matchesSearch(p, searchQuery) &&
+      (feedTab !== 'following' || friendIds.has(String(p.author.id)))
   )
 
   return (
@@ -512,7 +518,13 @@ export function FeedSection() {
         <div className="flex flex-col items-center py-16 gap-2">
           <span className="text-3xl">🎵</span>
           <p className="text-sm" style={{ color: 'rgba(229,226,225,0.35)' }}>
-            {posts.length === 0 ? 'Be the first to post something' : 'No posts match your filter'}
+            {feedTab === 'following' && friends.length === 0
+            ? 'Add friends to see their posts here'
+            : feedTab === 'following'
+            ? 'Your friends haven\'t posted yet'
+            : posts.length === 0
+            ? 'Be the first to post something'
+            : 'No posts match your filter'}
           </p>
         </div>
       ) : (

@@ -14,6 +14,7 @@ import AuthModal from './components/AuthModal.jsx'
 import { AuthModalProvider, useAuthModal } from './context/AuthModalContext.jsx'
 import { NotificationsProvider } from './context/NotificationsContext.jsx'
 import { FriendsProvider } from './context/FriendsContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 import { useAuth } from './injectables/Auth.jsx'
 
 /** Redirects unauthenticated users to / and opens the login modal. */
@@ -42,6 +43,7 @@ const App = () => {
   }
 
   return (
+    <ToastProvider>
     <NotificationsProvider>
       <FriendsProvider>
         <AuthModalProvider>
@@ -65,6 +67,7 @@ const App = () => {
         </AuthModalProvider>
       </FriendsProvider>
     </NotificationsProvider>
+    </ToastProvider>
   )
 }
 

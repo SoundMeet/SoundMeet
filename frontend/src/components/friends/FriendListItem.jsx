@@ -2,6 +2,38 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MdPerson, MdChat } from 'react-icons/md'
 
+function FriendAvatar({ displayName, avatarUrl }) {
+  const [imgError, setImgError] = useState(false)
+  const initials = (displayName || '?')
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  if (avatarUrl && !imgError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={displayName}
+        className="w-9 h-9 rounded-full object-cover transition-transform duration-150 group-hover:scale-105"
+        style={{ background: '#222' }}
+        onError={() => setImgError(true)}
+      />
+    )
+  }
+
+  return (
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105 select-none"
+      style={{ background: 'linear-gradient(135deg, #DC2E73 0%, #c02460 100%)' }}
+    >
+      <span className="text-xs font-bold text-white">{initials}</span>
+    </div>
+  )
+}
+
 export function FriendListItem({ friend }) {
   const { displayName, instruments, avatarUrl, isOnline } = friend
   const [menuOpen, setMenuOpen] = useState(false)
@@ -50,12 +82,7 @@ export function FriendListItem({ friend }) {
       >
         {/* Avatar with online indicator */}
         <div className="relative flex-shrink-0">
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-9 h-9 rounded-full object-cover transition-transform duration-150 group-hover:scale-105"
-            style={{ background: '#222' }}
-          />
+          <FriendAvatar displayName={displayName} avatarUrl={avatarUrl} />
           {isOnline && (
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 ring-2 ring-black" />
           )}
