@@ -41,7 +41,7 @@ const EventIdentitySection = ({ item, accent, canSeeLocation }) => {
 
   const dateTime = item.dateTime ?? item.date ?? item.metaSecondary ?? null;
   const neighborhood = item.neighborhood ?? item.subtitle ?? null;
-  const distance = item.distanceMiles != null ? `${item.distanceMiles} mi away` : null;
+  const distance = item.distanceMiles != null ? `${Number(item.distanceMiles).toFixed(1)} mi away` : null;
 
   const locationLine = [
     canSeeLocation ? (item.venueName ?? neighborhood) : neighborhood,

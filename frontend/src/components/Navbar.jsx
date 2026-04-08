@@ -6,11 +6,13 @@ import { Link, useLocation } from "react-router-dom";
 import { FaBars, FaTimes } from "react-icons/fa";
 import ProfileDropdown from "./ProfileDropdown";
 import { NotificationsDropdown } from "./notifications/NotificationsDropdown";
+import { useNotifications } from "../context/NotificationsContext";
 
 const Navbar = () => {
   const [navHover, setNavHover] = useState(-1);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const { unreadCount } = useNotifications();
   const activePage = navItems.findIndex((item) => item.path === location.pathname);
 
   return (
@@ -52,7 +54,17 @@ const Navbar = () => {
         {menuOpen ? (
           <FaTimes onClick={() => setMenuOpen(false)} className="text-xl" />
         ) : (
-          <FaBars onClick={() => setMenuOpen(true)} className="text-xl" />
+          <div className="relative inline-block">
+            <FaBars onClick={() => setMenuOpen(true)} className="text-xl cursor-pointer" />
+            {unreadCount > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white pointer-events-none"
+                style={{ background: '#ef4444', lineHeight: 1 }}
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

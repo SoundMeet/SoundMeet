@@ -8,8 +8,16 @@ import {
   hexToRgba,
   DISCOVERY_VARIANTS,
 } from '../utils/discovery'
-import { BROWSE_SECTIONS } from '../data/mockMyJamsData'
-import { jamService } from '../services/jamService'
+
+const BROWSE_SECTIONS = [
+  { key: 'all',  title: 'Near You',          filter: () => true },
+  { key: 'jam',  title: 'Jams',              filter: (i) => i.type === 'jam' },
+  { key: 'show', title: 'Shows',             filter: (i) => i.type === 'promote_show' },
+  { key: 'fb',   title: 'Bandmate Requests', filter: (i) => i.type === 'find_bandmate' },
+  { key: 'jb',   title: 'Join a Band',       filter: (i) => i.type === 'join_band' },
+]
+
+import { jamService } from '../injectables/jamService'
 import { useAuth } from '../injectables/Auth'
 
 // ─────────────────────────────────────────────────────────────
@@ -571,10 +579,14 @@ const MyJams = () => {
           setEditingJam(item)
           setCreateOpen(true)
         }}
-        onDelete={(item) => {
+        onDelete={async (item) => {
           setDiscoveryModal({ open: false, item: null, openedFrom: null })
-          console.log("Delete jam:", item.id)
-          // TODO: await api.deleteJam(item.id)
+          try {
+            await jamService.deleteJam(item.id)
+            setCreatedItems((prev) => prev.filter((j) => j.id !== String(item.id)))
+          } catch (err) {
+            console.error('Delete jam failed:', err)
+          }
         }}
         onRate={(item, rating, comment) => {
           // Optimistically update the rating on the archive card

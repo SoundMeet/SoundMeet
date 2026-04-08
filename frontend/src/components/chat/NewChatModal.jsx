@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useFriends } from '../../context/FriendsContext'
-import { UserSearchResult } from './UserSearchResult'
+import React from 'react'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ function CloseIcon({ size = 13 }) {
   )
 }
 
-function UsersIcon() {
+function NoFriendsIcon() {
   return (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
@@ -48,59 +49,68 @@ function NoResultsIcon() {
   )
 }
 
+// ─── Fallback avatar ──────────────────────────────────────────────────────────
+
+const AVATAR_PALETTE = ['#C2185B', '#7B1FA2', '#1565C0', '#00695C', '#E65100', '#4527A0']
+
+function FallbackAvatar({ name, size }) {
+  const initials = (name || '?')
+    .split(' ').slice(0, 2)
+    .map((w) => w[0] || '').join('').toUpperCase()
+  const bg = AVATAR_PALETTE[(name?.charCodeAt(0) ?? 0) % AVATAR_PALETTE.length]
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      <span style={{ color: '#fff', fontSize: size * 0.37, fontWeight: 600, lineHeight: 1 }}>
+        {initials}
+      </span>
+    </div>
+  )
+}
+
+function Avatar({ src, name, size = 36 }) {
+  const [broken, setBroken] = React.useState(false)
+  if (!src || broken) return <FallbackAvatar name={name} size={size} />
+  return (
+    <img src={src} alt={name} width={size} height={size}
+      className="rounded-full object-cover flex-shrink-0"
+      style={{ width: size, height: size, background: '#1c1c1e' }}
+      onError={() => setBroken(true)}
+    />
+  )
+}
+
 // ─── Search logic ─────────────────────────────────────────────────────────────
 
-function scoreUser(user, lq) {
-  let score = 0
-  const dn = (user.displayName || '').toLowerCase()
-  const un = (user.username || '').toLowerCase()
-  const ab = (user.about || '').toLowerCase()
-
-  if (dn === lq) score += 100
-  else if (dn.startsWith(lq)) score += 60
-  else if (dn.includes(lq)) score += 40
-
-  if (un === lq) score += 80
-  else if (un.startsWith(lq)) score += 50
-  else if (un.includes(lq)) score += 30
-
-  if (user.instruments.some((i) => i.toLowerCase() === lq)) score += 25
-  else if (user.instruments.some((i) => i.toLowerCase().includes(lq))) score += 18
-
-  if (user.genres.some((g) => g.toLowerCase() === lq)) score += 20
-  else if (user.genres.some((g) => g.toLowerCase().includes(lq))) score += 14
-
-  if (user.vibes.some((v) => v.toLowerCase() === lq)) score += 15
-  else if (user.vibes.some((v) => v.toLowerCase().includes(lq))) score += 10
-
-  if (ab.includes(lq)) score += 5
-  return score
-}
-
-function filterAndRank(users, query) {
+function filterFriends(friends, query) {
   const q = query.trim()
-  if (!q) return users.slice(0, 40)
+  if (!q) return friends
   const lq = q.toLowerCase()
-  return users
-    .filter((u) => {
-      const dn = (u.displayName || '').toLowerCase()
-      const un = (u.username || '').toLowerCase()
-      const ab = (u.about || '').toLowerCase()
-      return (
-        dn.includes(lq) ||
-        un.includes(lq) ||
-        u.instruments.some((i) => i.toLowerCase().includes(lq)) ||
-        u.genres.some((g) => g.toLowerCase().includes(lq)) ||
-        u.vibes.some((v) => v.toLowerCase().includes(lq)) ||
-        ab.includes(lq)
-      )
+  return friends
+    .filter((f) => {
+      const dn = (f.displayName || '').toLowerCase()
+      const un = (f.username || '').toLowerCase()
+      return dn.includes(lq) || un.includes(lq)
     })
-    .map((u) => ({ u, s: scoreUser(u, lq) }))
-    .sort((a, b) => b.s - a.s)
-    .map((x) => x.u)
+    .map((f) => {
+      let score = 0
+      const dn = (f.displayName || '').toLowerCase()
+      const un = (f.username || '').toLowerCase()
+      if (dn === lq) score += 100
+      else if (dn.startsWith(lq)) score += 60
+      else if (dn.includes(lq)) score += 40
+      if (un === lq) score += 80
+      else if (un.startsWith(lq)) score += 50
+      else if (un.includes(lq)) score += 30
+      return { f, score }
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.f)
 }
 
-// ─── Empty / loading / error states ──────────────────────────────────────────
+// ─── State views ──────────────────────────────────────────────────────────────
 
 function StateView({ icon, title, subtitle }) {
   return (
@@ -109,27 +119,13 @@ function StateView({ icon, title, subtitle }) {
       <div className="text-center">
         <p className="text-[13px] font-medium" style={{ color: 'rgba(229,226,225,0.38)' }}>{title}</p>
         {subtitle && (
-          <p className="text-[11px] mt-1" style={{ color: 'rgba(229,226,225,0.2)', lineHeight: 1.7, maxWidth: 220, margin: '6px auto 0' }}>
+          <p className="text-[11px] mt-1" style={{
+            color: 'rgba(229,226,225,0.2)', lineHeight: 1.7, maxWidth: 220, margin: '6px auto 0',
+          }}>
             {subtitle}
           </p>
         )}
       </div>
-    </div>
-  )
-}
-
-function LoadingState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3" style={{ padding: '52px 24px' }}>
-      <div style={{
-        width: 28, height: 28,
-        border: '1.5px solid rgba(255,255,255,0.08)',
-        borderTopColor: 'rgba(220,46,115,0.6)',
-        borderRadius: '50%',
-        animation: 'usm-spin 0.7s linear infinite',
-      }} />
-      <p className="text-[12px]" style={{ color: 'rgba(229,226,225,0.25)' }}>Loading&hellip;</p>
-      <style>{`@keyframes usm-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
@@ -141,36 +137,81 @@ function SectionLabel({ count }) {
     <div className="flex items-center gap-2.5 px-4" style={{ paddingTop: 10, paddingBottom: 6 }}>
       <span className="text-[10px] font-semibold uppercase tracking-widest"
         style={{ color: 'rgba(229,226,225,0.2)', letterSpacing: '0.1em' }}>
-        People
+        Friends
       </span>
       {count != null && (
-        <span className="text-[10px]" style={{ color: 'rgba(229,226,225,0.15)' }}>
-          {count}
-        </span>
+        <span className="text-[10px]" style={{ color: 'rgba(229,226,225,0.15)' }}>{count}</span>
       )}
     </div>
   )
 }
 
+// ─── Friend result row ────────────────────────────────────────────────────────
+
+function FriendRow({ friend, onClick }) {
+  const { displayName, username, avatarUrl, isOnline } = friend
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 text-left transition-colors duration-100"
+      style={{ padding: '9px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'transparent' }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
+      {/* Avatar + online dot */}
+      <div className="relative flex-shrink-0">
+        <Avatar src={avatarUrl} name={displayName} size={36} />
+        {isOnline && (
+          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 block"
+            style={{ boxShadow: '0 0 0 1.5px rgba(18,18,20,0.96)' }} />
+        )}
+      </div>
+
+      {/* Name + handle */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[13px] font-medium text-white leading-none truncate">{displayName}</span>
+          {username && (
+            <span className="text-[11px] flex-shrink-0" style={{ color: 'rgba(229,226,225,0.28)' }}>
+              @{username}
+            </span>
+          )}
+        </div>
+        {isOnline && (
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(52,211,153,0.6)' }}>Online</p>
+        )}
+      </div>
+
+      {/* Arrow hint */}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        style={{ color: 'rgba(229,226,225,0.18)', flexShrink: 0 }}>
+        <path d="M9 18l6-6-6-6" />
+      </svg>
+    </button>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function UserSearchModal({ open, onOpenChange }) {
-  const { allUsers, allUsersLoading, allUsersError, allUsersFetched, fetchAllUsers } = useFriends()
+export function NewChatModal({ open, onOpenChange }) {
+  const { friends } = useFriends()
+  const navigate = useNavigate()
   const [displayQuery, setDisplayQuery] = useState('')
   const [query, setQuery] = useState('')
   const debounceRef = useRef(null)
   const inputRef = useRef(null)
 
   useEffect(() => {
-    if (open && !allUsersFetched && !allUsersLoading) fetchAllUsers()
     if (open) { setDisplayQuery(''); setQuery('') }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open])
 
   const handleChange = (e) => {
     const val = e.target.value
     setDisplayQuery(val)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => setQuery(val), 180)
+    debounceRef.current = setTimeout(() => setQuery(val), 150)
   }
 
   const clearSearch = () => {
@@ -179,24 +220,46 @@ export function UserSearchModal({ open, onOpenChange }) {
     inputRef.current?.focus()
   }
 
-  const results = filterAndRank(allUsers, query)
+  const handleSelectFriend = (friend) => {
+    onOpenChange(false)
+    navigate('/chat', {
+      state: {
+        openDmWith: {
+          id: friend.id,
+          username: friend.username,
+          displayName: friend.displayName,
+          avatarUrl: friend.avatarUrl,
+        },
+      },
+    })
+  }
+
+  const results = filterFriends(friends, query)
   const hasQuery = query.trim().length > 0
 
   let body
-  if (allUsersLoading) {
-    body = <LoadingState />
-  } else if (allUsersError) {
-    body = <StateView icon={<NoResultsIcon />} title="Could not load people" subtitle={allUsersError || 'Something went wrong. Please try again.'} />
-  } else if (allUsers.length === 0) {
-    body = <StateView icon={<UsersIcon />} title="Find musicians on SoundMeet" subtitle="Search by name, instrument, genre, or vibe" />
+  if (friends.length === 0) {
+    body = (
+      <StateView
+        icon={<NoFriendsIcon />}
+        title="No friends yet"
+        subtitle="Add friends on SoundMeet to start a conversation"
+      />
+    )
   } else if (hasQuery && results.length === 0) {
-    body = <StateView icon={<NoResultsIcon />} title="No results" subtitle={`Nothing matched "${query.trim()}". Try a different keyword.`} />
+    body = (
+      <StateView
+        icon={<NoResultsIcon />}
+        title="No friend matched your search"
+        subtitle="Try a different name or username"
+      />
+    )
   } else {
     body = (
       <>
         <SectionLabel count={hasQuery ? results.length : null} />
-        {results.map((user) => (
-          <UserSearchResult key={user.id} user={user} activeQuery={query.trim()} />
+        {results.map((friend) => (
+          <FriendRow key={friend.id} friend={friend} onClick={() => handleSelectFriend(friend)} />
         ))}
       </>
     )
@@ -221,7 +284,7 @@ export function UserSearchModal({ open, onOpenChange }) {
             className="w-full flex flex-col"
             style={{
               pointerEvents: 'auto',
-              maxWidth: 580,
+              maxWidth: 480,
               margin: '0 16px',
               background: 'rgba(18,18,20,0.96)',
               backdropFilter: 'blur(48px)',
@@ -229,7 +292,7 @@ export function UserSearchModal({ open, onOpenChange }) {
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16,
               boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 24px 64px rgba(0,0,0,0.7)',
-              maxHeight: '68vh',
+              maxHeight: '60vh',
               overflow: 'hidden',
             }}
           >
@@ -246,15 +309,18 @@ export function UserSearchModal({ open, onOpenChange }) {
                 <SearchIcon />
               </div>
 
-              <Dialog.Title className="sr-only">Find People</Dialog.Title>
+              <Dialog.Title className="sr-only">New Message</Dialog.Title>
 
               <input
                 ref={inputRef}
                 type="text"
                 value={displayQuery}
                 onChange={handleChange}
-                onKeyDown={(e) => e.key === 'Escape' && (displayQuery ? clearSearch() : onOpenChange(false))}
-                placeholder="Find people by name, instrument, genre or vibe"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') displayQuery ? clearSearch() : onOpenChange(false)
+                  if (e.key === 'Enter' && results.length > 0) handleSelectFriend(results[0])
+                }}
+                placeholder="Search friends"
                 autoFocus
                 className="flex-1 bg-transparent text-[14px] text-white outline-none"
                 style={{ caretColor: '#DC2E73', minWidth: 0 }}

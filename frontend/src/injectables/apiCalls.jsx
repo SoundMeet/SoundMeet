@@ -53,6 +53,26 @@ export const apiService = {
     return data;
   },
 
+  async getRoles() {
+    const { data, error } = await supabase
+      .from('chat_role')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getGear() {
+    const { data, error } = await supabase
+      .from('chat_gear')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data;
+  },
+
   async getArtists() {
     const { data, error } = await supabase
       .from('chat_artist')
@@ -108,18 +128,22 @@ export const apiService = {
 
   async getAllFormOptions() {
     try {
-      const [instruments, genres, vibes, artists] = await Promise.all([
+      const [instruments, genres, vibes, artists, roles, gear] = await Promise.all([
         this.getInstruments(),
         this.getGenres(),
         this.getVibes(),
-        this.getArtists()
+        this.getArtists(),
+        this.getRoles(),
+        this.getGear(),
       ]);
 
       return {
         instruments,
         genres,
         vibes,
-        artists
+        artists,
+        roles,
+        gear
       };
     } catch (error) {
       console.error("Error fetching form options:", error);

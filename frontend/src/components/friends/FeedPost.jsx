@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { MOCK_AUTHENTICATED_USER } from '../../data/mockUser'
+import { useAuth } from '../../injectables/Auth'
+import { postService } from '../../injectables/postService'
+import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
 import { PostHeader } from './PostHeader'
 import { PostTextBody } from './PostTextBody'
 import { PostAudioBody } from './PostAudioBody'
@@ -9,18 +11,34 @@ import { PostReviewBody } from './PostReviewBody'
 import { PostActions } from './PostActions'
 import { CommentSection } from './CommentSection'
 
+function normalizeComment(c) {
+  return {
+    id:        c.id,
+    author: {
+      id:          c.author?.id,
+      displayName: c.author?.username ?? 'Unknown',
+      avatarUrl:   null,
+    },
+    content:   c.content,
+    createdAt: c.created_at,
+  }
+}
+
 export function FeedPost({ post }) {
+  const { user } = useAuth()
   const { author, type, postType, media, jamRef, showRef, reviewRef, location, likes, comments, hasLiked, createdAt } = post
 
-  const isOwn = author.id === MOCK_AUTHENTICATED_USER.id
+  const isOwn = !!user && author.id === user.id
 
-  // Local state so edits/deletes are self-contained
-  const [content, setContent]         = useState(post.content)
-  const [deleted, setDeleted]         = useState(false)
-  const [isEditing, setIsEditing]     = useState(false)
-  const [editText, setEditText]       = useState(post.content)
-  const [commentsOpen, setComments]   = useState(false)
-  const [commentCount] = useState(comments)
+  const [content, setContent]           = useState(post.content)
+  const [deleted, setDeleted]           = useState(false)
+  const [isEditing, setIsEditing]       = useState(false)
+  const [editText, setEditText]         = useState(post.content)
+  const [commentsOpen, setComments]     = useState(false)
+  const [commentCount, setCommentCount] = useState(comments)
+  const [localComments, setLocalComments] = useState(
+    () => (post._rawComments ?? []).map(normalizeComment)
+  )
   const editRef = useRef(null)
 
   if (deleted) return null
@@ -41,8 +59,38 @@ export function FeedPost({ post }) {
     if (e.key === 'Escape') { setIsEditing(false); setEditText(content) }
   }
 
-  const handleToggleComments = () => {
-    setComments((v) => !v)
+  const handleAddComment = async (content) => {
+    if (!user?.id) return
+    const optimistic = {
+      id:        `opt-${Date.now()}`,
+      author: {
+        id:          user.id,
+        displayName: user.display_name ?? user.username ?? 'You',
+        avatarUrl:   formatAvatarUrl(user.pfp),
+      },
+      content,
+      createdAt: new Date().toISOString(),
+    }
+    setLocalComments((prev) => [...prev, optimistic])
+    try {
+      const saved = await postService.addComment(post.id, content)
+      const confirmed = {
+        id:        saved?.id ?? optimistic.id,
+        author:    optimistic.author,
+        content:   saved?.content ?? content,
+        createdAt: saved?.created_at ?? optimistic.createdAt,
+      }
+      setLocalComments((prev) => prev.map((c) => c.id === optimistic.id ? confirmed : c))
+      setCommentCount((c) => c + 1)
+    } catch (err) {
+      console.error('addComment failed:', err)
+      setLocalComments((prev) => prev.filter((c) => c.id !== optimistic.id))
+    }
+  }
+
+  const handleDeleteComment = (id) => {
+    setLocalComments((prev) => prev.filter((c) => c.id !== id))
+    setCommentCount((c) => Math.max(0, c - 1))
   }
 
   return (
@@ -108,16 +156,23 @@ export function FeedPost({ post }) {
       )}
 
       <PostActions
+        postId={post.id}
+        userId={user?.id}
         likes={likes}
         comments={commentCount}
         hasLiked={hasLiked}
         commentsOpen={commentsOpen}
-        onToggleComments={handleToggleComments}
+        onToggleComments={() => setComments((v) => !v)}
       />
 
       <AnimatePresence>
         {commentsOpen && (
-          <CommentSection postId={post.id} initialCount={commentCount} />
+          <CommentSection
+            comments={localComments}
+            currentUserId={user?.id}
+            onAdd={handleAddComment}
+            onDelete={handleDeleteComment}
+          />
         )}
       </AnimatePresence>
     </div>

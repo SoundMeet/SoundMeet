@@ -1,15 +1,40 @@
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import ChatSectionList from './ChatSectionList'
+import { NewChatModal } from './NewChatModal'
+
+const SearchIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+)
 
 const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose }) => {
+  const [query, setQuery] = useState('')
+  const [newChatOpen, setNewChatOpen] = useState(false)
+
+  const q = query.trim().toLowerCase()
+
+  const filteredDms = q
+    ? dmThreads.filter((t) => {
+        const user = (users || []).find((u) => u.id === t.participantId)
+        return user?.name?.toLowerCase().includes(q)
+      })
+    : dmThreads
+
+  const filteredJams = q
+    ? jamThreads.filter((t) => t.name?.toLowerCase().includes(q))
+    : jamThreads
+
   const handleSelect = (id) => {
     onSelect(id)
     if (onClose) onClose()
   }
 
   return (
-    // Outer shell — full height, p-3 gives the floating-panel effect
     <div className="h-full p-3 flex flex-col" style={{ backgroundColor: 'transparent' }}>
+      <NewChatModal open={newChatOpen} onOpenChange={setNewChatOpen} />
       {/* Floating panel */}
       <div
         className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden bg-[#1C1B1B]/60"
@@ -20,49 +45,77 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
         }}
       >
 
-        {/* "Chats" header — slightly lighter bg, rounded top */}
-        <div
-          className="flex-shrink-0 rounded-t-2xl p-4 bg-[#232323]/50"
-          style={{
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-xl text-[#E5E2E1]">Chats</span>
+        {/* Header */}
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 bg-[#232323]/50 rounded-t-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-bold text-lg text-[#E5E2E1]" style={{ fontFamily: 'Sora, sans-serif' }}>
+              Chats
+            </span>
             <button
-              onClick={() => console.log('New chat placeholder')}
+              onClick={() => setNewChatOpen(true)}
               className="flex items-center justify-center rounded-full cursor-pointer hover:brightness-110 transition-all"
-              style={{ width: 36, height: 36, backgroundColor: '#2A2A2A' }}
+              style={{ width: 32, height: 32, backgroundColor: '#2A2A2A' }}
               aria-label="New chat"
             >
-              <Plus size={18} color="#E5E2E1" />
+              <Plus size={15} color="#E5E2E1" />
             </button>
+          </div>
+
+          {/* Search input */}
+          <div className="relative flex items-center">
+            <span
+              className="absolute left-3 pointer-events-none"
+              style={{ color: 'rgba(229,226,225,0.35)' }}
+            >
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search chats"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm outline-none transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                color: '#E5E2E1',
+                fontFamily: 'Sora, sans-serif',
+                caretColor: '#DC2E73',
+              }}
+              onFocus={(e) => {
+                e.target.style.border = '1px solid rgba(220,46,115,0.35)'
+                e.target.style.background = 'rgba(255,255,255,0.07)'
+              }}
+              onBlur={(e) => {
+                e.target.style.border = '1px solid rgba(255,255,255,0.07)'
+                e.target.style.background = 'rgba(255,255,255,0.05)'
+              }}
+            />
           </div>
         </div>
 
-        {/* Pink glow separator below header */}
-        <div className="h-[2px] mx-4 my-3 bg-gradient-to-r from-transparent via-[#DC2E73]/40 to-transparent flex-shrink-0" />
+        {/* Subtle divider */}
+        <div className="h-px mx-4 bg-white/[0.06] flex-shrink-0" />
 
-        {/* Scrollable list area */}
-        <div className="flex-1 overflow-y-auto p-2">
+        {/* Scrollable list */}
+        <div className="flex-1 overflow-y-auto py-2 px-1">
           <ChatSectionList
             title="Direct Messages"
-            items={dmThreads}
+            items={filteredDms}
             activeId={activeId}
             onSelect={handleSelect}
             users={users}
           />
 
-          {/* Whisper separator between DMs and Jam Groups */}
-          <div className="mx-2 my-3 h-[2px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          <div className="mx-3 my-2 h-px bg-white/[0.06]" />
 
           <ChatSectionList
             title="Jam Groups"
-            items={jamThreads}
+            items={filteredJams}
             activeId={activeId}
             onSelect={handleSelect}
             users={users}
+            showEmptyState
           />
         </div>
 

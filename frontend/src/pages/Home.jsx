@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import MapComponent from "../components/MapComponent";
 import GlowSwitch from "../components/GlowSwitch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,7 +23,7 @@ import {
   DEFAULT_SORT,
   DEFAULT_MORE_FILTERS,
 } from "../utils/discoverFilters";
-import { jamService, normalizeJamRow } from "../services/jamService";
+import { jamService, normalizeJamRow } from "../injectables/jamService";
 import DiscoveryCard from "../components/discover/DiscoveryCard";
 import EventDetailModal from "../components/event-detail/EventDetailModal";
 import {
@@ -42,6 +43,8 @@ const CATEGORY_HEADINGS = {
 const Home = () => {
   const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // ── Category filter ────────────────────────────────────────────────────────
   // Empty array = "All" (no restriction). Populated = specific categories selected.
@@ -174,6 +177,19 @@ const Home = () => {
   const openDiscoveryModal = (itemId) => setModalItem(discoveryById[itemId] ?? null);
   const closeDiscoveryModal = () => setModalItem(null);
 
+  // ── Deep-link: open EventDetailModal when navigated here from a notification ──
+  // Triggered by navigate('/', { state: { openJamId: id } }) in NotificationItem.
+  useEffect(() => {
+    const jamId = location.state?.openJamId
+    if (!jamId || feedLoading) return
+    const item = discoveryById[String(jamId)] ?? discoveryById[jamId]
+    if (item) {
+      setModalItem(item)
+      // Clear the state so back-navigation doesn't re-open the modal
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [feedLoading, location.state?.openJamId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const editInitialValues = editingJam ? {
     title: editingJam.title ?? "",
     description: editingJam.description ?? "",
@@ -188,10 +204,14 @@ const Home = () => {
     setCreateJamModalOpen(true);
   };
 
-  const handleDiscoveryDelete = (item) => {
+  const handleDiscoveryDelete = async (item) => {
     closeDiscoveryModal();
-    console.log("Delete jam:", item.id);
-    // TODO: await api.deleteJam(item.id)
+    try {
+      await jamService.deleteJam(item.id);
+      setRawJamRows((prev) => prev.filter((j) => String(j.id) !== String(item.id)));
+    } catch (err) {
+      console.error('Delete jam failed:', err);
+    }
   };
 
   // Opens JoinJamModal from EventDetailModal footer action

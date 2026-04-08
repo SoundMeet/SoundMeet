@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdSearch, MdMusicNote, MdHeadphones, MdStars, MdPhotoCamera, MdClose, MdStar } from 'react-icons/md'
-import { mockFeedPosts } from '../../data/mockFriendsData'
-import { MOCK_AUTHENTICATED_USER } from '../../data/mockUser'
-import { postService } from '../../services/postService'
+import { postService } from '../../injectables/postService'
+import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
+import { useAuth } from '../../injectables/Auth'
+import { useFriends } from '../../context/FriendsContext'
 import { FeedPost } from './FeedPost'
 import { PostComposerModal } from './composer/PostComposerModal'
 import { ClipComposerBody } from './composer/ClipComposerBody'
@@ -74,16 +75,6 @@ const COMPOSER_CONFIG = {
   },
 }
 
-// ─── Author derived from mock user ────────────────────────────────────────────
-
-const AUTHOR = {
-  id:          MOCK_AUTHENTICATED_USER.id,
-  displayName: MOCK_AUTHENTICATED_USER.name,
-  username:    MOCK_AUTHENTICATED_USER.username,
-  avatarUrl:   MOCK_AUTHENTICATED_USER.avatarUrl,
-  instruments: [],
-}
-
 // ─── Char counter SVG (Twitter-style ring) ────────────────────────────────────
 
 const MAX_CHARS = 300
@@ -134,7 +125,7 @@ const ATTACH_BUTTONS = [
   { key: 'review', icon: MdStar,        color: '#FB923C', bg: 'rgba(251,146,60,0.12)',  label: 'Review a Jam'  },
 ]
 
-function PostComposer({ onOpen, onPost }) {
+function PostComposer({ author, onOpen, onPost }) {
   const [expanded, setExpanded] = useState(false)
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
@@ -207,17 +198,19 @@ function PostComposer({ onOpen, onPost }) {
         <div className="flex gap-3">
           {/* Avatar */}
           <div className="flex-shrink-0 pt-0.5">
-            {AUTHOR.avatarUrl ? (
+            {author.avatarUrl ? (
               <img
-                src={AUTHOR.avatarUrl}
-                alt={AUTHOR.displayName}
+                src={author.avatarUrl}
+                alt={author.displayName}
                 className="w-9 h-9 rounded-full object-cover"
               />
             ) : (
               <div
-                className="w-9 h-9 rounded-full"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.4), rgba(251,64,64,0.25))' }}
-              />
+              >
+                {author.displayName?.[0]}
+              </div>
             )}
           </div>
 
@@ -362,12 +355,35 @@ function PostComposer({ onOpen, onPost }) {
 
 // ─── FeedSection ──────────────────────────────────────────────────────────────
 
-export function FeedSection() {
+export function FeedSection({ feedTab = 'forYou' }) {
+  const { user } = useAuth()
+  const { friends } = useFriends()
+  const friendIds = new Set(friends.map((f) => String(f.id)))
+
+  const author = {
+    id:          user?.id          ?? 'guest',
+    displayName: user?.display_name ?? user?.username ?? 'You',
+    username:    user?.username    ? `@${user.username}` : '',
+    avatarUrl:   formatAvatarUrl(user?.pfp),
+    instruments: [],
+  }
+
   const [activeFilter, setActiveFilter] = useState('all')
   const [searchQuery,  setSearchQuery]  = useState('')
 
-  // Optimistic post store — new posts prepended in front of seed data
-  const [localPosts, setLocalPosts] = useState([])
+  const [posts, setPosts]       = useState([])
+  const [loadError, setLoadError] = useState(null)
+
+  const loadPosts = useCallback(() => {
+    postService.getFeed(user?.id)
+      .then(setPosts)
+      .catch((err) => {
+        console.error('Failed to load posts:', err?.message ?? err)
+        setLoadError(`Could not load posts: ${err?.message ?? 'unknown error'}`)
+      })
+  }, [user?.id])
+
+  useEffect(() => { loadPosts() }, [loadPosts])
 
   // Active composer type: 'clip' | 'jam' | 'show' | 'photo' | null
   const [openType, setOpenType]     = useState(null)
@@ -391,16 +407,9 @@ export function FeedSection() {
 
   // Plain text post (no modal needed)
   const handleTextPost = useCallback(async (content) => {
-    const newPost = await postService.createPost({
-      author:   AUTHOR,
-      type:     'text',
-      postType: 'text',
-      content,
-      location: null,
-      tags:     [],
-    })
-    setLocalPosts((prev) => [newPost, ...prev])
-  }, [])
+    await postService.createNewPost(content, null)
+    loadPosts()
+  }, [loadPosts])
 
   const patchComposerState = (type, patch) => {
     setComposerState((prev) => ({
@@ -417,96 +426,20 @@ export function FeedSection() {
     setIsSubmitting(true)
 
     try {
-      let payload = null
+      let content = ''
+      let imageFile = null
 
-      if (type === 'clip') {
-        payload = {
-          author:   AUTHOR,
-          type:     'audio',
-          postType: 'clip',
-          content:  state.caption || '',
-          media:    state.audioFile
-            ? {
-                audioFile:     state.audioFile,
-                audioFileName: state.audioFile.name,
-                duration:      null, // TODO: parse from <audio> element or backend
-              }
-            : null,
-          location,
-          tags: [],
-        }
-      }
-
-      if (type === 'jam') {
-        payload = {
-          author:   AUTHOR,
-          type:     'text',
-          postType: 'jam',
-          content:  state.message || '',
-          jamRef:   state.selectedJam
-            ? {
-                id:           state.selectedJam.id,
-                title:        state.selectedJam.title,
-                date:         state.selectedJam.date,
-                locationName: state.selectedJam.locationName,
-              }
-            : null,
-          location,
-          tags: [],
-        }
-      }
-
-      if (type === 'show') {
-        payload = {
-          author:   AUTHOR,
-          type:     'text',
-          postType: 'show',
-          content:  state.caption || '',
-          showRef:  state.selectedShow ?? null,
-          location,
-          tags: [],
-        }
-      }
-
+      if (type === 'clip')   content = state.caption  || ''
+      if (type === 'jam')    content = state.message   || ''
+      if (type === 'show')   content = state.caption   || ''
+      if (type === 'review') content = state.caption   || ''
       if (type === 'photo') {
-        payload = {
-          author:   AUTHOR,
-          type:     'photo',
-          postType: 'gear',
-          content:  state.caption || '',
-          media:    state.photos.length > 0
-            ? { images: state.photos.map((p) => p.previewUrl) }
-            : null,
-          location,
-          tags: [],
-        }
+        content   = state.caption || ''
+        imageFile = state.photos?.[0]?.file ?? null
       }
 
-      if (type === 'review') {
-        payload = {
-          author:    AUTHOR,
-          type:      'text',
-          postType:  'review',
-          content:   state.caption || '',
-          jamRef:    state.selectedJam
-            ? {
-                id:           state.selectedJam.id,
-                title:        state.selectedJam.title,
-                date:         state.selectedJam.date,
-                locationName: state.selectedJam.locationName,
-              }
-            : null,
-          reviewRef: { rating: state.rating },
-          location,
-          tags: [],
-        }
-      }
-
-      if (!payload) return
-
-      const newPost = await postService.createPost(payload)
-      // Optimistically prepend to local feed
-      setLocalPosts((prev) => [newPost, ...prev])
+      await postService.createNewPost(content, imageFile)
+      loadPosts()
       closeComposer()
     } catch (err) {
       console.error('Post failed:', err)
@@ -527,19 +460,19 @@ export function FeedSection() {
     return false
   })()
 
-  // ── Merged feed ──────────────────────────────────────────────────────────
+  // ── Filtered feed ────────────────────────────────────────────────────────
 
-  const allPosts  = [...localPosts, ...mockFeedPosts]
-  const displayed = allPosts.filter(
-    (p) => matchesFilter(p, activeFilter) && matchesSearch(p, searchQuery)
+  const displayed = posts.filter(
+    (p) =>
+      matchesFilter(p, activeFilter) &&
+      matchesSearch(p, searchQuery) &&
+      (feedTab !== 'following' || friendIds.has(String(p.author.id)))
   )
-
-  const cfg = openType ? COMPOSER_CONFIG[openType] : null
 
   return (
     <div className="flex flex-col gap-4">
       {/* Composer entry point */}
-      <PostComposer onOpen={openComposer} onPost={handleTextPost} />
+      <PostComposer author={author} onOpen={openComposer} onPost={handleTextPost} />
 
       {/* Filter pills */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -579,13 +512,19 @@ export function FeedSection() {
       </div>
 
       {/* Posts */}
-      {displayed.length === 0 ? (
+      {loadError ? (
+        <p className="text-sm text-center py-12" style={{ color: 'rgba(251,64,64,0.7)' }}>{loadError}</p>
+      ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <span className="text-3xl">🎵</span>
           <p className="text-sm" style={{ color: 'rgba(229,226,225,0.35)' }}>
-            {localPosts.length === 0 && allPosts.length === 0
-              ? 'Be the first to post something'
-              : 'No posts match your filter'}
+            {feedTab === 'following' && friends.length === 0
+            ? 'Add friends to see their posts here'
+            : feedTab === 'following'
+            ? 'Your friends haven\'t posted yet'
+            : posts.length === 0
+            ? 'Be the first to post something'
+            : 'No posts match your filter'}
           </p>
         </div>
       ) : (
@@ -615,7 +554,7 @@ export function FeedSection() {
         canSubmit={openType === 'clip' && canSubmit}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
-        author={AUTHOR}
+        author={author}
       >
         <ClipComposerBody
           state={composerState.clip ?? COMPOSER_CONFIG.clip.initState()}
@@ -633,7 +572,7 @@ export function FeedSection() {
         canSubmit={openType === 'jam' && canSubmit}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
-        author={AUTHOR}
+        author={author}
       >
         <JamInviteComposerBody
           state={composerState.jam ?? COMPOSER_CONFIG.jam.initState()}
@@ -651,7 +590,7 @@ export function FeedSection() {
         canSubmit={openType === 'show' && canSubmit}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
-        author={AUTHOR}
+        author={author}
       >
         <ShowPromoComposerBody
           state={composerState.show ?? COMPOSER_CONFIG.show.initState()}
@@ -674,7 +613,7 @@ export function FeedSection() {
         canSubmit={openType === 'photo' && canSubmit}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
-        author={AUTHOR}
+        author={author}
       >
         <PhotoComposerBody
           state={composerState.photo ?? COMPOSER_CONFIG.photo.initState()}
@@ -692,7 +631,7 @@ export function FeedSection() {
         canSubmit={openType === 'review' && canSubmit}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
-        author={AUTHOR}
+        author={author}
       >
         <ReviewComposerBody
           state={composerState.review ?? COMPOSER_CONFIG.review.initState()}

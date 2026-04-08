@@ -7,14 +7,13 @@ import JamTaxonomySection from "./sections/JamTaxonomySection";
 import CreateJamFooterActions from "./CreateJamFooterActions";
 import StepIndicator from "../ui/StepIndicator";
 import ImageUploadField from "../ui/ImageUploadField";
-import { createJamOptions } from "../../data/mockCreateJamOptions";
 import { getFormTheme } from "../../utils/discovery";
 import { Field } from "./sections/JamBasicInfoSection";
 import {
   validateJamCoreDetails,
   validateJamField,
 } from "../../utils/validateJamCoreDetails";
-import { jamService } from "../../services/jamService";
+import { jamService } from "../../injectables/jamService";
 import { useAuth } from "../../injectables/Auth";
 
 // ─── Steps definition ─────────────────────────────────────────────────────────
@@ -129,12 +128,12 @@ const Stepper = ({ value, onChange }) => {
  * CreateJamForm — owns all form state and step navigation.
  *
  * Props:
- *   options       CreateJamOptionSets  — injectable (default: mockCreateJamOptions)
+ *   options       CreateJamOptionSets  — provided by CreateJamModal via useFormOptions()
  *   onClose       () => void
  *   initialValues object?              — pre-fills form for edit mode
  */
 const CreateJamForm = ({
-  options = createJamOptions,
+  options,
   onClose,
   initialValues,
 }) => {

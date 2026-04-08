@@ -10,7 +10,7 @@ import JamInfoModal from '../components/chat/JamInfoModal'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
-import { jamService } from '../services/jamService'
+import { jamService } from '../injectables/jamService'
 
 
 const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 

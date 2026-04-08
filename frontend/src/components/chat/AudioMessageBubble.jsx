@@ -11,7 +11,7 @@ const formatTime = (secs) => {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-const AudioMessageBubble = ({ message, isOutgoing, showSenderInfo, sender }) => {
+const AudioMessageBubble = ({ message, isOutgoing, showSenderInfo, sender, isFirst, isLast }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playheadPercent, setPlayheadPercent] = useState(0)
   const [displayTime, setDisplayTime] = useState('0:00')
@@ -51,7 +51,7 @@ const AudioMessageBubble = ({ message, isOutgoing, showSenderInfo, sender }) => 
 
   const containerClass = isOutgoing
     ? 'rounded-2xl p-4 transition-colors duration-200 cursor-pointer'
-    : 'rounded-2xl p-4 bg-[#141414]/80 hover:bg-[#0D0D0D]/90 transition-colors duration-200 cursor-pointer'
+    : 'rounded-2xl p-4 transition-colors duration-200 cursor-pointer'
 
   const containerStyle = isOutgoing
     ? {
@@ -60,23 +60,24 @@ const AudioMessageBubble = ({ message, isOutgoing, showSenderInfo, sender }) => 
       }
     : {
         maxWidth: 420,
-        boxShadow: '0 0 0 1px rgba(255,255,255,0.06)',
+        background: 'rgba(255,255,255,0.07)',
+        border: '1px solid rgba(255,255,255,0.06)',
       }
 
   const bars = message.waveformBars || Array.from({ length: 40 }, () => 0.5)
   const playedCount = Math.floor((playheadPercent / 100) * bars.length)
 
   return (
-    <div className={`flex ${isOutgoing ? 'justify-end' : 'items-end gap-2'}`}>
-      {/* Incoming avatar */}
+    <div className={`flex ${isOutgoing ? 'justify-end' : 'items-end gap-2.5'}`}>
+      {/* Incoming avatar — reserve space so bubbles stay aligned */}
       {!isOutgoing && (
-        <div style={{ width: 36, flexShrink: 0 }}>
+        <div style={{ width: 32, flexShrink: 0 }}>
           {showSenderInfo && (
             <img
               src={sender?.avatar}
               alt={sender?.name}
               className="rounded-full object-cover"
-              style={{ width: 36, height: 36 }}
+              style={{ width: 32, height: 32 }}
             />
           )}
         </div>
@@ -85,12 +86,11 @@ const AudioMessageBubble = ({ message, isOutgoing, showSenderInfo, sender }) => 
       <div className={`flex flex-col ${isOutgoing ? 'items-end' : 'items-start'}`}>
         {showSenderInfo && !isOutgoing && sender && (
           <div
-            className="mb-1"
+            className="mb-1 ml-1"
             style={{
-              fontSize: '0.75rem',
-              color: 'rgba(229,226,225,0.7)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              fontSize: '0.68rem',
+              color: 'rgba(229,226,225,0.5)',
+              letterSpacing: '0.03em',
             }}
           >
             {sender.name}
