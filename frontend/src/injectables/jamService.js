@@ -8,9 +8,13 @@
 import { supabase } from './supaBaseClient';
 import { parseEWKBPoint, toWKTPoint } from '../utils/parseGeography';
 import { DISCOVERY_COLORS } from '../utils/discovery';
+import { apiFetch } from './Auth'; // <-- Added for Django backend calls
 
 // ─── Shared select clause ─────────────────────────────────────────────────────
 
+// NOTE: Since you upgraded Genre and Vibe to ManyToMany fields in Django, 
+// after you migrate, you may need to update this select to fetch through the M2M tables 
+// e.g., `genres:chat_jam_genre( genre:chat_genre(id, name) )`
 const JAM_SELECT = `
   id, name, location, date_time, description, access, admin_id,
   genre:genre_id (id, name),
@@ -31,14 +35,6 @@ function formatDateTime(iso) {
   });
 }
 
-/**
- * Classifies a jam's date_time into a timeSlot string used by discoverFilters.
- * live → started within the last 4 hours and no end time
- * tonight → today, after 6 pm
- * tomorrow → next calendar day
- * week → within the next 7 days
- * future → more than 7 days away
- */
 function computeTimeSlot(iso) {
   if (!iso) return 'future';
   const now = new Date();
@@ -46,7 +42,6 @@ function computeTimeSlot(iso) {
   const diffMs = d - now;
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
-  // Consider "live" if started less than 4 hours ago
   if (diffMs > -4 * 60 * 60 * 1000 && diffMs < 0) return 'live';
 
   const isToday =
@@ -55,7 +50,7 @@ function computeTimeSlot(iso) {
     d.getDate() === now.getDate();
 
   if (isToday && d.getHours() >= 18) return 'tonight';
-  if (isToday) return 'tonight'; // daytime jams also bucket as tonight for filter purposes
+  if (isToday) return 'tonight'; 
 
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -69,11 +64,8 @@ function computeTimeSlot(iso) {
   return 'future';
 }
 
-/**
- * Compute distance in miles between two lat/lng pairs using the Haversine formula.
- */
 function haversineMiles(lat1, lng1, lat2, lng2) {
-  const R = 3958.8; // Earth radius in miles
+  const R = 3958.8; 
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
@@ -86,15 +78,14 @@ function haversineMiles(lat1, lng1, lat2, lng2) {
 
 // ─── Normalizer ───────────────────────────────────────────────────────────────
 
-/**
- * Converts a raw Supabase chat_jam row into the discovery item shape.
- * Pass userLocation { latitude, longitude } to populate distanceMiles.
- */
 export function normalizeJamRow(row, userLocation = null) {
   const coords = parseEWKBPoint(row.location);
   const isPublic = row.access === true;
+  
+  // Note: If you update JAM_SELECT for the M2M arrays, you'll need to map the first item here
   const genreName = row.genre?.name ?? null;
   const vibeName = row.vibe?.name ?? null;
+  
   const formattedDate = formatDateTime(row.date_time);
   const timeSlot = computeTimeSlot(row.date_time);
 
@@ -109,38 +100,27 @@ export function normalizeJamRow(row, userLocation = null) {
       : null;
 
   return {
-    // ── Identity ──────────────────────────────────────────────────────────────
     id: String(row.id),
     type: 'jam',
     entityKind: 'jam_session',
-
-    // ── Display ───────────────────────────────────────────────────────────────
     title: row.name,
     subtitle: [genreName, vibeName].filter(Boolean).join(' · ') || 'Jam Session',
     neighborhood: null,
     summary: row.description ?? '',
     description: row.description ?? '',
-
-    // ── Map ───────────────────────────────────────────────────────────────────
     coordinates: coords,
     locationVisibility: coords ? 'exact' : null,
     approximateRadiusMeters: null,
-
-    // ── Taxonomy ──────────────────────────────────────────────────────────────
     genre: genreName,
     vibe: vibeName,
     vibes: vibeName ? [vibeName] : [],
     previewPills: [genreName, vibeName].filter(Boolean),
     tags: [genreName, vibeName].filter(Boolean),
-
-    // ── Timing ───────────────────────────────────────────────────────────────
     dateTime: formattedDate,
     date: formattedDate,
     metaSecondary: formattedDate ?? 'Open session',
     timeSlot,
     isLive: timeSlot === 'live',
-
-    // ── Distance ─────────────────────────────────────────────────────────────
     distanceMiles,
     metaPrimary: [
       genreName,
@@ -148,18 +128,12 @@ export function normalizeJamRow(row, userLocation = null) {
     ]
       .filter(Boolean)
       .join(' · '),
-
-    // ── Access ────────────────────────────────────────────────────────────────
     isPrivate: !isPublic,
     access: isPublic,
     ctaLabel: isPublic ? 'Join Jam' : 'Request to Join',
     previewCtaLabel: 'View Jam',
     badgeLabel: timeSlot === 'live' ? 'Live Now' : !isPublic ? 'Private' : null,
-
-    // ── Styling ───────────────────────────────────────────────────────────────
     accentColor: DISCOVERY_COLORS.jam,
-
-    // ── Admin (for MyJams) ────────────────────────────────────────────────────
     admin_id: row.admin_id,
   };
 }
@@ -167,10 +141,6 @@ export function normalizeJamRow(row, userLocation = null) {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const jamService = {
-  /**
-   * Fetch upcoming public jams as raw Supabase rows.
-   * Use this when the caller wants to re-normalize (e.g. with changing userLocation).
-   */
   async fetchRawDiscoverFeed() {
     const { data, error } = await supabase
       .from('chat_jam')
@@ -182,18 +152,11 @@ export const jamService = {
     return data ?? [];
   },
 
-  /**
-   * Fetch upcoming public jams, normalized.
-   * Pass userLocation to populate distanceMiles.
-   */
   async getDiscoverFeed(userLocation = null) {
     const rows = await this.fetchRawDiscoverFeed();
     return rows.map((row) => normalizeJamRow(row, userLocation));
   },
 
-  /**
-   * Fetch all jams where admin_id = userId (Created Jams tab).
-   */
   async getMyCreatedJams(userId, userLocation = null) {
     const { data, error } = await supabase
       .from('chat_jam')
@@ -207,10 +170,6 @@ export const jamService = {
     }));
   },
 
-  /**
-   * Fetch upcoming jams the user is attending (Jams I'm Going tab).
-   * Does NOT include jams the user created.
-   */
   async getMyAttendingJams(userId, userLocation = null) {
     const { data: attending, error: attError } = await supabase
       .from('chat_jam_users_attending')
@@ -233,20 +192,15 @@ export const jamService = {
     }));
   },
 
-  /**
-   * Fetch past jams the user attended or created (Past Jams tab).
-   */
   async getMyPastJams(userId, userLocation = null) {
     const now = new Date().toISOString();
 
-    // Jams user attended
     const { data: attending } = await supabase
       .from('chat_jam_users_attending')
       .select('jam_id')
       .eq('user_id', userId);
     const attendingIds = attending?.map((r) => r.jam_id) ?? [];
 
-    // Jams user created
     const { data: created } = await supabase
       .from('chat_jam')
       .select('id')
@@ -267,10 +221,6 @@ export const jamService = {
     return (data ?? []).map((row) => normalizeJamRow(row, userLocation));
   },
 
-  /**
-   * Insert a new jam into chat_jam.
-   * Returns the created row.
-   */
   async createJam(form, userId) {
     const dateTime =
       form.date && form.startTime
@@ -279,40 +229,32 @@ export const jamService = {
 
     const location =
       form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null
-        ? toWKTPoint(form.selectedPlace.latitude, form.selectedPlace.longitude)
+        ? `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`
         : null;
 
-    // form.genres.presetIds are DB IDs from useFormOptions (strings) — chat_jam takes a single FK
-    const genreId = form.isOpenToAllGenres
-      ? null
-      : form.genres?.presetIds?.[0]
-        ? parseInt(form.genres.presetIds[0], 10)
-        : null;
-
-    const vibeId = form.isOpenToAllVibes
-      ? null
-      : form.vibes?.presetIds?.[0]
-        ? parseInt(form.vibes.presetIds[0], 10)
-        : null;
-
-    const row = {
-      name: form.title.trim(),
+    const payload = {
+      name: form.title?.trim(),
       date_time: dateTime,
-      description: form.description?.trim() || null,
-      access: !form.isPrivate, // true = public
-      admin_id: userId,
-      location,
-      genre_id: genreId,
-      vibe_id: vibeId,
+      location: location,
+      description: form.description?.trim() || '',
+      jam_type: form.jamType || 'OPEN JAM',
+      skill_level: form.skillLevel || 'ALL LEVELS',
+      access: !form.isPrivate, 
+      
+      genre_ids: form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []),
+      vibe_ids: form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []),
+      instruments_needed_ids: form.instruments?.presetIds || [],
+      roles_needed_ids: form.roles?.presetIds || [],
+      gear_provided_ids: form.gearProvided?.presetIds || [],
+      gear_needed_ids: form.gearNeeded?.presetIds || []
     };
 
-    const { data, error } = await supabase
-      .from('chat_jam')
-      .insert([row])
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await apiFetch('api/jams/create/', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    return response;
   },
 
   async deleteJam(jamId) {
@@ -323,10 +265,6 @@ export const jamService = {
     if (error) throw error;
   },
 
-  /**
-   * Enrich jam thread names for the Chat page.
-   * Given an array of jam IDs, returns a map { jamId → name }.
-   */
   async getJamNames(jamIds) {
     if (!jamIds.length) return {};
     const { data, error } = await supabase
