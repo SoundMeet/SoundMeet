@@ -26,6 +26,17 @@ import { apiService } from "../injectables/apiCalls";
 import { socialService } from "../injectables/socialService";
 import { useAuth } from "../injectables/Auth";
 
+const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
+const BUCKET_URL = `${SUPABASE_URL}/storage/v1/object/public/media/`;
+function formatAvatarUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  
+  return `${BUCKET_URL}${cleanPath}`;
+}
+
 const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-200, 200], [-10, 10]);
@@ -77,7 +88,7 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
       <div className="relative h-full w-full">
         <img
           src={
-            profile.avatar_url ||
+            formatAvatarUrl(profile.pfp) ||
             "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&w=150&h=150&q=80"
           }
           alt={profile.display_name}
@@ -336,9 +347,9 @@ export default function SoundMeetDiscovery() {
                           className="flex items-center gap-3 p-3 rounded-2xl hover:bg-[#2A2A2A] transition-colors text-left group"
                         >
                           <div className="w-10 h-10 rounded-full bg-[#2A2A2A] overflow-hidden border border-white/5">
-                            {p.avatar_url ? (
+                            {formatAvatarUrl(p.pfp) ? (
                               <img
-                                src={p.avatar_url}
+                                src={formatAvatarUrl(p.pfp)}
                                 className="w-full h-full object-cover"
                                 alt=""
                               />
@@ -450,7 +461,7 @@ export default function SoundMeetDiscovery() {
                 </Dialog.Description>
                 <div className="relative h-32 shrink-0 w-full">
                   <img 
-                    src={selectedProfile.avatar_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800"} 
+                    src={formatAvatarUrl(selectedProfile.pfp) || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800"} 
                     className="w-full h-full object-cover"
                     alt=""
                   />
