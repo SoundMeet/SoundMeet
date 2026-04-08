@@ -31,6 +31,30 @@ export const socialService = {
     if (error) throw error;
   },
 
+  async getMyFriends(userId) {
+    const { data, error } = await supabase
+      .from('chat_profile')
+      .select(`
+        friends:chat_profile_friends (
+          user:user_id (
+            id,
+            username,
+            chat_profile ( display_name, pfp )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching friends:', error);
+      return [];
+    }
+
+    return (data?.friends || [])
+      .map(link => link.user)
+      .filter(Boolean);
+  },
 
   async getPendingFriendRequests(userId) {
     const { data, error } = await supabase
