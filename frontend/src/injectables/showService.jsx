@@ -1,5 +1,6 @@
 import { supabase } from './supaBaseClient';
 import { parseEWKBPoint } from '../utils/parseGeography';
+import { apiFetch } from './Auth';
 
 export const showService = {
   
