@@ -398,7 +398,6 @@ const Chat = () => {
 
       <div
         className="flex flex-col flex-1 overflow-hidden"
-        style={{ backgroundColor: '#141414' }}
       >
         <div className="flex items-center lg:hidden px-3 py-1.5 flex-shrink-0">
           <button

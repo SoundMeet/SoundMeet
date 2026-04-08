@@ -32,16 +32,10 @@ const Friends = () => {
       </aside>
 
       {/* Main feed */}
-      <main className="flex-1 h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <main className="flex-1 flex flex-col h-full overflow-hidden">
 
-        {/* Sticky top bar */}
-        <div
-          className="sticky top-0 z-10"
-          style={{
-            background: 'rgba(17,17,17,0.9)',
-            backdropFilter: 'blur(16px)',
-          }}
-        >
+        {/* Tab bar — outside scroll container so posts never reach it */}
+        <div className="flex-shrink-0">
           {/* Mobile: Feed title + Find People */}
           <div
             className="lg:hidden px-4 py-3 flex items-center justify-between"
@@ -88,9 +82,11 @@ const Friends = () => {
           </div>
         </div>
 
-        {/* Feed content */}
-        <div className="max-w-[680px] mx-auto px-4 py-6">
-          <FeedSection feedTab={feedTab} />
+        {/* Feed content — only this part scrolls */}
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+          <div className="max-w-[680px] mx-auto px-4 py-6">
+            <FeedSection feedTab={feedTab} />
+          </div>
         </div>
       </main>
 
