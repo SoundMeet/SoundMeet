@@ -162,20 +162,41 @@ export default function SoundMeetDiscovery() {
     roles: [],
   });
 
+  // Dynamic Options State
+  const [options, setOptions] = useState({
+    genres: [],
+    instruments: [],
+    roles: [],
+  });
+
   const searchContainerRef = useRef(null);
 
   useEffect(() => {
-    async function fetchProfiles() {
+    async function initDiscovery() {
       try {
-        const data = await apiService.getProfiles();
-        setProfiles(data);
+        setLoading(true);
+        // Concurrent load of profiles and filter options
+        const [profilesData, formOptions] = await Promise.all([
+          apiService.getProfiles(),
+          apiService.getAllFormOptions()
+        ]);
+        
+        setProfiles(profilesData);
+        
+        // Map API objects to simple name arrays for the filter UI
+        setOptions({
+          genres: formOptions.genres?.map(g => g.name) || [],
+          instruments: formOptions.instruments?.map(i => i.name) || [],
+          roles: formOptions.roles?.map(r => r.name) || [],
+        });
+
       } catch (err) {
-        console.error(err);
+        console.error("Discovery Init Error:", err);
       } finally {
         setLoading(false);
       }
     }
-    fetchProfiles();
+    initDiscovery();
   }, []);
 
   useEffect(() => {
@@ -188,21 +209,6 @@ export default function SoundMeetDiscovery() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const options = {
-    genres: [
-      "Synthwave",
-      "R&B",
-      "Pop",
-      "Techno",
-      "Indie",
-      "Rock",
-      "House",
-      "Ambient",
-    ],
-    instruments: ["Synthesizer", "Guitar", "Vocals", "Drums", "Bass"],
-    roles: ["Producer", "Vocalist", "Songwriter", "DJ"],
-  };
 
   const toggleFilter = (key, value) => {
     setFilters((prev) => ({
@@ -224,16 +230,15 @@ export default function SoundMeetDiscovery() {
       const matchInst =
         filters.instruments.length === 0 ||
         p.instruments.some((i) => filters.instruments.includes(i.name));
-      return matchSearch && matchGenre && matchInst;
+      const matchRole =
+        filters.roles.length === 0 ||
+        (p.roles && p.roles.some((r) => filters.roles.includes(r.name)));
+        
+      return matchSearch && matchGenre && matchInst && matchRole;
     });
   }, [profiles, searchQuery, filters]);
 
   const handleSwipe = (direction, id) => {
-    if (direction === "left") {
-      console.log("left swipe");
-    } else if (direction === "right") {
-      console.log("right swipe");
-    }
     setProfiles((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -256,6 +261,7 @@ export default function SoundMeetDiscovery() {
             {item}
           </button>
         ))}
+        {items.length === 0 && <span className="text-[10px] text-white/10 italic">Loading...</span>}
       </div>
     </div>
   );
