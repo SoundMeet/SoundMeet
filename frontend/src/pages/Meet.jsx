@@ -5,7 +5,7 @@ import SwipeStack from '../components/SwipeStack'
 
 const Meet = () => {
   return (
-    <div className="h-[calc(100vh-4rem)] bg-neutral-950 text-white flex flex-col relative overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] text-white flex flex-col relative overflow-hidden">
       <SwipeStack/>
     </div>
   )

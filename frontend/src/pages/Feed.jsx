@@ -16,7 +16,7 @@ const Friends = () => {
   return (
     <div
       className="flex relative"
-      style={{ height: 'calc(100vh - 64px)', background: '#111', overflow: 'hidden' }}
+      style={{ height: 'calc(100vh - 64px)', overflow: 'hidden' }}
     >
 
       {/* Left sidebar */}
