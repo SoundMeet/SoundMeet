@@ -77,6 +77,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'https://soundmeet-production.up.railway.app',
     'https://www.soundmeet.app',
+    "https://5173-firebase-soundmeetgit-1775582687917.cluster-a6fboot2vrctkwj6dpuoyj5s7y.cloudworkstations.dev",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -84,6 +85,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
     'http://localhost:5173',
     'https://www.soundmeet.app',
+    "https://5173-firebase-soundmeetgit-1775582687917.cluster-a6fboot2vrctkwj6dpuoyj5s7y.cloudworkstations.dev",
+
 ]
 
 CORS_ALLOW_CREDENTIALS = True

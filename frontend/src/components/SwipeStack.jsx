@@ -23,6 +23,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { apiService } from "../injectables/apiCalls";
+import { socialService } from "../injectables/socialService";
+import { useAuth } from "../injectables/Auth";
 
 const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
   const dragX = useMotionValue(0);
@@ -152,17 +154,18 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
 };
 
 export default function SoundMeetDiscovery() {
+  const { user, isLoggedIn, isLoading: authLoading } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [friends, setFriends] = useState([]);
   const [filters, setFilters] = useState({
     genres: [],
     instruments: [],
     roles: [],
   });
 
-  // Dynamic Options State
   const [options, setOptions] = useState({
     genres: [],
     instruments: [],
@@ -173,17 +176,22 @@ export default function SoundMeetDiscovery() {
 
   useEffect(() => {
     async function initDiscovery() {
+      if (!isLoggedIn || !user?.id) return;
+      
       try {
         setLoading(true);
-        // Concurrent load of profiles and filter options
-        const [profilesData, formOptions] = await Promise.all([
+        const [profilesData, formOptions, friendsData] = await Promise.all([
           apiService.getProfiles(),
-          apiService.getAllFormOptions()
+          apiService.getAllFormOptions(),
+          socialService.getMyFriends(user.id)
         ]);
         
-        setProfiles(profilesData);
+        // Hide and Do not show users own profile
+        const otherProfiles = profilesData.filter(p => p.id !== user.id);
         
-        // Map API objects to simple name arrays for the filter UI
+        setProfiles(otherProfiles);
+        setFriends(friendsData || []);
+        
         setOptions({
           genres: formOptions.genres?.map(g => g.name) || [],
           instruments: formOptions.instruments?.map(i => i.name) || [],
@@ -196,8 +204,11 @@ export default function SoundMeetDiscovery() {
         setLoading(false);
       }
     }
-    initDiscovery();
-  }, []);
+    
+    if (!authLoading) {
+      initDiscovery();
+    }
+  }, [isLoggedIn, user?.id, authLoading]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -238,7 +249,14 @@ export default function SoundMeetDiscovery() {
     });
   }, [profiles, searchQuery, filters]);
 
-  const handleSwipe = (direction, id) => {
+  const handleSwipe = async (direction, id) => {
+    if (direction === "right") {
+      try {
+        await socialService.sendFriendRequest(id);
+      } catch (err) {
+        console.error("Failed to send friend request on swipe:", err);
+      }
+    }
     setProfiles((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -265,6 +283,22 @@ export default function SoundMeetDiscovery() {
       </div>
     </div>
   );
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#0F0F0F]">
+        <Loader2 className="w-8 h-8 text-[#DC2E73] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#0F0F0F] text-white/40">
+        Please log in to discover artists.
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden">
@@ -472,10 +506,31 @@ export default function SoundMeetDiscovery() {
                   </div>
 
                   <div className="flex flex-col gap-2 mt-auto">
-                    <button className="w-full py-3 rounded-full bg-gradient-to-r from-[#DC2E73] to-[#FB4040] text-white font-bold text-[12px] shadow-[0_0_20px_rgba(220,46,115,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                      <UserPlus size={14} />
-                      Add Friend
-                    </button>
+                    {friends.some(f => f.id === selectedProfile.id) ? (
+                      <button 
+                        disabled
+                        className="w-full py-3 rounded-full bg-[#DC2E73]/10 text-[#DC2E73] font-bold text-[12px] border border-[#DC2E73]/30 flex items-center justify-center gap-2 opacity-80"
+                      >
+                        <Check size={14} />
+                        Friends
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={async () => {
+                          try {
+                            await socialService.sendFriendRequest(selectedProfile.id);
+                            setSelectedProfile(null);
+                            handleSwipe("right", selectedProfile.id);
+                          } catch (err) {
+                            console.error("Failed to send friend request:", err);
+                          }
+                        }}
+                        className="w-full py-3 rounded-full bg-gradient-to-r from-[#DC2E73] to-[#FB4040] text-white font-bold text-[12px] shadow-[0_0_20px_rgba(220,46,115,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        <UserPlus size={14} />
+                        Add Friend
+                      </button>
+                    )}
                     <button className="w-full py-3 rounded-full bg-[#2A2A2A] text-white/80 font-bold text-[12px] hover:bg-[#393939] hover:text-white hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                       <ExternalLink size={14} />
                       View Profile
