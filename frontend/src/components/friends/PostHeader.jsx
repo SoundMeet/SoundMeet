@@ -50,12 +50,21 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
   return (
     <div className="flex items-start justify-between gap-2">
       <div className="flex items-center gap-2.5">
-        <img
-          src={author.avatarUrl}
-          alt={author.displayName}
-          className="w-9 h-9 rounded-full object-cover flex-shrink-0 transition-transform duration-150 hover:scale-105 cursor-pointer"
-          style={{ background: '#222' }}
-        />
+        {author.avatarUrl ? (
+          <img
+            src={author.avatarUrl}
+            alt={author.displayName}
+            className="w-9 h-9 rounded-full object-cover flex-shrink-0 transition-transform duration-150 hover:scale-105 cursor-pointer"
+            style={{ background: '#222' }}
+          />
+        ) : (
+          <div
+            className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white transition-transform duration-150 hover:scale-105 cursor-pointer"
+            style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.5), rgba(251,64,64,0.3))' }}
+          >
+            {author.displayName?.[0]?.toUpperCase()}
+          </div>
+        )}
         <div>
           <p className="text-sm font-semibold text-white leading-tight cursor-pointer hover:underline decoration-white/30 underline-offset-2 transition-all duration-150">
             {author.displayName}
