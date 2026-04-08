@@ -1,10 +1,15 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
-from .models import Profile, Post
+from django.contrib.gis.geos import GEOSGeometry
+from django.db import transaction
+from .models import (
+    Profile, Post, FriendRequest, Notification, 
+    BandmateListing, BandmateCandidate, Jam
+)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -20,9 +25,7 @@ def register_user(request):
         return Response({'error': 'Username already taken'}, status=400)
 
     user = User.objects.create_user(username=username, email=email, password=password)
-    
     Profile.objects.create(user=user, display_name=username[:15])
-    
     token = Token.objects.create(user=user)
 
     return Response({
@@ -41,19 +44,15 @@ def get_profile(request):
     
     if request.method == 'PATCH':
         data = request.data
-        
         if 'display_name' in data: profile.display_name = data['display_name']
         if 'about' in data: profile.about = data['about']
         if 'country' in data: profile.country = data['country']
         if 'city' in data: profile.city = data['city']
         if 'gender' in data: profile.gender = data['gender']
-        
         if 'spectator' in data:
             profile.spectator = str(data['spectator']).lower() == 'true'
-            
         if 'age' in data:
             profile.age = int(data['age']) if data['age'] else None
-            
         if 'pfp' in request.FILES:
             profile.pfp = request.FILES['pfp']
             
@@ -62,7 +61,6 @@ def get_profile(request):
         def update_m2m(field_name, m2m_manager):
             if field_name in data:
                 items = data.getlist(field_name) if hasattr(data, 'getlist') else data[field_name]
-                
                 if items == [''] or items == "":
                     m2m_manager.clear()
                 else:
@@ -112,3 +110,111 @@ def create_post(request):
         'author_id': post.author.id,
         'created_at': post.created_at
     }, status=201)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def create_jam(request):
+    data = request.data
+
+    location_wkt = data.get('location')
+    jam_location = GEOSGeometry(location_wkt) if location_wkt else None
+    
+    jam = Jam.objects.create(
+        admin=request.user,
+        name=data.get('name'),
+        date_time=data.get('date_time'),
+        location=jam_location,
+        description=data.get('description', ''),
+        jam_type=data.get('jam_type', 'OPEN JAM'),
+        skill_level=data.get('skill_level', 'ALL LEVELS'),
+        access=str(data.get('access')).lower() == 'true',
+    )
+    
+    jam.users_attending.add(request.user)
+    
+    def set_m2m(field_name, manager):
+        items = data.getlist(field_name) if hasattr(data, 'getlist') else data.get(field_name, [])
+        if items and items != [''] and items != "":
+            valid_ids = [int(i) for i in items if str(i).isdigit()]
+            manager.set(valid_ids)
+
+    set_m2m('genre_ids', jam.genre)
+    set_m2m('vibe_ids', jam.vibe)
+    set_m2m('instruments_needed_ids', jam.instruments_needed)
+    set_m2m('roles_needed_ids', jam.roles_needed)
+    set_m2m('gear_provided_ids', jam.gear_provided)
+    set_m2m('gear_needed_ids', jam.gear_needed)
+    
+    return Response({'status': 'Jam created successfully', 'jam_id': jam.id})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def send_friend_request(request):
+    target_user_id = request.data.get('target_user_id')
+    target_user = get_object_or_404(User, id=target_user_id)
+
+    if request.user == target_user:
+        return Response({'error': 'Cannot add yourself'}, status=400)
+
+    fr, created = FriendRequest.objects.get_or_create(from_user=request.user, to_user=target_user)
+    
+    if created:
+        Notification.objects.create(
+            user=target_user,
+            notification_type='FRIEND_REQUEST',
+            message=f"{request.user.profile.display_name} sent you a friend request.",
+            reference_id=fr.id,
+            metadata={'sender_id': request.user.id}
+        )
+    return Response({'status': 'Request sent'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def handle_friend_request(request, request_id):
+    action = request.data.get('action') 
+    fr = get_object_or_404(FriendRequest, id=request_id, to_user=request.user)
+
+    if action == 'ACCEPT':
+        request.user.profile.friends.add(fr.from_user)
+        fr.from_user.profile.friends.add(request.user)
+        
+        Notification.objects.create(
+            user=fr.from_user,
+            notification_type='FRIEND_ACCEPTED',
+            message=f"{request.user.profile.display_name} accepted your friend request.",
+            metadata={'accepter_id': request.user.id}
+        )
+        fr.status = 'ACCEPTED'
+        fr.save()
+        return Response({'status': 'Accepted'})
+        
+    elif action == 'DENY':
+        fr.delete()
+        return Response({'status': 'Denied and deleted'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def apply_for_bandmate(request, listing_id):
+    listing = get_object_or_404(BandmateListing, id=listing_id)
+    message = request.data.get('message', '')
+
+    candidate, created = BandmateCandidate.objects.get_or_create(
+        listing=listing, 
+        user=request.user,
+        defaults={'message': message}
+    )
+
+    if created:
+        Notification.objects.create(
+            user=listing.admin,
+            notification_type='BAND_CANDIDATE',
+            message=f"{request.user.profile.display_name} applied for your {listing.instrument_needed.name} opening.",
+            reference_id=candidate.id,
+            metadata={'applicant_id': request.user.id, 'listing_id': listing.id}
+        )
+    return Response({'status': 'Application submitted'})
