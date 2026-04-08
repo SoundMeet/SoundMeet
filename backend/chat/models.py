@@ -70,6 +70,7 @@ class Profile(models.Model):
     age = models.PositiveIntegerField(null=True, blank=True)
     gender = models.CharField(max_length=100, choices=genders.choices, blank=True)
     spectator = models.BooleanField(default=False)
+    onboarding_complete = models.BooleanField(default=False)
 
     # Music links
     spotify = models.URLField(blank=True, null=True)
@@ -84,6 +85,7 @@ class Profile(models.Model):
     genres_liked = models.ManyToManyField(Genre, related_name="profiles", blank=True)
     vibes_liked = models.ManyToManyField(Vibe, related_name="profiles", blank=True)
     friends = models.ManyToManyField(User, blank=True, related_name="friends_of")
+    artists_liked = models.ManyToManyField(Artist, blank=True, related_name='profiles')
 
     @property
     def friends_count(self):
