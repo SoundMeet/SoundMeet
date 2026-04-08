@@ -8,7 +8,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from .models import (
     Profile, Post, FriendRequest, Notification, 
-    BandmateListing, BandmateCandidate, Jam
+    BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation
 )
 
 @api_view(['POST'])
@@ -116,7 +116,6 @@ def create_post(request):
 @transaction.atomic
 def create_jam(request):
     data = request.data
-
     location_wkt = data.get('location')
     jam_location = GEOSGeometry(location_wkt) if location_wkt else None
     
@@ -130,8 +129,10 @@ def create_jam(request):
         skill_level=data.get('skill_level', 'ALL LEVELS'),
         access=str(data.get('access')).lower() == 'true',
     )
-    
     jam.users_attending.add(request.user)
+    
+    chat_room = Conversation.objects.create(jam=jam)
+    chat_room.participants.add(request.user)
     
     def set_m2m(field_name, manager):
         items = data.getlist(field_name) if hasattr(data, 'getlist') else data.get(field_name, [])
@@ -148,6 +149,58 @@ def create_jam(request):
     
     return Response({'status': 'Jam created successfully', 'jam_id': jam.id})
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def create_band(request):
+    data = request.data
+    
+    band = Band.objects.create(
+        admin=request.user,
+        name=data.get('name'),
+        description=data.get('description', '')
+    )
+    band.members.add(request.user)
+    
+    chat_room = Conversation.objects.create(band=band)
+    chat_room.participants.add(request.user)
+    
+    genre_ids = data.getlist('genre_ids') if hasattr(data, 'getlist') else data.get('genre_ids', [])
+    if genre_ids and genre_ids != [''] and genre_ids != "":
+        valid_ids = [int(i) for i in genre_ids if str(i).isdigit()]
+        band.genres.set(valid_ids)
+        
+    return Response({'status': 'Band created successfully', 'band_id': band.id})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def create_show(request):
+    data = request.data
+    location_wkt = data.get('location')
+    show_location = GEOSGeometry(location_wkt) if location_wkt else None
+    
+    genre_id = data.get('genre_id')
+    genre_instance = None
+    if genre_id and str(genre_id).isdigit():
+        genre_instance = Genre.objects.filter(id=int(genre_id)).first()
+        
+    show = Show.objects.create(
+        admin=request.user,
+        name=data.get('name'),
+        date_time=data.get('date_time'),
+        location=show_location,
+        description=data.get('description', ''),
+        ticket_link=data.get('ticket_link', ''),
+        genre=genre_instance,
+        cover_image=request.FILES.get('cover_image')
+    )
+    show.users_attending.add(request.user)
+
+    chat_room = Conversation.objects.create(show=show)
+    chat_room.participants.add(request.user)
+    
+    return Response({'status': 'Show created successfully', 'show_id': show.id})
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -190,8 +243,11 @@ def handle_friend_request(request, request_id):
         )
         fr.status = 'ACCEPTED'
         fr.save()
-        return Response({'status': 'Accepted'})
+
+        dm_room = Conversation.objects.create()
+        dm_room.participants.add(request.user, fr.from_user)
         
+        return Response({'status': 'Accepted'})
     elif action == 'DENY':
         fr.delete()
         return Response({'status': 'Denied and deleted'})

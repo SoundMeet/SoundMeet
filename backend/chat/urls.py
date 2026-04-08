@@ -15,6 +15,8 @@ urlpatterns = [
 
     path('api/posts/create/', views.create_post, name='create_post'),
     path('api/jams/create/', views.create_jam, name='create_jam'),
+    path('api/shows/create/', views.create_show, name='create_show'),
+    path('api/bands/create/', views.create_band, name='create_band'),
 
     path('api/friends/request/', views.send_friend_request, name='send_friend_request'),
     path('api/friends/request/<int:request_id>/handle/', views.handle_friend_request, name='handle_friend_request'),

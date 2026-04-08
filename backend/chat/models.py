@@ -186,13 +186,16 @@ class BandmateCandidate(models.Model):
 class Conversation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     jam = models.ForeignKey(Jam, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_rooms")
+    band = models.ForeignKey(Band, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_rooms")
+    show = models.ForeignKey(Show, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_rooms")
     participants = models.ManyToManyField(User, related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        if self.jam:
-            return f"Jam Chat: {self.jam.name}"
+        if self.jam: return f"Jam Chat: {self.jam.name}"
+        if self.band: return f"Band Chat: {self.band.name}"
+        if self.show: return f"Show Chat: {self.show.name}"
         return f"DM: {self.id}"
 
 class Message(models.Model):
