@@ -24,12 +24,6 @@ class Genre(models.Model):
     def __str__(self):
         return self.name
 
-class Vibe(models.Model):
-    name = models.CharField(blank=True, max_length=100, unique=True)
-
-    def __str__(self):
-        return self.name
-
 class Role(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
