@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from .models import (
-    Profile, Post, FriendRequest, Notification, 
+    Profile, Post, Comment, FriendRequest, Notification,
     BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation
 )
 
@@ -109,6 +109,22 @@ def create_post(request):
         'image': post.image.url if post.image else None,
         'author_id': post.author.id,
         'created_at': post.created_at
+    }, status=201)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_comment(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    content = request.data.get('content', '').strip()
+    if not content:
+        return Response({'error': 'Content is required'}, status=400)
+
+    comment = Comment.objects.create(post=post, author=request.user, content=content)
+    return Response({
+        'id': comment.id,
+        'content': comment.content,
+        'created_at': comment.created_at,
+        'author_id': comment.author.id,
     }, status=201)
 
 @api_view(['POST'])

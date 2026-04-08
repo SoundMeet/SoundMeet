@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MdSend, MdDeleteOutline } from 'react-icons/md'
+import { MdSend } from 'react-icons/md'
 import { useAuth } from '../../injectables/Auth'
-import { postService } from '../../injectables/postService'
 
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -72,26 +71,8 @@ function Comment({ comment, canDelete, onDelete }) {
   )
 }
 
-function normalizeComment(c) {
-  return {
-    id:        c.id,
-    author: {
-      id:          c.author?.id,
-      displayName: c.author?.username ?? 'Unknown',
-      avatarUrl:   null,
-    },
-    content:   c.content,
-    createdAt: c.created_at,
-  }
-}
-
-export function CommentSection({ postId, existingComments = [], onCommentAdded, onCommentDeleted }) {
+export function CommentSection({ comments = [], currentUserId, onAdd, onDelete }) {
   const { user } = useAuth()
-  const [comments, setComments] = useState(() => {
-    const normalized = existingComments.map(normalizeComment);
-    console.log('[CommentSection] initial comments state for post', postId, ':', normalized);
-    return normalized;
-  })
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
   const canSubmit = text.trim().length > 0
@@ -103,48 +84,12 @@ export function CommentSection({ postId, existingComments = [], onCommentAdded, 
     el.style.height = `${el.scrollHeight}px`
   }
 
-  const handleSubmit = async () => {
-    if (!canSubmit || !user?.id) return
+  const handleSubmit = () => {
+    if (!canSubmit) return
     const body = text.trim()
     setText('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    // Optimistic
-    const optimistic = {
-      id: `opt-${Date.now()}`,
-      author: {
-        id:          user.id,
-        displayName: user.display_name ?? user.username ?? 'You',
-        avatarUrl:   user.pfp ?? null,
-      },
-      content:   body,
-      createdAt: new Date().toISOString(),
-    }
-    console.log('[CommentSection] before submit — comments:', comments)
-    setComments((prev) => [...prev, optimistic])
-    try {
-      const saved = await postService.addComment(postId, user.id, body)
-      // Build the confirmed comment from user data we already have — avoids
-      // relying on a Supabase join in the insert response which can fail under RLS.
-      const confirmed = {
-        id:        saved.id,
-        author: {
-          id:          user.id,
-          displayName: user.display_name ?? user.username ?? 'You',
-          avatarUrl:   user.pfp ?? null,
-        },
-        content:   saved.content,
-        createdAt: saved.created_at,
-      }
-      setComments((prev) => {
-        const next = prev.map((c) => c.id === optimistic.id ? confirmed : c)
-        console.log('[CommentSection] after save — comments:', next)
-        return next
-      })
-      onCommentAdded?.()
-    } catch (err) {
-      console.error('[CommentSection] addComment failed:', err)
-      setComments((prev) => prev.filter((c) => c.id !== optimistic.id))
-    }
+    onAdd(body)
   }
 
   const handleKeyDown = (e) => {
@@ -153,11 +98,6 @@ export function CommentSection({ postId, existingComments = [], onCommentAdded, 
       e.preventDefault()
       handleSubmit()
     }
-  }
-
-  const deleteComment = (id) => {
-    setComments((prev) => prev.filter((c) => c.id !== id))
-    onCommentDeleted?.()
   }
 
   return (
@@ -180,8 +120,8 @@ export function CommentSection({ postId, existingComments = [], onCommentAdded, 
                 <Comment
                   key={c.id}
                   comment={c}
-                  canDelete={!!user && c.author.id === user.id}
-                  onDelete={() => deleteComment(c.id)}
+                  canDelete={!!currentUserId && c.author.id === currentUserId}
+                  onDelete={() => onDelete(c.id)}
                 />
               ))}
             </AnimatePresence>

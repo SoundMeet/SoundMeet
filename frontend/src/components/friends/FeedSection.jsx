@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdSearch, MdMusicNote, MdHeadphones, MdStars, MdPhotoCamera, MdClose, MdStar } from 'react-icons/md'
 import { postService } from '../../injectables/postService'
+import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
 import { useAuth } from '../../injectables/Auth'
 import { FeedPost } from './FeedPost'
 import { PostComposerModal } from './composer/PostComposerModal'
@@ -360,7 +361,7 @@ export function FeedSection() {
     id:          user?.id          ?? 'guest',
     displayName: user?.display_name ?? user?.username ?? 'You',
     username:    user?.username    ? `@${user.username}` : '',
-    avatarUrl:   user?.pfp         ?? null,
+    avatarUrl:   formatAvatarUrl(user?.pfp),
     instruments: [],
   }
 
