@@ -458,6 +458,33 @@ export const jamService = {
   },
 
   /**
+   * Remove any attendee from a jam (host/admin action).
+   * Deletes them from the attending table and from the jam's chat participants.
+   */
+  async removeAttendee(jamId, userId) {
+    const { error: attErr } = await supabase
+      .from('chat_jam_users_attending')
+      .delete()
+      .eq('jam_id', Number(jamId))
+      .eq('user_id', userId);
+    if (attErr) throw attErr;
+
+    const { data: conv } = await supabase
+      .from('chat_conversation')
+      .select('id')
+      .eq('jam_id', Number(jamId))
+      .maybeSingle();
+
+    if (conv?.id) {
+      await supabase
+        .from('chat_conversation_participants')
+        .delete()
+        .eq('conversation_id', conv.id)
+        .eq('user_id', userId);
+    }
+  },
+
+  /**
    * Returns the IDs (as strings) of upcoming jams the user is currently attending.
    * Lightweight — only fetches the junction table, no full jam rows.
    */
@@ -472,26 +499,55 @@ export const jamService = {
 
   /**
    * Join a public jam: add the user to the attendees list and the jam's chat.
+   * Resolves preset IDs to names and persists instruments, roles, and gear.
    * Returns the conversation ID so callers can navigate to the chat if needed.
    */
-  async joinJam(jamId, userId) {
+  async joinJam(jamId, userId, payload = {}) {
+    const {
+      instrumentIds = [], customInstruments = [],
+      roleIds = [],       customRoles = [],
+      gearIds = [],       customGear = [],
+    } = payload;
+
+    // Resolve all preset IDs → names in parallel
+    const [instrumentRows, roleRows, gearRows] = await Promise.all([
+      instrumentIds.length
+        ? supabase.from('chat_instrument').select('name').in('id', instrumentIds.map(Number)).then(r => r.data ?? [])
+        : Promise.resolve([]),
+      roleIds.length
+        ? supabase.from('chat_role').select('name').in('id', roleIds.map(Number)).then(r => r.data ?? [])
+        : Promise.resolve([]),
+      gearIds.length
+        ? supabase.from('chat_gear').select('name').in('id', gearIds.map(Number)).then(r => r.data ?? [])
+        : Promise.resolve([]),
+    ]);
+
+    const instruments_bringing = [...instrumentRows.map(r => r.name), ...customInstruments];
+    const roles_bringing       = [...roleRows.map(r => r.name),       ...customRoles];
+    const gear_bringing        = [...gearRows.map(r => r.name),       ...customGear];
+
     const { error } = await supabase
       .from('chat_jam_users_attending')
       .upsert({ jam_id: Number(jamId), user_id: userId }, { onConflict: 'jam_id,user_id' });
     if (error) throw error;
+
+    await supabase
+      .from('chat_jamattendeebringing')
+      .upsert(
+        { jam_id: Number(jamId), user_id: userId, instruments_bringing, roles_bringing, gear_bringing },
+        { onConflict: 'jam_id,user_id' }
+      );
 
     const conversationId = await chatService.getOrCreateJamChat(Number(jamId), userId);
     return conversationId;
   },
 
   /**
-   * Fetch the attendee list for a jam, enriched with profile data.
+   * Fetch the attendee list for a jam, enriched with profile data, instruments, roles, and gear.
    * Returns an array of attendee objects shaped for the ManageAttendeesModal.
-   *
-   * gearBringing is stubbed as [] until a per-attendee gear table exists.
    */
   async getJamAttendees(jamId) {
-    // 1. Get user IDs attending this jam
+    // 1. Get attending user IDs
     const { data: rows, error: attErr } = await supabase
       .from('chat_jam_users_attending')
       .select('user_id')
@@ -500,6 +556,20 @@ export const jamService = {
     if (!rows?.length) return [];
 
     const userIds = rows.map((r) => r.user_id);
+
+    // 2. Get per-attendee bringing selections from dedicated table
+    const { data: bringingRows } = await supabase
+      .from('chat_jamattendeebringing')
+      .select('user_id, instruments_bringing, roles_bringing, gear_bringing')
+      .eq('jam_id', Number(jamId));
+
+    const selectionMap = Object.fromEntries(
+      (bringingRows ?? []).map((r) => [String(r.user_id), {
+        instruments: r.instruments_bringing ?? [],
+        roles:       r.roles_bringing       ?? [],
+        gear:        r.gear_bringing        ?? [],
+      }])
+    );
 
     // 2. Fetch profiles for those users
     const { data: profiles, error: profErr } = await supabase
@@ -513,15 +583,38 @@ export const jamService = {
     );
 
     return userIds.map((uid) => {
-      const p = profileMap[String(uid)];
+      const p   = profileMap[String(uid)];
+      const sel = selectionMap[String(uid)] ?? { instruments: [], roles: [], gear: [] };
       return {
-        userId:      String(uid),
-        displayName: p?.display_name ?? `User #${uid}`,
-        pfp:         p?.pfp ?? null,
-        // Stub: no per-attendee gear table yet — wire up when backend is ready
-        gearBringing: [],
+        userId:               String(uid),
+        displayName:          p?.display_name ?? `User #${uid}`,
+        pfp:                  p?.pfp ?? null,
+        instrumentsBringing:  sel.instruments,
+        rolesBringing:        sel.roles,
+        gearBringing:         sel.gear,
       };
     });
+  },
+
+  /**
+   * Update only the bringing arrays for the current user on a jam they're attending.
+   * Pass only the fields you want to change — unspecified fields are left untouched.
+   * Uses UPDATE (not upsert) so sibling columns are never clobbered.
+   */
+  async updateMyBringing(jamId, userId, partial = {}) {
+    const update = {};
+    if (partial.instruments !== undefined) update.instruments_bringing = partial.instruments;
+    if (partial.roles       !== undefined) update.roles_bringing       = partial.roles;
+    if (partial.gear        !== undefined) update.gear_bringing        = partial.gear;
+    if (!Object.keys(update).length) return;
+
+    const { error } = await supabase
+      .from('chat_jamattendeebringing')
+      .upsert(
+        { jam_id: Number(jamId), user_id: userId, ...update },
+        { onConflict: 'jam_id,user_id' }
+      );
+    if (error) throw error;
   },
 
   /**

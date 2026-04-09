@@ -12,7 +12,7 @@ class Instrument(models.Model):
         NULL = 'NULL'
 
     name = models.CharField(max_length=100, unique=True)
-    family = models.CharField(choices=families.choices, default=families.NULL)
+    family = models.CharField(max_length=20, choices=families.choices, default=families.NULL)
 
     def __str__(self):
         return self.name
@@ -151,6 +151,21 @@ class Jam(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class JamAttendeeBringing(models.Model):
+    jam = models.ForeignKey(Jam, on_delete=models.CASCADE, related_name="attendee_bringing")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="jam_bringing")
+    instruments_bringing = models.JSONField(blank=True, default=list)
+    roles_bringing = models.JSONField(blank=True, default=list)
+    gear_bringing = models.JSONField(blank=True, default=list)
+
+    class Meta:
+        unique_together = ('jam', 'user')
+
+    def __str__(self):
+        return f"{self.user.username} @ {self.jam.name}"
+
 
 class Show(models.Model):
     name = models.CharField(max_length=150)

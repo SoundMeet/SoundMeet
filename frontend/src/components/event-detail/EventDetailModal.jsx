@@ -15,6 +15,7 @@ import {
 } from "../../utils/validateJamCoreDetails";
 import { useFormOptions } from "../../hooks/useFormOptions";
 import { jamService } from "../../injectables/jamService";
+import { showService } from "../../injectables/showService";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../injectables/Auth";
 
@@ -27,6 +28,8 @@ import EventLogisticsSection from "./EventLogisticsSection";
 import EventHostSection from "./EventHostSection";
 import EventAdminActions from "./EventAdminActions";
 import EventSafetyActions from "./EventSafetyActions";
+import { ManageAttendeesModal } from "./ManageAttendeesModal";
+import { JamFriendsPreview } from "./JamFriendsPreview";
 import EventFooterActions from "./EventFooterActions";
 import { RateJamSheet } from "./RateJamSheet";
 import { DestructiveConfirmSheet } from "./DestructiveConfirmSheet";
@@ -282,6 +285,7 @@ const EventDetailModal = ({
   const [isSaving,          setIsSaving]           = useState(false);
   const [saveError,         setSaveError]          = useState(null);
   const [discardConfirmOpen,setDiscardConfirmOpen] = useState(false);
+  const [attendeesOpen,     setAttendeesOpen]      = useState(false);
   const editInitialFormRef = useRef(null);
 
   // ── Computed state ──────────────────────────────────────────────────────────
@@ -291,6 +295,7 @@ const EventDetailModal = ({
   const canSeeLocation   = canRevealExactLocation(localItem, ctx);
   const isCreatorOrAdmin = relationship === "creator" || relationship === "admin";
   const isJam            = localItem?.type === "jam";
+  const isShow           = localItem?.type === "promote_show";
   // Jams owned by creator get in-place editing; everything else uses onEdit callback
   const canEditInPlace   = isJam && isCreatorOrAdmin;
 
@@ -379,6 +384,7 @@ const EventDetailModal = ({
       setActionLoading(false);
       exitEditMode();
       setDiscardConfirmOpen(false);
+      setAttendeesOpen(false);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -531,6 +537,15 @@ const EventDetailModal = ({
 
                       <EventTagsSection item={localItem} accent={accent} />
 
+                      {(isJam || isShow) && (
+                        <JamFriendsPreview
+                          item={localItem}
+                          currentUserId={user?.id}
+                          accent={accent}
+                          onOpen={() => setAttendeesOpen(true)}
+                          getAttendees={isShow ? showService.getShowAttendees : undefined}
+                        />
+                      )}
                       {localItem.type === "jam"           && <JamDetailSections item={localItem} accent={accent} />}
                       {localItem.type === "promote_show"  && <ShowDetailSections item={localItem} accent={accent} />}
                       {localItem.type === "join_band"     && <JoinBandDetailSections item={localItem} />}
@@ -554,7 +569,40 @@ const EventDetailModal = ({
                               onEnterEdit={canEditInPlace ? handleEnterEdit : undefined}
                               onDelete={() => setDeleteConfirmOpen(true)}
                               onClose={onClose}
+                              onOpenAttendees={() => setAttendeesOpen(true)}
                             />
+                          </>
+                        )}
+
+                        {/* Attendee-facing attendees entry point — pre-join viewers and joined attendees */}
+                        {(isJam || isShow) && !isCreatorOrAdmin && (
+                          <>
+                            <Divider />
+                            <div className="px-3 pb-3">
+                              <div
+                                className="rounded-2xl overflow-hidden"
+                                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+                              >
+                                <div className="px-4 pt-3 pb-1">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                                    Attendees
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setAttendeesOpen(true)}
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium transition-all duration-150 hover:bg-white/[0.06] text-left"
+                                  style={{ color: "rgba(229,226,225,0.65)" }}
+                                >
+                                  <span className="shrink-0 opacity-70">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                    </svg>
+                                  </span>
+                                  See Who's Going
+                                </button>
+                              </div>
+                            </div>
                           </>
                         )}
 
@@ -669,6 +717,16 @@ const EventDetailModal = ({
             confirmLabel="Discard Changes"
             cancelLabel="Keep Editing"
             loading={false}
+          />
+
+          {/* ── Attendees modal — role-aware, shared by all entry points ──── */}
+          <ManageAttendeesModal
+            open={attendeesOpen}
+            onClose={() => setAttendeesOpen(false)}
+            item={localItem}
+            accent={accent}
+            currentUserId={user?.id}
+            isAdminMode={isCreatorOrAdmin}
           />
 
           {/* ── Rate / review sheet ────────────────────────────────────────── */}

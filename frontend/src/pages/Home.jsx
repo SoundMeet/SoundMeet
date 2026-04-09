@@ -885,7 +885,18 @@ const Home = () => {
         isOpen={joinJamModal.open}
         onClose={() => { setJoinJamModal({ open: false, jam: null }); refreshMyJoinedIds(); }}
         jam={joinJamModal.jam}
-        onSubmit={() => jamService.joinJam(joinJamModal.jam.id, user?.id)}
+        onSubmit={(payload) => jamService.joinJam(
+          joinJamModal.jam.id,
+          user?.id,
+          {
+            instrumentIds:        payload?.instrumentIds ?? [],
+            customInstruments:    payload?.customInstruments ?? [],
+            roleIds:              payload?.roleIds ?? [],
+            customRoles:          payload?.customRoles ?? [],
+            gearIds:              payload?.equipmentOfferingIds ?? [],
+            customGear:           payload?.customEquipmentOfferings ?? [],
+          }
+        )}
         onSuccessNavigateToMyJams={() => navigate("/jams")}
       />
 
