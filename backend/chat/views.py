@@ -8,7 +8,8 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from .models import (
     Profile, Post, Comment, FriendRequest, Notification,
-    BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation
+    BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation,
+    Artist, Instrument, Vibe
 )
 
 @api_view(['POST'])
@@ -61,21 +62,36 @@ def get_profile(request):
     # onboarding on every login. Any user who already has a display name
     # or preferences set is considered to have completed onboarding.
     if not profile.onboarding_complete:
-        if profile.genres_liked.exists() or profile.instruments_liked.exists() or profile.display_name:
+        if profile.genres_liked.exists() or profile.instruments_liked.exists():
             profile.onboarding_complete = True
             profile.save()
 
     if request.method == 'PATCH':
         data = request.data
-        if 'display_name' in data: profile.display_name = data['display_name']
-        if 'about' in data: profile.about = data['about']
-        if 'country' in data: profile.country = data['country']
-        if 'city' in data: profile.city = data['city']
-        if 'gender' in data: profile.gender = data['gender']
+
+        if 'display_name' in data:
+            profile.display_name = data['display_name'][:15]
+        if 'about' in data:
+            profile.about = data['about']
+        if 'country' in data:
+            profile.country = data['country']
+        if 'city' in data:
+            profile.city = data['city']
+        if 'state' in data:
+            profile.state = data['state']
+        if 'gender' in data:
+            profile.gender = data['gender']
         if 'spectator' in data:
-            profile.spectator = str(data['spectator']).lower() == 'true'
+            val = data['spectator']
+            profile.spectator = val if isinstance(val, bool) else str(val).lower() == 'true'
         if 'age' in data:
             profile.age = int(data['age']) if data['age'] else None
+        if 'skill_level' in data:
+            profile.skill_level = data['skill_level']
+        if 'onboarding_complete' in data:
+            val = data['onboarding_complete']
+            profile.onboarding_complete = val if isinstance(val, bool) else str(val).lower() == 'true'
+
         # Music links
         if 'spotify' in data:
             profile.spotify = data['spotify'] or None
@@ -92,7 +108,7 @@ def get_profile(request):
 
         if 'pfp' in request.FILES:
             profile.pfp = request.FILES['pfp']
-            
+
         profile.save()
 
         def update_m2m(field_name, m2m_manager):
@@ -107,6 +123,9 @@ def get_profile(request):
         update_m2m('instruments_liked', profile.instruments_liked)
         update_m2m('genres_liked', profile.genres_liked)
         update_m2m('vibes_liked', profile.vibes_liked)
+        update_m2m('artists_liked', profile.artists_liked)
+
+        profile.refresh_from_db()
 
     return Response({
         'id': request.user.id,
@@ -114,6 +133,8 @@ def get_profile(request):
         'display_name': profile.display_name,
         'about': profile.about,
         'spectator': profile.spectator,
+        'onboarding_complete': profile.onboarding_complete,
+        'skill_level': profile.skill_level,
         'pfp': profile.pfp.url if profile.pfp else None,
         'country': profile.country,
         'city': profile.city,
@@ -129,6 +150,7 @@ def get_profile(request):
         'instruments_liked': list(profile.instruments_liked.values('id', 'name', 'family')),
         'genres_liked': list(profile.genres_liked.values('id', 'name')),
         'vibes_liked': list(profile.vibes_liked.values('id', 'name')),
+        'artists_liked': list(profile.artists_liked.values('id', 'name', 'picture')),
         'friends_count': profile.friends_count,
     })
 
@@ -178,7 +200,7 @@ def create_jam(request):
     data = request.data
     location_wkt = data.get('location')
     jam_location = GEOSGeometry(location_wkt) if location_wkt else None
-    
+
     jam = Jam.objects.create(
         admin=request.user,
         name=data.get('name'),
@@ -190,10 +212,10 @@ def create_jam(request):
         access=str(data.get('access')).lower() == 'true',
     )
     jam.users_attending.add(request.user)
-    
+
     chat_room = Conversation.objects.create(jam=jam)
     chat_room.participants.add(request.user)
-    
+
     def set_m2m(field_name, manager):
         items = data.getlist(field_name) if hasattr(data, 'getlist') else data.get(field_name, [])
         if items and items != [''] and items != "":
@@ -206,7 +228,7 @@ def create_jam(request):
     set_m2m('roles_needed_ids', jam.roles_needed)
     set_m2m('gear_provided_ids', jam.gear_provided)
     set_m2m('gear_needed_ids', jam.gear_needed)
-    
+
     return Response({'status': 'Jam created successfully', 'jam_id': jam.id})
 
 @api_view(['POST'])
@@ -214,22 +236,22 @@ def create_jam(request):
 @transaction.atomic
 def create_band(request):
     data = request.data
-    
+
     band = Band.objects.create(
         admin=request.user,
         name=data.get('name'),
         description=data.get('description', '')
     )
     band.members.add(request.user)
-    
+
     chat_room = Conversation.objects.create(band=band)
     chat_room.participants.add(request.user)
-    
+
     genre_ids = data.getlist('genre_ids') if hasattr(data, 'getlist') else data.get('genre_ids', [])
     if genre_ids and genre_ids != [''] and genre_ids != "":
         valid_ids = [int(i) for i in genre_ids if str(i).isdigit()]
         band.genres.set(valid_ids)
-        
+
     return Response({'status': 'Band created successfully', 'band_id': band.id})
 
 @api_view(['POST'])
@@ -239,12 +261,12 @@ def create_show(request):
     data = request.data
     location_wkt = data.get('location')
     show_location = GEOSGeometry(location_wkt) if location_wkt else None
-    
+
     genre_id = data.get('genre_id')
     genre_instance = None
     if genre_id and str(genre_id).isdigit():
         genre_instance = Genre.objects.filter(id=int(genre_id)).first()
-        
+
     show = Show.objects.create(
         admin=request.user,
         name=data.get('name'),
@@ -259,7 +281,7 @@ def create_show(request):
 
     chat_room = Conversation.objects.create(show=show)
     chat_room.participants.add(request.user)
-    
+
     return Response({'status': 'Show created successfully', 'show_id': show.id})
 
 @api_view(['POST'])
@@ -273,7 +295,7 @@ def send_friend_request(request):
         return Response({'error': 'Cannot add yourself'}, status=400)
 
     fr, created = FriendRequest.objects.get_or_create(from_user=request.user, to_user=target_user)
-    
+
     if created:
         Notification.objects.create(
             user=target_user,
@@ -288,13 +310,13 @@ def send_friend_request(request):
 @permission_classes([IsAuthenticated])
 @transaction.atomic
 def handle_friend_request(request, request_id):
-    action = request.data.get('action') 
+    action = request.data.get('action')
     fr = get_object_or_404(FriendRequest, id=request_id, to_user=request.user)
 
     if action == 'ACCEPT':
         request.user.profile.friends.add(fr.from_user)
         fr.from_user.profile.friends.add(request.user)
-        
+
         Notification.objects.create(
             user=fr.from_user,
             notification_type='FRIEND_ACCEPTED',
@@ -306,7 +328,7 @@ def handle_friend_request(request, request_id):
 
         dm_room = Conversation.objects.create()
         dm_room.participants.add(request.user, fr.from_user)
-        
+
         return Response({'status': 'Accepted'})
     elif action == 'DENY':
         fr.delete()
@@ -320,7 +342,7 @@ def apply_for_bandmate(request, listing_id):
     message = request.data.get('message', '')
 
     candidate, created = BandmateCandidate.objects.get_or_create(
-        listing=listing, 
+        listing=listing,
         user=request.user,
         defaults={'message': message}
     )

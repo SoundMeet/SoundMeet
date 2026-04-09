@@ -174,7 +174,6 @@ const css = `
   .artist-name { font-size: 11px; font-family: 'DM Sans', sans-serif; font-weight: 500; color: rgba(255,255,255,0.7); text-align: center; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .artist-bubble.sel .artist-name { color: #fff; }
 
-  /* ── Music links dropdown UI ── */
   .ml-added-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
   .ml-added-item {
     display: flex; align-items: center; gap: 12px;
@@ -191,9 +190,7 @@ const css = `
   }
   .ml-remove-btn:hover { color: #ff3d6e; background: rgba(255,61,110,0.1); }
 
-  .ml-add-row {
-    display: flex; gap: 10px; align-items: stretch;
-  }
+  .ml-add-row { display: flex; gap: 10px; align-items: stretch; }
   .ml-select {
     flex: 0 0 160px; padding: 13px 14px;
     background: rgba(255,255,255,0.05); border: 1px solid var(--border);
@@ -344,7 +341,6 @@ function MusicLinksScreen({ links, onChange, onRemove }) {
       <h2 className="ob-headline">Share your music.</h2>
       <p className="ob-sub">Add links so others can hear your sound. All optional.</p>
 
-      {/* Added links list */}
       {addedKeys.length > 0 && (
         <div className="ml-added-list">
           {addedKeys.map(key => {
@@ -365,7 +361,6 @@ function MusicLinksScreen({ links, onChange, onRemove }) {
         <div className="ml-empty">No links added yet — pick a platform below.</div>
       )}
 
-      {/* Add row — only show if platforms remain */}
       {availablePlatforms.length > 0 && (
         <div className="ml-add-row" style={{ marginBottom: 8 }}>
           <select
@@ -448,6 +443,7 @@ export default function Onboarding() {
     try {
       await updateProfile({
         display_name: username,
+        skill_level: skillsLevel,          // ← was missing, now fixed
         onboarding_complete: true,
         genres_liked: selectedGenres.map(g => g.id),
         instruments_liked: selectedInstruments.map(i => i.id),
@@ -460,6 +456,8 @@ export default function Onboarding() {
         ...(musicLinks.instagram  && { instagram:  musicLinks.instagram }),
         ...(musicLinks.tiktok     && { tiktok:     musicLinks.tiktok }),
       });
+      // Small delay so Auth.jsx's optimistic onboarding_complete:true
+      // propagates to OnboardingGuard before navigate fires
       setTimeout(() => navigate("/", { replace: true }), 50);
     } catch (err) {
       console.error("Submit error:", err);
