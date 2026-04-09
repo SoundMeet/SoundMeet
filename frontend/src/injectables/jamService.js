@@ -251,7 +251,8 @@ export const jamService = {
     formData.append('access', !form.isPrivate);
 
     if (form.coverImage) {
-      formData.append('cover_image', form.coverImage);
+      const actualFile = form.coverImage.file ? form.coverImage.file : form.coverImage;
+      formData.append('cover_image', actualFile);
     }
 
     const genreIds = form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []);
