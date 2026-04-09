@@ -6,11 +6,12 @@ import ChatHeader from '../components/chat/ChatHeader'
 import MessageList from '../components/chat/MessageList'
 import TypingIndicator from '../components/chat/TypingIndicator'
 import ChatComposer from '../components/chat/ChatComposer'
-import JamInfoModal from '../components/chat/JamInfoModal'
+import EventDetailModal from '../components/event-detail/EventDetailModal'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
 import { jamService } from '../injectables/jamService'
+import { useToast } from '../context/ToastContext'
 
 
 const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
@@ -40,6 +41,7 @@ function normalizeMessage(row) {
 const Chat = () => {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
   const { openModal } = useAuthModal()
+  const { showToast } = useToast()
   const location = useLocation()
 
   // ─── State ────────────────────────────────────────────────────────────────
@@ -52,7 +54,7 @@ const Chat = () => {
   const [isLoadingMsgs, setIsLoadingMsgs]   = useState(false)
   const [convError, setConvError]           = useState(null)
   const [sendError, setSendError]           = useState(null)
-  const [isJamModalOpen, setIsJamModalOpen] = useState(false)
+  const [jamDetailModal, setJamDetailModal] = useState({ open: false, item: null })
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false)
   const [isTyping, setIsTyping]             = useState(false)
 
@@ -237,6 +239,15 @@ const Chat = () => {
       })
   }, [location.state, isLoggedIn, user?.id, isLoadingConvs, dmThreads])
 
+  // ─── Auto-open jam chat when navigated from the jam detail modal ──────────
+  useEffect(() => {
+    const jamId = location.state?.openJamId
+    if (!jamId || !isLoggedIn || isLoadingConvs) return
+
+    const thread = jamThreads.find((t) => String(t.jamId) === String(jamId))
+    if (thread) setActiveThreadId(thread.id)
+  }, [location.state, isLoggedIn, isLoadingConvs, jamThreads])
+
   // ─── Load messages + subscribe when active thread changes ─────────────────
   useEffect(() => {
     if (!activeThreadId || !isLoggedIn) return
@@ -283,6 +294,18 @@ const Chat = () => {
   }, [activeThreadId, isLoggedIn]) 
 
   useEffect(() => () => unsubRef.current?.(), [])
+
+  // ─── View Jam ─────────────────────────────────────────────────────────────
+  const handleViewJam = async () => {
+    if (!activeThread?.jamId) return
+    try {
+      const item = await jamService.getJamById(activeThread.jamId)
+      setJamDetailModal({ open: true, item })
+    } catch (err) {
+      console.error('[Chat] Failed to load jam:', err)
+      showToast('Could not load jam details.', 'error')
+    }
+  }
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectThread = (id) => {
@@ -440,7 +463,7 @@ const Chat = () => {
             <ChatHeader
               thread={activeThread}
               users={chatUsers}
-              onJamLinkClick={() => setIsJamModalOpen(true)}
+              onJamLinkClick={handleViewJam}
             />
 
             {isLoadingMsgs ? (
@@ -474,11 +497,16 @@ const Chat = () => {
         )}
       </div>
 
-      <JamInfoModal
-        jam={null}
-        isOpen={isJamModalOpen}
-        onClose={() => setIsJamModalOpen(false)}
-        users={chatUsers}
+      <EventDetailModal
+        item={jamDetailModal.item}
+        open={jamDetailModal.open}
+        onClose={() => setJamDetailModal({ open: false, item: null })}
+        viewerContext={
+          jamDetailModal.item && user
+            ? { isCreator: String(jamDetailModal.item.admin_id) === String(user.id) }
+            : {}
+        }
+        openedFrom="chat"
       />
     </div>
   )

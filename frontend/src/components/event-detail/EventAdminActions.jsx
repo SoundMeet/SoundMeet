@@ -1,14 +1,21 @@
-import { useState } from "react";
-
 /**
  * EventAdminActions — management controls for the event creator or admin.
  * Rendered inside the scrollable body, below the host section.
+ *
+ * Delete confirmation is handled upstream by EventDetailModal's
+ * DestructiveConfirmSheet — this component just fires the callback.
  */
 
-const AdminButton = ({ icon, label, onClick, danger = false }) => (
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ManageAttendeesModal } from "./ManageAttendeesModal";
+import { getDiscoveryAccentColor } from "../../utils/discovery";
+
+const AdminButton = ({ icon, label, onClick, danger = false, disabled = false }) => (
   <button
     onClick={onClick}
-    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 hover:bg-white/[0.06] text-left"
+    disabled={disabled}
+    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 hover:bg-white/[0.06] text-left disabled:opacity-40 disabled:cursor-not-allowed"
     style={{ color: danger ? "rgba(251,64,64,0.85)" : "rgba(229,226,225,0.65)" }}
   >
     <span className="shrink-0 opacity-70">{icon}</span>
@@ -32,6 +39,12 @@ const UsersIcon = () => (
   </svg>
 );
 
+const ChatIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+
 const LinkIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
@@ -46,76 +59,95 @@ const TrashIcon = () => (
   </svg>
 );
 
-const EventAdminActions = ({ item, onEdit, onDelete, onClose }) => {
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+/**
+ * Props:
+ *   item        — event item
+ *   onEdit      — legacy: opens external edit flow (non-jam / fallback)
+ *   onEnterEdit — preferred for jams: activates in-place edit mode without closing
+ *   onDelete    — opens delete confirm
+ *   onClose     — closes the modal
+ */
+const EventAdminActions = ({ item, onEdit, onEnterEdit, onDelete, onClose }) => {
+  const navigate = useNavigate();
+  const [attendeesOpen, setAttendeesOpen] = useState(false);
+  const accent = getDiscoveryAccentColor(item);
+
+  const handleViewChat = () => {
+    onClose?.();
+    navigate("/chat", { state: { openJamId: item.id } });
+  };
 
   return (
-    <div className="px-3 pb-3">
-      <div
-        className="rounded-2xl overflow-hidden"
-        style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        <div className="px-4 pt-3 pb-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
-            Manage
-          </p>
-        </div>
-
-        <AdminButton
-          icon={<EditIcon />}
-          label="Edit Event"
-          onClick={() => { onEdit?.(item); onClose?.(); }}
-        />
-        <AdminButton
-          icon={<UsersIcon />}
-          label="Manage Attendees"
-          onClick={() => {
-            /* TODO: open attendee management panel when backend is ready */
-          }}
-        />
-        <AdminButton
-          icon={<LinkIcon />}
-          label="Copy Invite Link"
-          onClick={() => {
-            /* TODO: copy invite link to clipboard when backend generates links */
-          }}
-        />
-
-        {confirmingDelete ? (
-          <div className="px-4 py-3">
-            <p
-              className="text-[13px] mb-2.5"
-              style={{ color: "rgba(229,226,225,0.65)" }}
-            >
-              Are you sure? This can't be undone.
+    <>
+      <div className="px-3 pb-3">
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <div className="px-4 pt-3 pb-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+              Manage
             </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { onDelete?.(item); setConfirmingDelete(false); }}
-                className="flex-1 py-2 rounded-xl text-[13px] font-medium transition-colors duration-150"
-                style={{ background: "rgba(251,64,64,0.12)", color: "rgba(251,64,64,0.85)" }}
-              >
-                Yes, Cancel
-              </button>
-              <button
-                onClick={() => setConfirmingDelete(false)}
-                className="flex-1 py-2 rounded-xl text-[13px] font-medium transition-colors duration-150 hover:bg-white/[0.06]"
-                style={{ color: "rgba(229,226,225,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}
-              >
-                Nevermind
-              </button>
-            </div>
           </div>
-        ) : (
+
+          {item?.type !== "promote_show" && (
+            <AdminButton
+              icon={<EditIcon />}
+              label="Edit Event"
+              onClick={() => {
+                if (onEnterEdit) {
+                  onEnterEdit();
+                } else {
+                  onEdit?.(item);
+                  onClose?.();
+                }
+              }}
+            />
+          )}
+
+          {(item?.type === "jam" || item?.type === "promote_show") && (
+            <AdminButton
+              icon={<UsersIcon />}
+              label="Manage Attendees"
+              onClick={() => setAttendeesOpen(true)}
+            />
+          )}
+
+          {item?.type === "jam" && (
+            <AdminButton
+              icon={<ChatIcon />}
+              label="View Chat"
+              onClick={handleViewChat}
+            />
+          )}
+
+          <AdminButton
+            icon={<LinkIcon />}
+            label="Copy Invite Link"
+            onClick={() => {
+              /* TODO: copy invite link when backend generates links */
+            }}
+          />
+
+          {/* Separator */}
+          <div className="mx-4 my-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+
           <AdminButton
             icon={<TrashIcon />}
-            label="Cancel Event"
+            label="Delete Event"
             danger
-            onClick={() => setConfirmingDelete(true)}
+            onClick={() => onDelete?.(item)}
           />
-        )}
+        </div>
       </div>
-    </div>
+
+      <ManageAttendeesModal
+        open={attendeesOpen}
+        onClose={() => setAttendeesOpen(false)}
+        item={item}
+        accent={accent}
+      />
+    </>
   );
 };
 

@@ -19,6 +19,21 @@ export function getEventLifecycleState(item, viewerContext = {}) {
   if (!item) return "upcoming";
   if (item.status === "cancelled") return "cancelled";
   if (viewerContext.isPastEvent === true) return "ended";
+
+  const now = new Date();
+  const start = item.dateTimeRaw ? new Date(item.dateTimeRaw) : null;
+  const end   = item.endDateTimeRaw ? new Date(item.endDateTimeRaw) : null;
+
+  if (start && end) {
+    if (now >= end)   return "ended";
+    if (now >= start) return "live";
+  } else if (start) {
+    // No explicit end — treat as live for 4 h after start, then ended
+    if (now >= new Date(start.getTime() + 4 * 60 * 60 * 1000)) return "ended";
+    if (now >= start) return "live";
+  }
+
+  // Legacy fallback for items normalised before dateTimeRaw was added
   if (item.isLive === true) return "live";
   return "upcoming";
 }
@@ -31,7 +46,7 @@ export function getEventLifecycleState(item, viewerContext = {}) {
  * @param {{ isCreator?: boolean, isAdmin?: boolean, isAttendee?: boolean, joinState?: string|null }} viewerContext
  * @returns {'creator'|'admin'|'approved'|'pending'|'waitlisted'|'not_joined'}
  */
-export function getUserEventRelationship(item, viewerContext = {}) {
+export function getUserEventRelationship(_item, viewerContext = {}) {
   if (viewerContext.isCreator) return "creator";
   if (viewerContext.isAdmin) return "admin";
   if (viewerContext.joinState === "approved" || viewerContext.isAttendee) return "approved";
@@ -79,40 +94,6 @@ export function getCapacityState(item) {
   if (fillRatio >= 0.8) return { state: "almost_full", spotsLeft, label: `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left` };
   if (fillRatio >= 0.5) return { state: "filling", spotsLeft, label: `${spotsLeft} spots left` };
   return { state: "open", spotsLeft, label: `${spotsLeft} spots open` };
-}
-
-// ─── Status badges ────────────────────────────────────────────────────────────
-
-/**
- * Returns badge descriptors to render in the modal header row.
- * @param {Object} item
- * @param {Object} viewerContext
- * @returns {Array<{ key: string, label: string, color: string, pulse?: boolean }>}
- */
-export function getStatusBadges(item, viewerContext = {}) {
-  const badges = [];
-  const lifecycle = getEventLifecycleState(item, viewerContext);
-
-  if (lifecycle === "live") {
-    badges.push({ key: "live", label: "Live Now", color: "#FB4040", pulse: true });
-  } else if (lifecycle === "ended") {
-    badges.push({ key: "ended", label: "Ended", color: "rgba(229,226,225,0.35)" });
-  } else if (lifecycle === "cancelled") {
-    badges.push({ key: "cancelled", label: "Cancelled", color: "#FB4040" });
-  }
-
-  if (item?.isPrivate) {
-    badges.push({ key: "private", label: "Private", color: "rgba(229,226,225,0.35)" });
-  }
-
-  const locationMode = item?.locationVisibility ?? "exact";
-  badges.push({
-    key: "location",
-    label: locationMode === "approximate" ? "Approximate area" : "Exact location",
-    color: "rgba(229,226,225,0.22)",
-  });
-
-  return badges;
 }
 
 // ─── Privacy notice ───────────────────────────────────────────────────────────
@@ -179,25 +160,34 @@ export function getFooterActions(item, viewerContext = {}) {
     return { primary: null, secondary: [] };
   }
 
-  // ── Creator ───────────────────────────────────────────────────────────────
+  // ── Creator / admin ───────────────────────────────────────────────────────
   if (relationship === "creator" || relationship === "admin") {
-    const primary = { label: "Manage Event", variant: "primary", actionKey: "manage" };
-    const secondary = [
-      { label: "Edit", variant: "ghost", actionKey: "edit" },
-      { label: "Share", variant: "ghost", actionKey: "share" },
-    ];
-    return { primary, secondary };
+    // Shows don't have an edit flow yet — only show delete
+    if (type === "promote_show") {
+      return {
+        primary: null,
+        secondary: [{ label: "Delete Event", variant: "danger", actionKey: "delete" }],
+      };
+    }
+    return {
+      primary:   { label: "Edit Event",    variant: "primary", actionKey: "edit" },
+      secondary: [{ label: "Delete Event", variant: "danger",  actionKey: "delete" }],
+    };
   }
 
   // ── Already approved / attendee ───────────────────────────────────────────
   if (relationship === "approved") {
-    const primaryLabel = lifecycle === "live" ? "Open Chat" : "You're Going";
+    if (lifecycle === "live") {
+      return {
+        primary: { label: "Open Chat", variant: "primary", actionKey: "chat" },
+        secondary: [{ label: "Leave Event", variant: "danger", actionKey: "leave" }],
+      };
+    }
+    // Type-aware label: shows say "Registered", jams say "You're Going"
+    const primaryLabel = type === "promote_show" ? "Registered" : "You're Going";
     return {
-      primary: { label: primaryLabel, variant: "primary", actionKey: lifecycle === "live" ? "chat" : "going", disabled: lifecycle !== "live" },
-      secondary: [
-        { label: "Leave Event", variant: "danger", actionKey: "leave" },
-        { label: "Add to Calendar", variant: "ghost", actionKey: "calendar" },
-      ],
+      primary: { label: primaryLabel, variant: "primary", actionKey: "going" },
+      secondary: [{ label: "Leave Event", variant: "danger", actionKey: "leave" }],
     };
   }
 
@@ -227,33 +217,33 @@ export function getFooterActions(item, viewerContext = {}) {
     if (isFull) {
       return {
         primary: { label: "Join Waitlist", variant: "primary", actionKey: "waitlist" },
-        secondary: [{ label: "Save", variant: "ghost", actionKey: "save" }],
+        secondary: [],
       };
     }
     return {
       primary: { label: isPrivate ? "Request to Join" : "Join Jam", variant: "primary", actionKey: "join" },
-      secondary: [{ label: "Save", variant: "ghost", actionKey: "save" }],
+      secondary: [],
     };
   }
 
   if (type === "promote_show") {
     return {
-      primary: { label: item?.ctaLabel ?? "View Show", variant: "primary", actionKey: "view_show" },
-      secondary: [{ label: "Save", variant: "ghost", actionKey: "save" }],
+      primary: { label: "RSVP", variant: "primary", actionKey: "rsvp" },
+      secondary: [],
     };
   }
 
   if (type === "join_band") {
     return {
       primary: { label: "View Profile", variant: "primary", actionKey: "view_profile" },
-      secondary: [{ label: "Save", variant: "ghost", actionKey: "save" }],
+      secondary: [],
     };
   }
 
   if (type === "find_bandmate") {
     return {
       primary: { label: item?.ctaLabel ?? "Apply", variant: "primary", actionKey: "apply" },
-      secondary: [{ label: "Save", variant: "ghost", actionKey: "save" }],
+      secondary: [],
     };
   }
 

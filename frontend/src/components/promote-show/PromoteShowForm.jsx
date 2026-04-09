@@ -6,7 +6,7 @@ import ShowVenueSection from "./sections/ShowVenueSection";
 import ShowDetailsSection from "./sections/ShowDetailsSection";
 import PromoteShowFooterActions from "./PromoteShowFooterActions";
 import StepIndicator from "../ui/StepIndicator";
-import { buildPromoteShowPayload } from "../../utils/buildPromoteShowPayload";
+import { showService } from "../../injectables/showService";
 import { getFormTheme } from "../../utils/discovery";
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
@@ -170,10 +170,8 @@ const PromoteShowForm = ({ options, onClose }) => {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    const payload = buildPromoteShowPayload(form);
     try {
-      // TODO: wire up real API call — e.g. await api.promoteShow(payload)
-      await new Promise((r) => setTimeout(r, 900));
+      await showService.createShow(form);
       onClose();
     } catch (err) {
       console.error("Promote show failed:", err);

@@ -1,4 +1,3 @@
-import { hexToRgba } from "../../utils/discovery";
 import { getCapacityState } from "../../utils/eventComputed";
 
 /**
@@ -26,9 +25,9 @@ const EventAttendanceSection = ({ item, accent }) => {
   const avatarCount = Math.min(count ?? 0, 4);
 
   return (
-    <div className="px-7 pb-5">
+    <div className="px-7 pb-3">
       <div
-        className="rounded-2xl px-4 py-3.5 space-y-3"
+        className="rounded-2xl px-4 py-2.5 space-y-2.5"
         style={{
           background: "rgba(255,255,255,0.03)",
           border: "1px solid rgba(255,255,255,0.06)",
@@ -96,14 +95,7 @@ const EventAttendanceSection = ({ item, accent }) => {
           </div>
         )}
 
-        {/* Friends going placeholder — ready for real data */}
-        <p
-          className="text-[11px]"
-          style={{ color: "rgba(229,226,225,0.25)" }}
-        >
-          {/* Integration point: replace with real friends data when available */}
-          Friends going will appear here
-        </p>
+        {/* Integration point: replace with real friends data when available */}
       </div>
     </div>
   );

@@ -55,6 +55,18 @@ export const chatService = {
     return conversationId;
   },
 
+  /**
+   * Delete the jam conversation (and all its messages via DB cascade).
+   * Safe to call after jam deletion — non-fatal if no conversation exists.
+   */
+  async deleteJamConversation(jamId) {
+    const { error } = await supabase
+      .from('chat_conversation')
+      .delete()
+      .eq('jam_id', Number(jamId));
+    if (error) throw error;
+  },
+
   async getUsersProfiles(userIds) {
     if (!userIds || userIds.length === 0) return [];
 

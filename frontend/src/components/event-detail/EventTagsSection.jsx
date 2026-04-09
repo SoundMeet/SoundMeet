@@ -24,8 +24,13 @@ const TagPill = ({ label, accent, highlight }) => (
 /**
  * EventTagsSection — renders all tag pills (tags, genres, vibes, skill level, jamType).
  * Merges all available pill sources and deduplicates.
+ *
+ * Jams skip this entirely — JamDetailSections renders genres/vibes in
+ * properly labelled sections.
  */
 const EventTagsSection = ({ item, accent }) => {
+  // Jam and show taxonomy is handled with labels in their respective DetailSections
+  if (item?.type === "jam" || item?.type === "promote_show") return null;
   // Combine all pill sources
   const seenLower = new Set();
   const allPills = [];

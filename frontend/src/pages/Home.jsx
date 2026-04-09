@@ -1,16 +1,18 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import MapComponent from "../components/MapComponent";
 import GlowSwitch from "../components/GlowSwitch";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateJamModal from "../components/create-jam/CreateJamModal";
 import JoinJamModal from "../components/join-jam/JoinJamModal";
+import RSVPShowModal from "../components/rsvp-show/RSVPShowModal";
 import PromoteShowModal from "../components/promote-show/PromoteShowModal";
 import JoinBandModal from "../components/join-band/JoinBandModal";
 import FindBandmateModal from "../components/find-bandmate/FindBandmateModal";
 import DiscoverPreview from "../components/DiscoverPreview";
 import { useAuth } from "../injectables/Auth.jsx";
 import { useAuthModal } from "../context/AuthModalContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 import DiscoverControls from "../components/discover/DiscoverControls";
 import SortMenu from "../components/discover/SortMenu";
 import MapFloatingControls from "../components/discover/MapControls";
@@ -24,6 +26,8 @@ import {
   DEFAULT_MORE_FILTERS,
 } from "../utils/discoverFilters";
 import { jamService, normalizeJamRow } from "../injectables/jamService";
+import { showService, normalizeShowRow } from "../injectables/showService";
+import { chatService } from "../injectables/chatService";
 import DiscoveryCard from "../components/discover/DiscoveryCard";
 import EventDetailModal from "../components/event-detail/EventDetailModal";
 import {
@@ -41,8 +45,10 @@ const CATEGORY_HEADINGS = {
 };
 
 const Home = () => {
+  const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
+  const { showToast } = useToast();
 
   // ── Category filter ────────────────────────────────────────────────────────
   // Empty array = "All" (no restriction). Populated = specific categories selected.
@@ -76,6 +82,7 @@ const Home = () => {
   const [joinBandModalOpen, setJoinBandModalOpen] = useState(false);
   const [findBandmateModalOpen, setFindBandmateModalOpen] = useState(false);
   const [joinJamModal, setJoinJamModal] = useState({ open: false, jam: null });
+  const [rsvpShowModal, setRsvpShowModal] = useState({ open: false, show: null });
 
   // ── Discovery interaction state ────────────────────────────────────────────
   const [hoveredDiscoveryId, setHoveredDiscoveryId] = useState(null);
@@ -109,32 +116,68 @@ const Home = () => {
     return flyRequestRef.current;
   };
 
-  // ── Real jam feed from Supabase ────────────────────────────────────────────
-  // rawJamRows holds the raw DB rows; normalization (incl. distanceMiles) happens
+  // ── Participation: IDs the current user has joined/RSVPd to ──────────────
+  // A lightweight Set of string IDs fetched once on login and refreshed after
+  // join / leave / RSVP actions. Used to derive the card participation state
+  // without touching the discover feed itself.
+  const [myJoinedIds, setMyJoinedIds] = useState(new Set());
+
+  const refreshMyJoinedIds = useCallback(async () => {
+    if (!user?.id) return setMyJoinedIds(new Set());
+    try {
+      const [jamIds, showIds] = await Promise.all([
+        jamService.getMyAttendingJamIds(user.id),
+        showService.getMyRsvpdShowIds(user.id),
+      ]);
+      setMyJoinedIds(new Set([...jamIds, ...showIds]));
+    } catch (err) {
+      console.error("[Home] Failed to load joined IDs:", err);
+    }
+  }, [user?.id]);
+
+  useEffect(() => { refreshMyJoinedIds(); }, [refreshMyJoinedIds]);
+
+  // ── Real feed from Supabase (jams + shows) ───────────────────────────────
+  // Raw rows are stored separately; normalization (incl. distanceMiles) happens
   // in the memo below so it auto-updates when userLocation arrives.
-  const [rawJamRows, setRawJamRows] = useState([]);
+  const [rawJamRows,  setRawJamRows]  = useState([]);
+  const [rawShowRows, setRawShowRows] = useState([]);
   const [feedLoading, setFeedLoading] = useState(true);
 
   const refreshFeed = () => {
     jamService.fetchRawDiscoverFeed()
       .then(setRawJamRows)
-      .catch((err) => console.error("[Home] Feed refresh failed:", err));
+      .catch((err) => console.error("[Home] Jam feed refresh failed:", err));
+    showService.fetchRawShowFeed()
+      .then(setRawShowRows)
+      .catch((err) => console.error("[Home] Show feed refresh failed:", err));
   };
 
   useEffect(() => {
     let cancelled = false;
     setFeedLoading(true);
-    jamService.fetchRawDiscoverFeed()
-      .then((rows) => { if (!cancelled) setRawJamRows(rows); })
-      .catch((err) => console.error("[Home] Failed to load jam feed:", err))
+    Promise.all([
+      jamService.fetchRawDiscoverFeed(),
+      showService.fetchRawShowFeed(),
+    ])
+      .then(([jams, shows]) => {
+        if (!cancelled) {
+          setRawJamRows(jams);
+          setRawShowRows(shows);
+        }
+      })
+      .catch((err) => console.error("[Home] Failed to load feed:", err))
       .finally(() => { if (!cancelled) setFeedLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
   // Normalize with live userLocation so distanceMiles updates when GPS arrives
   const discoveryFeed = useMemo(
-    () => rawJamRows.map((row) => normalizeJamRow(row, userLocation)),
-    [rawJamRows, userLocation]
+    () => [
+      ...rawJamRows.map((row) => normalizeJamRow(row, userLocation)),
+      ...rawShowRows.map((row) => normalizeShowRow(row, userLocation)),
+    ],
+    [rawJamRows, rawShowRows, userLocation]
   );
 
   const discoveryById = useMemo(
@@ -175,6 +218,19 @@ const Home = () => {
   const openDiscoveryModal = (itemId) => setModalItem(discoveryById[itemId] ?? null);
   const closeDiscoveryModal = () => setModalItem(null);
 
+  /**
+   * Derives the card participation state for a given discovery item.
+   * 'creator'  — current user owns the event
+   * 'joined'   — current user is an approved attendee / has RSVPd
+   * 'default'  — no relationship (or not logged in)
+   */
+  const getParticipationState = (item) => {
+    if (!user) return "default";
+    if (item.admin_id != null && String(item.admin_id) === String(user.id)) return "creator";
+    if (myJoinedIds.has(item.id)) return "joined";
+    return "default";
+  };
+
   // ── Deep-link: open EventDetailModal when navigated here from a notification ──
   // Triggered by navigate('/', { state: { openJamId: id } }) in NotificationItem.
   useEffect(() => {
@@ -196,19 +252,67 @@ const Home = () => {
     locationQuery: editingJam.locationName ?? editingJam.subtitle ?? "",
   } : undefined;
 
+  // ── viewerContext for EventDetailModal ─────────────────────────────────────
+  // Creator is derived from admin_id match. Attendee state is derived from
+  // myJoinedIds, which is fetched and kept in sync with join/leave/rsvp actions.
+  const modalViewerContext = useMemo(() => {
+    if (!modalItem || !user) return {};
+    const isCreator =
+      modalItem.admin_id != null &&
+      String(modalItem.admin_id) === String(user.id);
+    if (isCreator) return { isCreator: true };
+    return myJoinedIds.has(modalItem.id) ? { isAttendee: true } : {};
+  }, [modalItem, user, myJoinedIds]);
+
   const handleDiscoveryEdit = (item) => {
     closeDiscoveryModal();
+    if (item?.type === "promote_show") {
+      // Show editing is not yet supported — open the create form for jams only
+      setPromoteShowModalOpen(true);
+      return;
+    }
     setEditingJam(item);
     setCreateJamModalOpen(true);
   };
 
   const handleDiscoveryDelete = async (item) => {
-    closeDiscoveryModal();
     try {
-      await jamService.deleteJam(item.id);
-      setRawJamRows((prev) => prev.filter((j) => String(j.id) !== String(item.id)));
+      if (item?.type === "jam") {
+        await jamService.deleteJam(item.id);
+        // Best-effort: delete the jam conversation (cascades in DB but frontend
+        // chat list won't know until next navigation — this speeds it up).
+        chatService.deleteJamConversation(item.id).catch(() => {});
+        setRawJamRows((prev) => prev.filter((j) => String(j.id) !== String(item.id)));
+        setSelectedDiscoveryId(null);
+        showToast("Jam and chat deleted", "success");
+      } else if (item?.type === "promote_show") {
+        await showService.deleteShow(item.id);
+        setRawShowRows((prev) => prev.filter((s) => String(s.id) !== String(item.id)));
+        setSelectedDiscoveryId(null);
+        showToast("Event deleted", "success");
+      }
     } catch (err) {
-      console.error('Delete jam failed:', err);
+      console.error("[Home] Delete failed:", err);
+      showToast("Failed to delete event. Please try again.", "error");
+      throw err; // let EventDetailModal reset loading state
+    }
+  };
+
+  const handleDiscoveryLeave = async (item) => {
+    if (!user?.id) return;
+    try {
+      if (item?.type === "jam") {
+        await jamService.leaveJam(item.id, user.id);
+        showToast("You left the jam", "success");
+      } else if (item?.type === "promote_show") {
+        await showService.cancelShowRsvp(item.id, user.id);
+        showToast("You left the event", "success");
+      }
+      refreshMyJoinedIds();
+    } catch (err) {
+      console.error("[Home] Leave failed:", err);
+      showToast("Failed to leave event. Please try again.", "error");
+      throw err; // let EventDetailModal reset loading state
     }
   };
 
@@ -225,6 +329,14 @@ const Home = () => {
           locationLabel: modalItem.locationName ?? modalItem.subtitle ?? null,
         },
       });
+    }
+    closeDiscoveryModal();
+  };
+
+  // Opens RSVPShowModal from EventDetailModal footer action
+  const handleDiscoveryRsvp = () => {
+    if (modalItem?.type === "promote_show") {
+      setRsvpShowModal({ open: true, show: modalItem });
     }
     closeDiscoveryModal();
   };
@@ -610,6 +722,7 @@ const Home = () => {
                     <div key={item.id} ref={(el) => { cardRefs.current[item.id] = el; }}>
                       <DiscoveryCard
                         item={item}
+                        participationState={getParticipationState(item)}
                         // isActive is suppressed when something is locked —
                         // hover should never visually compete with a selection.
                         isActive={!selectedDiscoveryId && hoveredDiscoveryId === item.id}
@@ -667,7 +780,10 @@ const Home = () => {
           onOpenChange={(open) => { setCreateJamModalOpen(open); if (!open) { setEditingJam(null); refreshFeed(); } }}
           initialValues={editInitialValues}
         />
-        <PromoteShowModal open={promoteShowModalOpen} onOpenChange={setPromoteShowModalOpen} />
+        <PromoteShowModal
+          open={promoteShowModalOpen}
+          onOpenChange={(open) => { setPromoteShowModalOpen(open); if (!open) refreshFeed(); }}
+        />
         <JoinBandModal
           open={joinBandModalOpen}
           onOpenChange={setJoinBandModalOpen}
@@ -691,16 +807,30 @@ const Home = () => {
         item={modalItem}
         open={isDiscoveryModalOpen}
         onClose={closeDiscoveryModal}
+        viewerContext={modalViewerContext}
         onJoin={handleDiscoveryJoin}
+        onRsvp={handleDiscoveryRsvp}
         onEdit={handleDiscoveryEdit}
         onDelete={handleDiscoveryDelete}
+        onLeave={handleDiscoveryLeave}
         openedFrom="discover"
       />
 
       <JoinJamModal
         isOpen={joinJamModal.open}
-        onClose={() => setJoinJamModal({ open: false, jam: null })}
+        onClose={() => { setJoinJamModal({ open: false, jam: null }); refreshMyJoinedIds(); }}
         jam={joinJamModal.jam}
+        onSubmit={() => jamService.joinJam(joinJamModal.jam.id, user?.id)}
+        onSuccessNavigateToMyJams={() => navigate("/jams")}
+      />
+
+      <RSVPShowModal
+        isOpen={rsvpShowModal.open}
+        onClose={() => { setRsvpShowModal({ open: false, show: null }); refreshMyJoinedIds(); }}
+        show={rsvpShowModal.show}
+        accentColor={rsvpShowModal.show?.accentColor}
+        onSubmit={() => showService.rsvpShow(rsvpShowModal.show?.id, user?.id)}
+        onSuccessNavigateToMyJams={() => navigate("/jams")}
       />
     </div>
   );
