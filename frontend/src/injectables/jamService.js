@@ -384,6 +384,33 @@ export const jamService = {
   },
 
   /**
+   * Remove any attendee from a jam (host/admin action).
+   * Deletes them from the attending table and from the jam's chat participants.
+   */
+  async removeAttendee(jamId, userId) {
+    const { error: attErr } = await supabase
+      .from('chat_jam_users_attending')
+      .delete()
+      .eq('jam_id', Number(jamId))
+      .eq('user_id', userId);
+    if (attErr) throw attErr;
+
+    const { data: conv } = await supabase
+      .from('chat_conversation')
+      .select('id')
+      .eq('jam_id', Number(jamId))
+      .maybeSingle();
+
+    if (conv?.id) {
+      await supabase
+        .from('chat_conversation_participants')
+        .delete()
+        .eq('conversation_id', conv.id)
+        .eq('user_id', userId);
+    }
+  },
+
+  /**
    * Returns the IDs (as strings) of upcoming jams the user is currently attending.
    * Lightweight — only fetches the junction table, no full jam rows.
    */
@@ -427,11 +454,15 @@ export const jamService = {
 
     const { error } = await supabase
       .from('chat_jam_users_attending')
+      .upsert({ jam_id: Number(jamId), user_id: userId }, { onConflict: 'jam_id,user_id' });
+    if (error) throw error;
+
+    await supabase
+      .from('chat_jamattendeebringing')
       .upsert(
         { jam_id: Number(jamId), user_id: userId, instruments_bringing, roles_bringing, gear_bringing },
         { onConflict: 'jam_id,user_id' }
       );
-    if (error) throw error;
 
     const conversationId = await chatService.getOrCreateJamChat(Number(jamId), userId);
     return conversationId;
@@ -442,17 +473,24 @@ export const jamService = {
    * Returns an array of attendee objects shaped for the ManageAttendeesModal.
    */
   async getJamAttendees(jamId) {
-    // 1. Get attending rows including all per-attendee selections
+    // 1. Get attending user IDs
     const { data: rows, error: attErr } = await supabase
       .from('chat_jam_users_attending')
-      .select('user_id, instruments_bringing, roles_bringing, gear_bringing')
+      .select('user_id')
       .eq('jam_id', Number(jamId));
     if (attErr) throw attErr;
     if (!rows?.length) return [];
 
     const userIds = rows.map((r) => r.user_id);
+
+    // 2. Get per-attendee bringing selections from dedicated table
+    const { data: bringingRows } = await supabase
+      .from('chat_jamattendeebringing')
+      .select('user_id, instruments_bringing, roles_bringing, gear_bringing')
+      .eq('jam_id', Number(jamId));
+
     const selectionMap = Object.fromEntries(
-      rows.map((r) => [String(r.user_id), {
+      (bringingRows ?? []).map((r) => [String(r.user_id), {
         instruments: r.instruments_bringing ?? [],
         roles:       r.roles_bringing       ?? [],
         gear:        r.gear_bringing        ?? [],
@@ -482,6 +520,27 @@ export const jamService = {
         gearBringing:         sel.gear,
       };
     });
+  },
+
+  /**
+   * Update only the bringing arrays for the current user on a jam they're attending.
+   * Pass only the fields you want to change — unspecified fields are left untouched.
+   * Uses UPDATE (not upsert) so sibling columns are never clobbered.
+   */
+  async updateMyBringing(jamId, userId, partial = {}) {
+    const update = {};
+    if (partial.instruments !== undefined) update.instruments_bringing = partial.instruments;
+    if (partial.roles       !== undefined) update.roles_bringing       = partial.roles;
+    if (partial.gear        !== undefined) update.gear_bringing        = partial.gear;
+    if (!Object.keys(update).length) return;
+
+    const { error } = await supabase
+      .from('chat_jamattendeebringing')
+      .upsert(
+        { jam_id: Number(jamId), user_id: userId, ...update },
+        { onConflict: 'jam_id,user_id' }
+      );
+    if (error) throw error;
   },
 
   /**

@@ -6,9 +6,7 @@
  * DestructiveConfirmSheet — this component just fires the callback.
  */
 
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ManageAttendeesModal } from "./ManageAttendeesModal";
 import { getDiscoveryAccentColor } from "../../utils/discovery";
 
 const AdminButton = ({ icon, label, onClick, danger = false, disabled = false }) => (
@@ -61,15 +59,15 @@ const TrashIcon = () => (
 
 /**
  * Props:
- *   item        — event item
- *   onEdit      — legacy: opens external edit flow (non-jam / fallback)
- *   onEnterEdit — preferred for jams: activates in-place edit mode without closing
- *   onDelete    — opens delete confirm
- *   onClose     — closes the modal
+ *   item             — event item
+ *   onEdit           — legacy: opens external edit flow (non-jam / fallback)
+ *   onEnterEdit      — preferred for jams: activates in-place edit mode without closing
+ *   onDelete         — opens delete confirm
+ *   onClose          — closes the modal
+ *   onOpenAttendees  — opens the shared attendees modal (managed by EventDetailModal)
  */
-const EventAdminActions = ({ item, onEdit, onEnterEdit, onDelete, onClose }) => {
+const EventAdminActions = ({ item, onEdit, onEnterEdit, onDelete, onClose, onOpenAttendees }) => {
   const navigate = useNavigate();
-  const [attendeesOpen, setAttendeesOpen] = useState(false);
   const accent = getDiscoveryAccentColor(item);
 
   const handleViewChat = () => {
@@ -109,7 +107,7 @@ const EventAdminActions = ({ item, onEdit, onEnterEdit, onDelete, onClose }) => 
             <AdminButton
               icon={<UsersIcon />}
               label="Manage Attendees"
-              onClick={() => setAttendeesOpen(true)}
+              onClick={onOpenAttendees}
             />
           )}
 
@@ -141,12 +139,6 @@ const EventAdminActions = ({ item, onEdit, onEnterEdit, onDelete, onClose }) => 
         </div>
       </div>
 
-      <ManageAttendeesModal
-        open={attendeesOpen}
-        onClose={() => setAttendeesOpen(false)}
-        item={item}
-        accent={accent}
-      />
     </>
   );
 };

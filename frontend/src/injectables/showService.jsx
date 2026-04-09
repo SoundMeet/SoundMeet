@@ -296,6 +296,56 @@ export const showService = {
     }));
   },
 
+  /**
+   * Fetch the attendee list for a show, enriched with profile data.
+   * Returns the same attendee shape as getJamAttendees but without
+   * instrument/role/gear fields (shows don't track those).
+   */
+  async getShowAttendees(showId) {
+    const { data: rows, error: attErr } = await supabase
+      .from('chat_show_users_attending')
+      .select('user_id')
+      .eq('show_id', Number(showId));
+    if (attErr) throw attErr;
+    if (!rows?.length) return [];
+
+    const userIds = rows.map((r) => r.user_id);
+
+    const { data: profiles, error: profErr } = await supabase
+      .from('chat_profile')
+      .select('user_id, display_name, pfp')
+      .in('user_id', userIds);
+    if (profErr) throw profErr;
+
+    const profileMap = Object.fromEntries(
+      (profiles ?? []).map((p) => [String(p.user_id), p])
+    );
+
+    return userIds.map((uid) => {
+      const p = profileMap[String(uid)];
+      return {
+        userId:              String(uid),
+        displayName:         p?.display_name ?? `User #${uid}`,
+        pfp:                 p?.pfp ?? null,
+        instrumentsBringing: [],
+        rolesBringing:       [],
+        gearBringing:        [],
+      };
+    });
+  },
+
+  /**
+   * Remove any attendee from a show (organizer action).
+   */
+  async removeShowAttendee(showId, userId) {
+    const { error } = await supabase
+      .from('chat_show_users_attending')
+      .delete()
+      .eq('show_id', Number(showId))
+      .eq('user_id', userId);
+    if (error) throw error;
+  },
+
   async getShowById(showId) {
     const { data, error } = await supabase
       .from('chat_show')
