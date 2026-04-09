@@ -37,7 +37,7 @@ function formatAvatarUrl(path) {
   return `${BUCKET_URL}${cleanPath}`;
 }
 
-const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
+const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection }) => {
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-200, 200], [-10, 10]);
   const peekOffset = index % 2 === 0 ? -80 : 80;
@@ -62,6 +62,12 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
     else if (info.offset.x < -threshold) onSwipe("left", profile.id);
   };
 
+  const getExitX = () => {
+    if (forcedDirection === "right") return 1000;
+    if (forcedDirection === "left") return -1000;
+    return dragX.get() > 0 ? 1000 : -1000;
+  };
+
   return (
     <motion.div
       style={{
@@ -74,16 +80,16 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index }) => {
         zIndex: index,
       }}
       exit={{
-        x: dragX.get() > 0 ? 500 : -500,
+        x: getExitX(),
         opacity: 0,
         scale: 0.5,
-        transition: { duration: 0.3 },
+        transition: { duration: 0.4, ease: "easeIn" },
       }}
       drag={isTop ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
       onTap={() => isTop && onClick(profile)}
-      className="absolute w-[85vw] max-w-[380px] h-[60vh] max-h-[500px] bg-[#2A2A2A] rounded-[2rem] overflow-hidden cursor-grab active:cursor-grabbing select-none transition-all duration-500 ease-out border border-white/5"
+      className="absolute w-[85vw] max-w-[380px] h-[60vh] max-h-[500px] bg-[#2A2A2A] rounded-[2rem] overflow-hidden cursor-grab active:cursor-grabbing select-none border border-white/5"
     >
       <div className="relative h-full w-full">
         <img
@@ -171,6 +177,7 @@ export default function SoundMeetDiscovery() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [friends, setFriends] = useState([]);
+  const [lastSwipeDirection, setLastSwipeDirection] = useState(null);
   const [filters, setFilters] = useState({
     genres: [],
     instruments: [],
@@ -197,7 +204,6 @@ export default function SoundMeetDiscovery() {
           socialService.getMyFriends(user.id)
         ]);
         
-        // Hide and Do not show users own profile
         const otherProfiles = profilesData.filter(p => p.id !== user.id);
         
         setProfiles(otherProfiles);
@@ -243,6 +249,9 @@ export default function SoundMeetDiscovery() {
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter((p) => {
+      const isAlreadyFriend = friends.some((f) => f.id === p.id);
+      if (isAlreadyFriend) return false;
+
       const matchSearch = p.display_name
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
@@ -258,9 +267,10 @@ export default function SoundMeetDiscovery() {
         
       return matchSearch && matchGenre && matchInst && matchRole;
     });
-  }, [profiles, searchQuery, filters]);
+  }, [profiles, searchQuery, filters, friends]);
 
   const handleSwipe = async (direction, id) => {
+    setLastSwipeDirection(direction);
     if (direction === "right") {
       try {
         await socialService.sendFriendRequest(id);
@@ -268,7 +278,10 @@ export default function SoundMeetDiscovery() {
         console.error("Failed to send friend request on swipe:", err);
       }
     }
-    setProfiles((prev) => prev.filter((p) => p.id !== id));
+    setTimeout(() => {
+      setProfiles((prev) => prev.filter((p) => p.id !== id));
+      setLastSwipeDirection(null);
+    }, 0);
   };
 
   const FilterSection = ({ title, items, storageKey }) => (
@@ -312,8 +325,8 @@ export default function SoundMeetDiscovery() {
   }
 
   return (
-    <div className="flex flex-col h-screen text-[#E5E2E1] font-sora overflow-hidden">
-      <header className="h-20 flex items-center justify-center px-8 shrink-0 z-50">
+    <div className="flex flex-col h-screen bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden">
+      <header className="h-20 flex items-center justify-center px-8 shrink-0 z-10">
         <div className="flex items-center gap-4 w-full max-w-[450px]" ref={searchContainerRef}>
           <div className="relative flex-1 group">
             <Search
@@ -573,6 +586,7 @@ export default function SoundMeetDiscovery() {
                       isTop={actualIndex === 0}
                       onSwipe={handleSwipe}
                       onClick={setSelectedProfile}
+                      forcedDirection={actualIndex === 0 ? lastSwipeDirection : null}
                     />
                   );
                 })}
