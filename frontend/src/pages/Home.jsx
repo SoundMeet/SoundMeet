@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import MapComponent from "../components/MapComponent";
 import GlowSwitch from "../components/GlowSwitch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,14 +43,6 @@ const CATEGORY_HEADINGS = {
 const Home = () => {
   const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
-  const navigate = useNavigate();
-
-  // Redirect to onboarding if not yet completed
-  useEffect(() => {
-    if (isLoggedIn && user && !user.onboarding_complete) {
-      navigate("/onboarding", { replace: true });
-    }
-  }, [isLoggedIn, user]);
 
   // ── Category filter ────────────────────────────────────────────────────────
   // Empty array = "All" (no restriction). Populated = specific categories selected.
@@ -182,6 +174,19 @@ const Home = () => {
   // ── Helpers ────────────────────────────────────────────────────────────────
   const openDiscoveryModal = (itemId) => setModalItem(discoveryById[itemId] ?? null);
   const closeDiscoveryModal = () => setModalItem(null);
+
+  // ── Deep-link: open EventDetailModal when navigated here from a notification ──
+  // Triggered by navigate('/', { state: { openJamId: id } }) in NotificationItem.
+  useEffect(() => {
+    const jamId = location.state?.openJamId
+    if (!jamId || feedLoading) return
+    const item = discoveryById[String(jamId)] ?? discoveryById[jamId]
+    if (item) {
+      setModalItem(item)
+      // Clear the state so back-navigation doesn't re-open the modal
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [feedLoading, location.state?.openJamId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const editInitialValues = editingJam ? {
     title: editingJam.title ?? "",

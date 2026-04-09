@@ -373,7 +373,7 @@ const MyJams = () => {
 
   // ── Render ────────────────────────────────────────────────
   return (
-    <div className="h-[calc(100vh-4rem)] bg-neutral-950 text-white flex flex-col relative overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] text-white flex flex-col relative overflow-hidden">
 
       {/* ── Tab bar ── */}
       <div className="border-b border-white/[0.06] shrink-0">

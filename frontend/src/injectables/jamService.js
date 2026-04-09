@@ -12,13 +12,10 @@ import { apiFetch } from './Auth'; // <-- Added for Django backend calls
 
 // ─── Shared select clause ─────────────────────────────────────────────────────
 
-// NOTE: Since you upgraded Genre and Vibe to ManyToMany fields in Django, 
-// after you migrate, you may need to update this select to fetch through the M2M tables 
-// e.g., `genres:chat_jam_genre( genre:chat_genre(id, name) )`
 const JAM_SELECT = `
   id, name, location, date_time, description, access, admin_id,
-  genre:genre_id (id, name),
-  vibe:vibe_id (id, name)
+  genres:chat_jam_genre( genre:genre_id(id, name) ),
+  vibes:chat_jam_vibe( vibe:vibe_id(id, name) )
 `;
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -82,10 +79,9 @@ export function normalizeJamRow(row, userLocation = null) {
   const coords = parseEWKBPoint(row.location);
   const isPublic = row.access === true;
   
-  // Note: If you update JAM_SELECT for the M2M arrays, you'll need to map the first item here
-  const genreName = row.genre?.name ?? null;
-  const vibeName = row.vibe?.name ?? null;
-  
+  const genreNames = (row.genres ?? []).map((g) => g.genre?.name).filter(Boolean);
+  const vibeNames = (row.vibes ?? []).map((v) => v.vibe?.name).filter(Boolean);
+
   const formattedDate = formatDateTime(row.date_time);
   const timeSlot = computeTimeSlot(row.date_time);
 
@@ -104,18 +100,19 @@ export function normalizeJamRow(row, userLocation = null) {
     type: 'jam',
     entityKind: 'jam_session',
     title: row.name,
-    subtitle: [genreName, vibeName].filter(Boolean).join(' · ') || 'Jam Session',
+    subtitle: [...genreNames, ...vibeNames].join(' · ') || 'Jam Session',
     neighborhood: null,
     summary: row.description ?? '',
     description: row.description ?? '',
     coordinates: coords,
     locationVisibility: coords ? 'exact' : null,
     approximateRadiusMeters: null,
-    genre: genreName,
-    vibe: vibeName,
-    vibes: vibeName ? [vibeName] : [],
-    previewPills: [genreName, vibeName].filter(Boolean),
-    tags: [genreName, vibeName].filter(Boolean),
+    genre: genreNames[0] ?? null,
+    genres: genreNames,
+    vibe: vibeNames[0] ?? null,
+    vibes: vibeNames,
+    previewPills: [...genreNames, ...vibeNames],
+    tags: [...genreNames, ...vibeNames],
     dateTime: formattedDate,
     date: formattedDate,
     metaSecondary: formattedDate ?? 'Open session',
@@ -123,7 +120,7 @@ export function normalizeJamRow(row, userLocation = null) {
     isLive: timeSlot === 'live',
     distanceMiles,
     metaPrimary: [
-      genreName,
+      genreNames.join(', ') || null,
       distanceMiles != null ? `${distanceMiles.toFixed(1)} mi` : null,
     ]
       .filter(Boolean)
@@ -227,31 +224,57 @@ export const jamService = {
         ? new Date(`${form.date}T${form.startTime}`).toISOString()
         : null;
 
+    const endDateTime =
+      form.date && form.endTime
+        ? new Date(`${form.date}T${form.endTime}`).toISOString()
+        : null;
+
     const location =
       form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null
         ? `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`
         : null;
 
-    const payload = {
-      name: form.title?.trim(),
-      date_time: dateTime,
-      location: location,
-      description: form.description?.trim() || '',
-      jam_type: form.jamType || 'OPEN JAM',
-      skill_level: form.skillLevel || 'ALL LEVELS',
-      access: !form.isPrivate, 
-      
-      genre_ids: form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []),
-      vibe_ids: form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []),
-      instruments_needed_ids: form.instruments?.presetIds || [],
-      roles_needed_ids: form.roles?.presetIds || [],
-      gear_provided_ids: form.gearProvided?.presetIds || [],
-      gear_needed_ids: form.gearNeeded?.presetIds || []
-    };
+    const formData = new FormData();
+
+    if (form.title) formData.append('name', form.title.trim());
+    if (dateTime) formData.append('date_time', dateTime);
+    if (endDateTime) formData.append('end_time', endDateTime);
+    if (location) formData.append('location', location);
+    
+    if (form.placeName) formData.append('location_name', form.placeName);
+    if (form.fullAddress) formData.append('location_address', form.fullAddress);
+    if (form.extraDirections) formData.append('location_guide', form.extraDirections);
+
+    formData.append('description', form.description?.trim() || '');
+    formData.append('jam_type', form.jamType || 'OPEN JAM');
+    formData.append('skill_level', form.skillLevel || 'ALL LEVELS');
+    formData.append('access', !form.isPrivate);
+
+    if (form.coverImage) {
+      formData.append('cover_image', form.coverImage);
+    }
+
+    const genreIds = form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []);
+    genreIds.forEach(id => formData.append('genre_ids', id));
+
+    const vibeIds = form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []);
+    vibeIds.forEach(id => formData.append('vibe_ids', id));
+
+    const instrumentsNeeded = form.instruments?.presetIds || [];
+    instrumentsNeeded.forEach(id => formData.append('instruments_needed_ids', id));
+
+    const rolesNeeded = form.roles?.presetIds || [];
+    rolesNeeded.forEach(id => formData.append('roles_needed_ids', id));
+
+    const gearProvided = form.gearProvided?.presetIds || [];
+    gearProvided.forEach(id => formData.append('gear_provided_ids', id));
+
+    const gearNeeded = form.gearNeeded?.presetIds || [];
+    gearNeeded.forEach(id => formData.append('gear_needed_ids', id));
 
     const response = await apiFetch('api/jams/create/', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     return response;
@@ -273,5 +296,16 @@ export const jamService = {
       .in('id', jamIds);
     if (error) return {};
     return Object.fromEntries((data ?? []).map((r) => [String(r.id), r.name]));
+  },
+
+  /**
+   * Invite a user to a jam. Only the jam admin should call this.
+   * Django creates a JAM_INVITE notification for the target user.
+   */
+  async inviteUserToJam(jamId, targetUserId) {
+    return await apiFetch(`api/jams/${jamId}/invite/`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: targetUserId }),
+    });
   },
 };

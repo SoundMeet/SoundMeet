@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+import json
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -50,6 +51,7 @@ def register_user(request):
         'username': user.username,
     })
 
+
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def get_profile(request):
@@ -58,9 +60,8 @@ def get_profile(request):
         defaults={'display_name': request.user.username[:15]}
     )
 
-    # Auto-mark existing users as onboarded so they aren't sent back to
-    # onboarding on every login. Any user who already has a display name
-    # or preferences set is considered to have completed onboarding.
+    # Auto-mark existing users as onboarded if they already have preferences.
+    # Does NOT mark based on display_name alone — that would mark new users too.
     if not profile.onboarding_complete:
         if profile.genres_liked.exists() or profile.instruments_liked.exists():
             profile.onboarding_complete = True
@@ -154,6 +155,7 @@ def get_profile(request):
         'friends_count': profile.friends_count,
     })
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_post(request):
@@ -177,8 +179,10 @@ def create_post(request):
         'created_at': post.created_at
     }, status=201)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def create_comment(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     content = request.data.get('content', '').strip()
@@ -186,12 +190,90 @@ def create_comment(request, post_id):
         return Response({'error': 'Content is required'}, status=400)
 
     comment = Comment.objects.create(post=post, author=request.user, content=content)
+
+    # Notify the post author — skip self-comments
+    if post.author != request.user:
+        Notification.objects.create(
+            user=post.author,
+            notification_type='POST_COMMENT',
+            message=f"{request.user.profile.display_name} commented on your post.",
+            reference_id=post.id,
+            metadata={'commenter_id': request.user.id, 'comment_id': comment.id},
+        )
+
     return Response({
         'id': comment.id,
         'content': comment.content,
         'created_at': comment.created_at,
         'author_id': comment.author.id,
     }, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def like_notify(request, post_id):
+    """
+    Called by the frontend after a successful like (Supabase already wrote the row).
+    Only job: create a POST_LIKE notification for the post author.
+    """
+    post = get_object_or_404(Post, id=post_id)
+
+    if post.author == request.user:
+        return Response({'status': 'skipped'})
+
+    try:
+        already_notified = Notification.objects.filter(
+            user=post.author,
+            notification_type='POST_LIKE',
+            reference_id=post.id,
+            metadata__contains={'liker_id': request.user.id},
+        ).exists()
+        if not already_notified:
+            Notification.objects.create(
+                user=post.author,
+                notification_type='POST_LIKE',
+                message=f"{request.user.profile.display_name} liked your post.",
+                reference_id=post.id,
+                metadata={'liker_id': request.user.id},
+            )
+    except Exception:
+        pass
+
+    return Response({'status': 'ok'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def invite_to_jam(request, jam_id):
+    """Jam admin invites a user to join their jam. Sends a JAM_INVITE notification."""
+    jam = get_object_or_404(Jam, id=jam_id, admin=request.user)
+    target_user_id = request.data.get('user_id')
+    if not target_user_id:
+        return Response({'error': 'user_id is required'}, status=400)
+
+    target_user = get_object_or_404(User, id=target_user_id)
+
+    if target_user == request.user:
+        return Response({'error': 'Cannot invite yourself'}, status=400)
+
+    already_invited = Notification.objects.filter(
+        user=target_user,
+        notification_type='JAM_INVITE',
+        reference_id=jam.id,
+    ).exists()
+
+    if not already_invited:
+        Notification.objects.create(
+            user=target_user,
+            notification_type='JAM_INVITE',
+            message=f"{request.user.profile.display_name} invited you to join {jam.name}.",
+            reference_id=jam.id,
+            metadata={'inviter_id': request.user.id, 'jam_name': jam.name},
+        )
+
+    return Response({'status': 'Invited'})
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -205,11 +287,16 @@ def create_jam(request):
         admin=request.user,
         name=data.get('name'),
         date_time=data.get('date_time'),
+        end_time=data.get('end_time'),
         location=jam_location,
+        location_name=data.get('location_name'),
+        location_address=data.get('location_address'),
+        location_guide=data.get('location_guide'),
         description=data.get('description', ''),
         jam_type=data.get('jam_type', 'OPEN JAM'),
         skill_level=data.get('skill_level', 'ALL LEVELS'),
         access=str(data.get('access')).lower() == 'true',
+        cover_image=request.FILES.get('cover_image')
     )
     jam.users_attending.add(request.user)
 
@@ -230,6 +317,7 @@ def create_jam(request):
     set_m2m('gear_needed_ids', jam.gear_needed)
 
     return Response({'status': 'Jam created successfully', 'jam_id': jam.id})
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -254,6 +342,7 @@ def create_band(request):
 
     return Response({'status': 'Band created successfully', 'band_id': band.id})
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
@@ -262,19 +351,29 @@ def create_show(request):
     location_wkt = data.get('location')
     show_location = GEOSGeometry(location_wkt) if location_wkt else None
 
-    genre_id = data.get('genre_id')
-    genre_instance = None
-    if genre_id and str(genre_id).isdigit():
-        genre_instance = Genre.objects.filter(id=int(genre_id)).first()
+    lineup_data = None
+    raw_lineup = data.get('lineup')
+    if raw_lineup:
+        try:
+            lineup_data = json.loads(raw_lineup)
+        except json.JSONDecodeError:
+            pass
 
     show = Show.objects.create(
         admin=request.user,
         name=data.get('name'),
         date_time=data.get('date_time'),
+        end_time=data.get('end_time'),
         location=show_location,
+        location_name=data.get('location_name'),
+        location_address=data.get('location_address'),
+        location_guide=data.get('location_guide'),
         description=data.get('description', ''),
         ticket_link=data.get('ticket_link', ''),
-        genre=genre_instance,
+        ticket_price=data.get('ticket_price') or None,
+        max_capacity=data.get('max_capacity') or None,
+        access=str(data.get('access', 'true')).lower() == 'true',
+        lineup=lineup_data,
         cover_image=request.FILES.get('cover_image')
     )
     show.users_attending.add(request.user)
@@ -282,7 +381,13 @@ def create_show(request):
     chat_room = Conversation.objects.create(show=show)
     chat_room.participants.add(request.user)
 
+    genre_ids = data.getlist('genre_ids') if hasattr(data, 'getlist') else data.get('genre_ids', [])
+    if genre_ids and genre_ids != [''] and genre_ids != "":
+        valid_ids = [int(i) for i in genre_ids if str(i).isdigit()]
+        show.genres.set(valid_ids)
+
     return Response({'status': 'Show created successfully', 'show_id': show.id})
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -305,6 +410,7 @@ def send_friend_request(request):
             metadata={'sender_id': request.user.id}
         )
     return Response({'status': 'Request sent'})
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -333,6 +439,7 @@ def handle_friend_request(request, request_id):
     elif action == 'DENY':
         fr.delete()
         return Response({'status': 'Denied and deleted'})
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

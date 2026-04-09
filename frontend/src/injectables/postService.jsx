@@ -90,6 +90,10 @@ export const postService = {
         .from(M2M_TABLE)
         .insert([{ post_id: postId, user_id: userId }]);
       if (error) throw error;
+
+      // Fire POST_LIKE notification via Django — best-effort, never blocks the like
+      apiFetch(`api/posts/${postId}/like/`, { method: 'POST' })
+        .catch((err) => console.warn('[like_notify] notification call failed:', err));
     }
   },
 
