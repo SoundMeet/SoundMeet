@@ -262,7 +262,7 @@ const CreateJamForm = ({
     setIsSubmitting(true);
     try {
       if (isEditMode) {
-        console.log("Edit Jam (not yet wired to backend):", form);
+        await jamService.updateJam(initialValues.jamId, form);
       } else {
         await jamService.createJam(form, user.id);
       }

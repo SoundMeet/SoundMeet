@@ -275,6 +275,46 @@ def invite_to_jam(request, jam_id):
     return Response({'status': 'Invited'})
 
 
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def update_jam(request, jam_id):
+    jam = get_object_or_404(Jam, id=jam_id, admin=request.user)
+    data = request.data
+
+    if 'name' in data:          jam.name = data['name']
+    if 'date_time' in data:     jam.date_time = data['date_time'] or None
+    if 'end_time' in data:      jam.end_time = data['end_time'] or None
+    if 'location' in data:
+        wkt = data.get('location')
+        jam.location = GEOSGeometry(wkt) if wkt else None
+    if 'location_name' in data:    jam.location_name = data['location_name']
+    if 'location_address' in data: jam.location_address = data['location_address']
+    if 'location_guide' in data:   jam.location_guide = data['location_guide'] or None
+    if 'description' in data:      jam.description = data['description']
+    if 'jam_type' in data:         jam.jam_type = data['jam_type']
+    if 'skill_level' in data:      jam.skill_level = data['skill_level']
+    if 'access' in data:           jam.access = str(data['access']).lower() == 'true'
+    if 'max_attendees' in data:    jam.max_attendees = data['max_attendees'] or None
+    if 'cover_image' in request.FILES: jam.cover_image = request.FILES['cover_image']
+
+    jam.save()
+
+    def set_m2m(field_name, manager):
+        items = data.getlist(field_name) if hasattr(data, 'getlist') else data.get(field_name, [])
+        valid_ids = [int(i) for i in (items or []) if str(i).isdigit()]
+        manager.set(valid_ids)
+
+    set_m2m('genre_ids', jam.genre)
+    set_m2m('vibe_ids', jam.vibe)
+    set_m2m('instruments_needed_ids', jam.instruments_needed)
+    set_m2m('roles_needed_ids', jam.roles_needed)
+    set_m2m('gear_provided_ids', jam.gear_provided)
+    set_m2m('gear_needed_ids', jam.gear_needed)
+
+    return Response({'status': 'Jam updated successfully'})
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
@@ -341,6 +381,45 @@ def create_band(request):
         band.genres.set(valid_ids)
 
     return Response({'status': 'Band created successfully', 'band_id': band.id})
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def update_show(request, show_id):
+    show = get_object_or_404(Show, id=show_id, admin=request.user)
+    data = request.data
+
+    if 'name' in data:          show.name = data['name']
+    if 'date_time' in data:     show.date_time = data['date_time'] or None
+    if 'end_time' in data:      show.end_time = data['end_time'] or None
+    if 'location' in data:
+        wkt = data.get('location')
+        show.location = GEOSGeometry(wkt) if wkt else None
+    if 'location_name' in data:    show.location_name = data['location_name']
+    if 'location_address' in data: show.location_address = data['location_address']
+    if 'location_guide' in data:   show.location_guide = data['location_guide'] or None
+    if 'description' in data:      show.description = data['description']
+    if 'ticket_link' in data:      show.ticket_link = data['ticket_link'] or None
+    if 'ticket_price' in data:     show.ticket_price = data['ticket_price'] or None
+    if 'max_capacity' in data:     show.max_capacity = data['max_capacity'] or None
+    if 'access' in data:           show.access = str(data['access']).lower() == 'true'
+    if 'cover_image' in request.FILES: show.cover_image = request.FILES['cover_image']
+
+    raw_lineup = data.get('lineup')
+    if raw_lineup is not None:
+        try:
+            show.lineup = json.loads(raw_lineup)
+        except (json.JSONDecodeError, TypeError):
+            show.lineup = []
+
+    show.save()
+
+    genre_ids = data.getlist('genre_ids') if hasattr(data, 'getlist') else data.get('genre_ids', [])
+    valid_genre_ids = [int(i) for i in (genre_ids or []) if str(i).isdigit()]
+    show.genres.set(valid_genre_ids)
+
+    return Response({'status': 'Show updated successfully'})
 
 
 @api_view(['POST'])

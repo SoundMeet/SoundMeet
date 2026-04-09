@@ -91,12 +91,14 @@ const stepVariants = {
  *   options  PromoteShowOptionSets — provided by PromoteShowModal via useFormOptions()
  *   onClose  () => void
  */
-const PromoteShowForm = ({ options, onClose }) => {
-  const [form,         setForm]         = useState(INITIAL_FORM);
+const PromoteShowForm = ({ options, onClose, initialValues }) => {
+  const isEditMode = !!initialValues;
+  const [form,         setForm]         = useState({ ...INITIAL_FORM, ...(initialValues ?? {}) });
   const [step,         setStep]         = useState(1);
   const [direction,    setDirection]    = useState(1);
   const [errors,       setErrors]       = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError,  setSubmitError]  = useState(null);
 
   const setField = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -169,12 +171,18 @@ const PromoteShowForm = ({ options, onClose }) => {
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
-      await showService.createShow(form);
+      if (isEditMode) {
+        await showService.updateShow(initialValues.showId, form);
+      } else {
+        await showService.createShow(form);
+      }
       onClose();
     } catch (err) {
       console.error("Promote show failed:", err);
+      setSubmitError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -194,7 +202,7 @@ const PromoteShowForm = ({ options, onClose }) => {
       <div className="flex items-center justify-between px-6 pt-5 pb-4 flex-shrink-0">
         <div>
           <Dialog.Title className="text-xl font-bold text-white tracking-tight">
-            Promote a Show
+            {isEditMode ? "Edit Show" : "Promote a Show"}
           </Dialog.Title>
           <p
             className="text-[10px] font-medium uppercase tracking-[0.12em] mt-0.5"
@@ -299,6 +307,11 @@ const PromoteShowForm = ({ options, onClose }) => {
       </div>
 
       {/* Footer */}
+      {submitError && (
+        <p className="text-xs text-center px-6 pb-2 flex-shrink-0" style={{ color: '#fb4040', fontFamily: 'Sora, sans-serif' }}>
+          {submitError}
+        </p>
+      )}
       <PromoteShowFooterActions
         step={step}
         totalSteps={STEPS.length}
@@ -306,6 +319,7 @@ const PromoteShowForm = ({ options, onClose }) => {
         isSubmitting={isSubmitting}
         gradientFrom={THEME.gradientFrom}
         gradientTo={THEME.gradientTo}
+        submitLabel={isEditMode ? "Save Changes" : undefined}
         onCancel={onClose}
         onBack={goBack}
         onNext={goNext}

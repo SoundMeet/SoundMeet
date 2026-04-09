@@ -89,6 +89,11 @@ export function normalizeShowRow(row, userLocation = null) {
     .map((g) => g.genre?.name ?? g.name)
     .filter(Boolean);
 
+  const genreIds = (row.genres ?? [])
+    .map((g) => g.genre?.id)
+    .filter(Boolean)
+    .map(String);
+
   const formattedDate = formatDateTime(row.date_time);
   const timeSlot = computeTimeSlot(row.date_time);
 
@@ -157,6 +162,7 @@ export function normalizeShowRow(row, userLocation = null) {
     badgeLabel: timeSlot === 'live' ? 'Live Now' : null,
     accentColor: DISCOVERY_COLORS.promote_show,
     admin_id: row.admin_id,
+    genreIds,
   };
 }
 
@@ -233,6 +239,50 @@ export const showService = {
     });
 
     return response;
+  },
+
+  async updateShow(showId, form) {
+    const formData = new FormData();
+
+    if (form.title)       formData.append('name', form.title.trim());
+    formData.append('description', form.description?.trim() || '');
+
+    if (form.ticketLink) {
+      const link = form.ticketLink.trim();
+      formData.append('ticket_link', /^https?:\/\//i.test(link) ? link : `https://${link}`);
+    } else {
+      formData.append('ticket_link', '');
+    }
+
+    if (form.date && form.startTime)
+      formData.append('date_time', new Date(`${form.date}T${form.startTime}`).toISOString());
+    formData.append('end_time', (form.date && form.endTime)
+      ? new Date(`${form.date}T${form.endTime}`).toISOString()
+      : '');
+
+    if (form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null)
+      formData.append('location', `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`);
+    if (form.selectedPlace?.placeName) formData.append('location_name', form.selectedPlace.placeName);
+    if (form.selectedPlace?.address)   formData.append('location_address', form.selectedPlace.address);
+    formData.append('location_guide', form.locationGuide?.trim() || '');
+
+    formData.append('ticket_price', form.ticketPrice || '');
+    formData.append('max_capacity', form.maxCapacity || '');
+    formData.append('access', !form.isPrivate);
+
+    const lineupPayload = (form.lineup ?? []).map(({ name, role }) => ({ name, role: role || null }));
+    formData.append('lineup', JSON.stringify(lineupPayload));
+
+    const genreIds = form.genres?.selectedIds || [];
+    genreIds.forEach((id) => formData.append('genre_ids', id));
+
+    if (form.coverImage?.file instanceof File)
+      formData.append('cover_image', form.coverImage.file);
+
+    return await apiFetch(`api/shows/${showId}/update/`, {
+      method: 'PATCH',
+      body: formData,
+    });
   },
 
   // ── RSVP — uses Django's auto-created chat_show_users_attending junction table ──
