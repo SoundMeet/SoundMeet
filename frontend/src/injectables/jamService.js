@@ -224,31 +224,57 @@ export const jamService = {
         ? new Date(`${form.date}T${form.startTime}`).toISOString()
         : null;
 
+    const endDateTime =
+      form.date && form.endTime
+        ? new Date(`${form.date}T${form.endTime}`).toISOString()
+        : null;
+
     const location =
       form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null
         ? `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`
         : null;
 
-    const payload = {
-      name: form.title?.trim(),
-      date_time: dateTime,
-      location: location,
-      description: form.description?.trim() || '',
-      jam_type: form.jamType || 'OPEN JAM',
-      skill_level: form.skillLevel || 'ALL LEVELS',
-      access: !form.isPrivate, 
-      
-      genre_ids: form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []),
-      vibe_ids: form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []),
-      instruments_needed_ids: form.instruments?.presetIds || [],
-      roles_needed_ids: form.roles?.presetIds || [],
-      gear_provided_ids: form.gearProvided?.presetIds || [],
-      gear_needed_ids: form.gearNeeded?.presetIds || []
-    };
+    const formData = new FormData();
+
+    if (form.title) formData.append('name', form.title.trim());
+    if (dateTime) formData.append('date_time', dateTime);
+    if (endDateTime) formData.append('end_time', endDateTime);
+    if (location) formData.append('location', location);
+    
+    if (form.placeName) formData.append('location_name', form.placeName);
+    if (form.fullAddress) formData.append('location_address', form.fullAddress);
+    if (form.extraDirections) formData.append('location_guide', form.extraDirections);
+
+    formData.append('description', form.description?.trim() || '');
+    formData.append('jam_type', form.jamType || 'OPEN JAM');
+    formData.append('skill_level', form.skillLevel || 'ALL LEVELS');
+    formData.append('access', !form.isPrivate);
+
+    if (form.coverImage) {
+      formData.append('cover_image', form.coverImage);
+    }
+
+    const genreIds = form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []);
+    genreIds.forEach(id => formData.append('genre_ids', id));
+
+    const vibeIds = form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []);
+    vibeIds.forEach(id => formData.append('vibe_ids', id));
+
+    const instrumentsNeeded = form.instruments?.presetIds || [];
+    instrumentsNeeded.forEach(id => formData.append('instruments_needed_ids', id));
+
+    const rolesNeeded = form.roles?.presetIds || [];
+    rolesNeeded.forEach(id => formData.append('roles_needed_ids', id));
+
+    const gearProvided = form.gearProvided?.presetIds || [];
+    gearProvided.forEach(id => formData.append('gear_provided_ids', id));
+
+    const gearNeeded = form.gearNeeded?.presetIds || [];
+    gearNeeded.forEach(id => formData.append('gear_needed_ids', id));
 
     const response = await apiFetch('api/jams/create/', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     return response;
