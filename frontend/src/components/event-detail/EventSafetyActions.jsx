@@ -13,9 +13,9 @@ const EventSafetyActions = ({ item }) => {
   const updatedAt = item?.updatedAt ?? null;
 
   return (
-    <div className="px-7 py-4 flex items-center justify-between">
+    <div className="px-7 pt-0.5 pb-2.5 flex items-center gap-4">
       <button
-        className="flex items-center gap-1.5 text-[11px] text-neutral-600 hover:text-neutral-400 transition-colors duration-150"
+        className="flex items-center gap-1 text-[10px] text-neutral-700 hover:text-neutral-500 transition-colors duration-150"
         onClick={() => {
           /* TODO: open report flow when moderation backend is ready */
         }}
@@ -25,7 +25,7 @@ const EventSafetyActions = ({ item }) => {
       </button>
 
       {updatedAt && (
-        <span className="text-[11px] text-neutral-700">
+        <span className="text-[10px] text-neutral-700">
           Updated {updatedAt}
         </span>
       )}

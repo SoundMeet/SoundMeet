@@ -1,29 +1,42 @@
 import { useState } from "react";
 
-const MAX_COLLAPSED_LINES = 4;
-// Approximate character threshold before showing expand toggle
-const EXPAND_THRESHOLD = 220;
+// Descriptions at or under this length render as a compact secondary line
+const SHORT_THRESHOLD = 160;
+// Descriptions over this length get a collapse toggle
+const EXPAND_THRESHOLD = 280;
 
 /**
- * EventDescriptionSection — description text with expand/collapse for long content.
+ * EventDescriptionSection — description text with progressive disclosure.
+ *   - Short  (≤ 160 chars): compact inline, visually secondary, no toggle
+ *   - Medium (161–280 chars): full text, no toggle
+ *   - Long   (> 280 chars):  clamped with expand/collapse
  */
 const EventDescriptionSection = ({ description }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (!description) return null;
 
+  const isShort = description.length <= SHORT_THRESHOLD;
   const isLong = description.length > EXPAND_THRESHOLD;
-  const showExpand = isLong && !expanded;
+  const showClamp = isLong && !expanded;
+
+  if (isShort) {
+    return (
+      <div className="px-7 pb-3">
+        <p className="text-[13px] text-neutral-500 leading-relaxed">{description}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="px-7 py-5">
+    <div className="px-7 pb-4">
       <p
         className="text-sm text-neutral-300 leading-relaxed"
         style={
-          showExpand
+          showClamp
             ? {
                 display: "-webkit-box",
-                WebkitLineClamp: MAX_COLLAPSED_LINES,
+                WebkitLineClamp: 4,
                 WebkitBoxOrient: "vertical",
                 overflow: "hidden",
               }
