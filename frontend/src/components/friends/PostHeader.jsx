@@ -12,24 +12,33 @@ const TYPE_BADGE = {
 }
 
 function formatTimestamp(isoString) {
+  // Guard: missing or invalid timestamps throw RangeError in Safari's Intl
+  if (!isoString) return { label: 'just now', full: '' }
   const date = new Date(isoString)
+  if (isNaN(date.getTime())) return { label: 'just now', full: '' }
+
   const diff = Date.now() - date.getTime()
   const mins = Math.floor(diff / 60000)
 
-  const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  const full = date.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: 'numeric', minute: '2-digit',
-  })
+  try {
+    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    const full = date.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    })
 
-  if (mins < 1)  return { label: 'just now',             full }
-  if (mins < 60) return { label: `${mins}m ago · ${timeStr}`, full }
+    if (mins < 1)  return { label: 'just now',                   full }
+    if (mins < 60) return { label: `${mins}m ago · ${timeStr}`,  full }
 
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)  return { label: `${hrs}h ago · ${timeStr}`,  full }
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24)  return { label: `${hrs}h ago · ${timeStr}`,   full }
 
-  const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return { label: `${dateStr} · ${timeStr}`, full }
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return { label: `${dateStr} · ${timeStr}`, full }
+  } catch {
+    // Fallback for environments where Intl throws on edge-case dates
+    return { label: 'just now', full: '' }
+  }
 }
 
 export function PostHeader({ author, createdAt, location, postType, isOwn, onEdit, onDelete }) {

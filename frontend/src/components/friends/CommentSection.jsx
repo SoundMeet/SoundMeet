@@ -4,7 +4,10 @@ import { MdSend } from 'react-icons/md'
 import { useAuth } from '../../injectables/Auth'
 
 function timeAgo(iso) {
-  const diff = Date.now() - new Date(iso).getTime()
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const diff = Date.now() - d.getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m`

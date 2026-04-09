@@ -4,6 +4,12 @@ export function FriendRequestCard({ request }) {
   const { acceptRequest, declineRequest } = useNotifications()
   const { fromUser } = request
 
+  // fromUser is null when the sender's account no longer exists in the DB.
+  // Rendering the card would immediately throw on fromUser.avatarUrl.
+  if (!fromUser) return null
+
+  const instruments = fromUser.instruments ?? []
+
   return (
     <div
       className="rounded-xl p-3 flex flex-col gap-2.5 transition-all duration-200 hover:border-white/[0.13] hover:bg-white/[0.04]"
@@ -11,18 +17,29 @@ export function FriendRequestCard({ request }) {
     >
       {/* User info */}
       <div className="flex items-center gap-2.5">
-        <img
-          src={fromUser.avatarUrl}
-          alt={fromUser.displayName}
-          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-          style={{ background: '#222' }}
-        />
+        {fromUser.avatarUrl ? (
+          <img
+            src={fromUser.avatarUrl}
+            alt={fromUser.displayName}
+            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+            style={{ background: '#222' }}
+          />
+        ) : (
+          <div
+            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
+            style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.5), rgba(251,64,64,0.3))' }}
+          >
+            {fromUser.displayName?.[0]?.toUpperCase() ?? '?'}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white truncate">{fromUser.displayName}</p>
-          <p className="text-[11px] truncate" style={{ color: 'rgba(229,226,225,0.4)' }}>
-            {fromUser.instruments.join(' · ')}
-          </p>
-          {fromUser.mutualFriendsCount > 0 && (
+          {instruments.length > 0 && (
+            <p className="text-[11px] truncate" style={{ color: 'rgba(229,226,225,0.4)' }}>
+              {instruments.join(' · ')}
+            </p>
+          )}
+          {(fromUser.mutualFriendsCount ?? 0) > 0 && (
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(229,226,225,0.3)' }}>
               {fromUser.mutualFriendsCount} mutual friend{fromUser.mutualFriendsCount !== 1 ? 's' : ''}
             </p>

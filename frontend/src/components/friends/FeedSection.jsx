@@ -371,16 +371,22 @@ export function FeedSection({ feedTab = 'forYou' }) {
   const [activeFilter, setActiveFilter] = useState('all')
   const [searchQuery,  setSearchQuery]  = useState('')
 
-  const [posts, setPosts]       = useState([])
+  const [posts, setPosts]         = useState([])
   const [loadError, setLoadError] = useState(null)
+  const [loading, setLoading]     = useState(true)
 
   const loadPosts = useCallback(() => {
+    setLoading(true)
     postService.getFeed(user?.id)
-      .then(setPosts)
+      .then((rows) => {
+        setPosts(rows)
+        setLoadError(null)
+      })
       .catch((err) => {
-        console.error('Failed to load posts:', err?.message ?? err)
+        console.error('[FeedSection] Failed to load posts:', err?.message ?? err)
         setLoadError(`Could not load posts: ${err?.message ?? 'unknown error'}`)
       })
+      .finally(() => setLoading(false))
   }, [user?.id])
 
   useEffect(() => { loadPosts() }, [loadPosts])
@@ -514,6 +520,13 @@ export function FeedSection({ feedTab = 'forYou' }) {
       {/* Posts */}
       {loadError ? (
         <p className="text-sm text-center py-12" style={{ color: 'rgba(251,64,64,0.7)' }}>{loadError}</p>
+      ) : loading ? (
+        <div className="flex flex-col items-center py-16 gap-2">
+          <div
+            className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'rgba(220,46,115,0.4)', borderTopColor: 'transparent' }}
+          />
+        </div>
       ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <span className="text-3xl">🎵</span>

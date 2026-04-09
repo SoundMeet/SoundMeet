@@ -12,15 +12,18 @@ import { PostActions } from './PostActions'
 import { CommentSection } from './CommentSection'
 
 function normalizeComment(c) {
+  // Supabase can return [null] for empty one-to-many joins in some PostgREST versions.
+  // Guard here so a null entry doesn't throw during the useState initializer.
+  if (!c) return null
   return {
-    id:        c.id,
+    id:        c.id ?? `unknown-${Math.random()}`,
     author: {
-      id:          c.author?.id,
+      id:          c.author?.id ?? null,
       displayName: c.author?.username ?? 'Unknown',
       avatarUrl:   null,
     },
-    content:   c.content,
-    createdAt: c.created_at,
+    content:   c.content ?? '',
+    createdAt: c.created_at ?? null,
   }
 }
 
@@ -37,7 +40,7 @@ export function FeedPost({ post }) {
   const [commentsOpen, setComments]     = useState(false)
   const [commentCount, setCommentCount] = useState(comments)
   const [localComments, setLocalComments] = useState(
-    () => (post._rawComments ?? []).map(normalizeComment)
+    () => (post._rawComments ?? []).map(normalizeComment).filter(Boolean)
   )
   const editRef = useRef(null)
 

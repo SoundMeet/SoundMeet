@@ -72,12 +72,15 @@ function playChime() {
 
 function buildFromUser(rawUser) {
   if (!rawUser) return null
-  const profile = rawUser.chat_profile
+  // Supabase returns one-to-many nested joins as arrays — unwrap first element.
+  const rawProfile = rawUser.chat_profile
+  const profile = Array.isArray(rawProfile) ? (rawProfile[0] ?? null) : rawProfile
   return {
     id: rawUser.id,
     username: rawUser.username || '',
     displayName: profile?.display_name || rawUser.username || 'Someone',
     avatarUrl: profile?.pfp || null,
+    instruments: [],
   }
 }
 
