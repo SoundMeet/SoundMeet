@@ -219,11 +219,16 @@ def create_jam(request):
         admin=request.user,
         name=data.get('name'),
         date_time=data.get('date_time'),
+        end_time=data.get('end_time'),  # Added end_time
         location=jam_location,
+        location_name=data.get('location_name'),
+        location_address=data.get('location_address'),
+        location_guide=data.get('location_guide'),
         description=data.get('description', ''),
         jam_type=data.get('jam_type', 'OPEN JAM'),
         skill_level=data.get('skill_level', 'ALL LEVELS'),
         access=str(data.get('access')).lower() == 'true',
+        cover_image=request.FILES.get('cover_image')
     )
     jam.users_attending.add(request.user)
     

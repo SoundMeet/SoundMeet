@@ -99,8 +99,15 @@ class Jam(models.Model):
         ALL_LEVELS = 'ALL LEVELS'
 
     name = models.CharField(max_length=100)
+    
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    location_name = models.CharField(max_length=255, blank=True, null=True)
+    location_address = models.CharField(max_length=255, blank=True, null=True)
+    location_guide = models.TextField(blank=True, null=True)
+    
     date_time = models.DateTimeField()
+    end_time = models.DateTimeField(blank=True, null=True)
+    
     description = models.TextField(blank=True, null=True)
     cover_image = models.ImageField(upload_to='jam_images/', blank=True, null=True)
     
