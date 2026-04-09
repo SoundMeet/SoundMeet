@@ -135,12 +135,26 @@ class Jam(models.Model):
 
 class Show(models.Model):
     name = models.CharField(max_length=150)
+    
     date_time = models.DateTimeField()
+    end_time = models.DateTimeField(blank=True, null=True)
+    
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    location_name = models.CharField(max_length=255, blank=True, null=True)
+    location_address = models.CharField(max_length=500, blank=True, null=True)
+    location_guide = models.TextField(blank=True, null=True)
+    
     description = models.TextField(blank=True, null=True)
     admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name="admin_shows")
-    genre = models.ForeignKey(Genre, on_delete=models.SET_NULL, null=True)
+    
+    genres = models.ManyToManyField(Genre, blank=True)
+    
     ticket_link = models.URLField(blank=True, null=True)
+    ticket_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    max_capacity = models.PositiveIntegerField(blank=True, null=True)
+    access = models.BooleanField(default=True, help_text="True means public, False means private")
+    lineup = models.JSONField(blank=True, null=True)
+    
     cover_image = models.ImageField(upload_to='show_images/', blank=True, null=True)
     users_attending = models.ManyToManyField(User, blank=True, related_name="attending_shows")
 

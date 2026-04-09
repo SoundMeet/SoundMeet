@@ -11,12 +11,20 @@ export const showService = {
         id,
         name,
         date_time,
+        end_time,
         location,
+        location_name,
+        location_address,
+        location_guide,
         description,
         ticket_link,
+        ticket_price,
+        max_capacity,
+        access,
+        lineup,
         cover_image,
         admin:admin_id ( id, username ),
-        genre:genre_id ( id, name )
+        genres:chat_show_genres ( genre:chat_genre ( id, name ) )
       `)
       .gte('date_time', new Date().toISOString())
       .order('date_time', { ascending: true });
@@ -25,7 +33,8 @@ export const showService = {
 
     return (data ?? []).map(show => ({
       ...show,
-      coordinates: parseEWKBPoint(show.location)
+      coordinates: parseEWKBPoint(show.location),
+      genres: show.genres?.map(g => g.genre) || []
     }));
   },
 
@@ -41,14 +50,30 @@ export const showService = {
       formData.append("date_time", dateTime);
     }
     
+    if (form.date && form.endTime) {
+      const endDateTime = new Date(`${form.date}T${form.endTime}`).toISOString();
+      formData.append("end_time", endDateTime);
+    }
+    
     if (form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null) {
       const wkt = `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`;
       formData.append("location", wkt);
     }
+
+    if (form.placeName) formData.append("location_name", form.placeName);
+    if (form.fullAddress) formData.append("location_address", form.fullAddress);
+    if (form.extraDirections) formData.append("location_guide", form.extraDirections);
+
+    if (form.ticketPrice) formData.append("ticket_price", form.ticketPrice);
+    if (form.maxCapacity) formData.append("max_capacity", form.maxCapacity);
+    if (form.isPrivate !== undefined) formData.append("access", !form.isPrivate);
     
-    if (form.genres?.presetIds?.length > 0) {
-      formData.append("genre_id", form.genres.presetIds[0]);
+    if (form.lineup) {
+      formData.append("lineup", JSON.stringify(form.lineup));
     }
+    
+    const genreIds = form.genres?.presetIds || [];
+    genreIds.forEach(id => formData.append('genre_ids', id));
     
     if (form.coverImage instanceof File) {
       formData.append("cover_image", form.coverImage);
@@ -68,7 +93,7 @@ export const showService = {
       .select(`
         *,
         admin:admin_id ( id, username ),
-        genre:genre_id ( id, name )
+        genres:chat_show_genres ( genre:chat_genre ( id, name ) )
       `)
       .eq('id', showId)
       .single();
@@ -77,7 +102,8 @@ export const showService = {
     
     return {
       ...data,
-      coordinates: parseEWKBPoint(data.location)
+      coordinates: parseEWKBPoint(data.location),
+      genres: data.genres?.map(g => g.genre) || []
     };
   }
 };

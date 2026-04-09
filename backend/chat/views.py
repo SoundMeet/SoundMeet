@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+import json
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -281,19 +282,29 @@ def create_show(request):
     location_wkt = data.get('location')
     show_location = GEOSGeometry(location_wkt) if location_wkt else None
     
-    genre_id = data.get('genre_id')
-    genre_instance = None
-    if genre_id and str(genre_id).isdigit():
-        genre_instance = Genre.objects.filter(id=int(genre_id)).first()
-        
+    lineup_data = None
+    raw_lineup = data.get('lineup')
+    if raw_lineup:
+        try:
+            lineup_data = json.loads(raw_lineup)
+        except json.JSONDecodeError:
+            pass
+            
     show = Show.objects.create(
         admin=request.user,
         name=data.get('name'),
         date_time=data.get('date_time'),
+        end_time=data.get('end_time'),
         location=show_location,
+        location_name=data.get('location_name'),
+        location_address=data.get('location_address'),
+        location_guide=data.get('location_guide'),
         description=data.get('description', ''),
         ticket_link=data.get('ticket_link', ''),
-        genre=genre_instance,
+        ticket_price=data.get('ticket_price') or None,
+        max_capacity=data.get('max_capacity') or None,
+        access=str(data.get('access', 'true')).lower() == 'true',
+        lineup=lineup_data,
         cover_image=request.FILES.get('cover_image')
     )
     show.users_attending.add(request.user)
@@ -301,6 +312,11 @@ def create_show(request):
     chat_room = Conversation.objects.create(show=show)
     chat_room.participants.add(request.user)
     
+    genre_ids = data.getlist('genre_ids') if hasattr(data, 'getlist') else data.get('genre_ids', [])
+    if genre_ids and genre_ids != [''] and genre_ids != "":
+        valid_ids = [int(i) for i in genre_ids if str(i).isdigit()]
+        show.genres.set(valid_ids)
+        
     return Response({'status': 'Show created successfully', 'show_id': show.id})
 
 @api_view(['POST'])
