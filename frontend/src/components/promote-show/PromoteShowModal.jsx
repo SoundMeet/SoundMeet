@@ -16,6 +16,7 @@ import { useFormOptions } from "../../hooks/useFormOptions";
 const PromoteShowModal = ({
   open,
   onOpenChange,
+  initialValues,
 }) => {
   const { options, isLoading } = useFormOptions()
   return (
@@ -67,6 +68,7 @@ const PromoteShowModal = ({
               key={open ? "open" : "closed"}
               options={options}
               onClose={() => onOpenChange(false)}
+              initialValues={initialValues}
             />
           )}
         </motion.div>

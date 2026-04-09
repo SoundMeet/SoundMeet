@@ -111,6 +111,14 @@ export function normalizeJamRow(row, userLocation = null) {
   const gearProvidedNames   = (row.gear_provided ?? []).map((g) => g.gear?.name).filter(Boolean);
   const gearNeededNames     = (row.gear_needed ?? []).map((g) => g.gear?.name).filter(Boolean);
 
+  // IDs — needed to pre-populate the edit form's TagGroup presetIds
+  const genreIds        = (row.genres ?? []).map((g) => g.genre?.id).filter(Boolean).map(String);
+  const vibeIds         = (row.vibes ?? []).map((v) => v.vibe?.id).filter(Boolean).map(String);
+  const instrumentIds   = (row.instruments_needed ?? []).map((i) => i.instrument?.id).filter(Boolean).map(String);
+  const roleIds         = (row.roles_needed ?? []).map((r) => r.role?.id).filter(Boolean).map(String);
+  const gearProvidedIds = (row.gear_provided ?? []).map((g) => g.gear?.id).filter(Boolean).map(String);
+  const gearNeededIds   = (row.gear_needed ?? []).map((g) => g.gear?.id).filter(Boolean).map(String);
+
   const formattedDate = formatDateTime(row.date_time);
   const timeSlot = computeTimeSlot(row.date_time);
 
@@ -169,6 +177,13 @@ export function normalizeJamRow(row, userLocation = null) {
     // Gear
     gearProvidedItems: gearProvidedNames,
     gearNeededItems: gearNeededNames,
+    // IDs for edit form pre-population
+    genreIds,
+    vibeIds,
+    instrumentIds,
+    roleIds,
+    gearProvidedIds,
+    gearNeededIds,
     // Privacy / access
     isPrivate: !isPublic,
     access: isPublic,
@@ -340,6 +355,65 @@ export const jamService = {
     });
 
     return response;
+  },
+
+  async updateJam(jamId, form) {
+    const dateTime =
+      form.date && form.startTime
+        ? new Date(`${form.date}T${form.startTime}`).toISOString()
+        : null;
+
+    const endDateTime =
+      form.date && form.endTime
+        ? new Date(`${form.date}T${form.endTime}`).toISOString()
+        : null;
+
+    const location =
+      form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null
+        ? `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`
+        : null;
+
+    const formData = new FormData();
+
+    if (form.title)                       formData.append('name', form.title.trim());
+    if (dateTime)                         formData.append('date_time', dateTime);
+    formData.append('end_time', endDateTime ?? '');
+    if (location)                         formData.append('location', location);
+    if (form.selectedPlace?.placeName)    formData.append('location_name', form.selectedPlace.placeName);
+    if (form.selectedPlace?.address)      formData.append('location_address', form.selectedPlace.address);
+    formData.append('location_guide', form.locationGuide?.trim() || '');
+    formData.append('description', form.description?.trim() || '');
+
+    const jamType = form.jamTypes?.presetIds?.[0] ?? form.jamTypes?.customValues?.[0] ?? 'OPEN JAM';
+    formData.append('jam_type', jamType);
+    formData.append('skill_level', form.skillLevel || 'ALL LEVELS');
+    formData.append('access', !form.isPrivate);
+    formData.append('max_attendees', form.maxParticipants ? parseInt(form.maxParticipants, 10) : '');
+
+    if (form.coverImage?.file) formData.append('cover_image', form.coverImage.file);
+
+    const genreIds = form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []);
+    genreIds.forEach(id => formData.append('genre_ids', id));
+
+    const vibeIds = form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []);
+    vibeIds.forEach(id => formData.append('vibe_ids', id));
+
+    const instrumentsNeeded = form.isOpenToAllInstruments ? [] : (form.instrumentsNeeded?.presetIds || []);
+    instrumentsNeeded.forEach(id => formData.append('instruments_needed_ids', id));
+
+    const rolesNeeded = form.rolesNeeded?.presetIds || [];
+    rolesNeeded.forEach(id => formData.append('roles_needed_ids', id));
+
+    const gearProvided = form.equipmentAvailable?.presetIds || [];
+    gearProvided.forEach(id => formData.append('gear_provided_ids', id));
+
+    const gearNeeded = form.equipmentNeeded?.presetIds || [];
+    gearNeeded.forEach(id => formData.append('gear_needed_ids', id));
+
+    return await apiFetch(`api/jams/${jamId}/update/`, {
+      method: 'PATCH',
+      body: formData,
+    });
   },
 
   async deleteJam(jamId) {

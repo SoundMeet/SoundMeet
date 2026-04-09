@@ -900,6 +900,7 @@ const MyJams = () => {
   // Modal state
   const [discoveryModal,  setDiscoveryModal]  = useState({ open: false, item: null, openedFrom: null })
   const [editingJam,      setEditingJam]      = useState(null)
+  const [editingShow,     setEditingShow]     = useState(null)
   const [createOpen,      setCreateOpen]      = useState(false)
   const [promoteShowOpen, setPromoteShowOpen] = useState(false)
   const [joinJamModal,    setJoinJamModal]    = useState({ open: false, jam: null })
@@ -1016,18 +1017,85 @@ const MyJams = () => {
   }
 
   const handleEditItem = (item) => {
-    if (item?.type === 'promote_show') return // Show editing not yet supported
+    if (item?.type === 'promote_show') {
+      setEditingShow(item)
+      setPromoteShowOpen(true)
+      return
+    }
     setEditingJam(item)
     setCreateOpen(true)
   }
 
-  const editInitialValues = editingJam ? {
-    title:          editingJam.title ?? '',
-    description:    editingJam.description ?? '',
-    isPrivate:      editingJam.isPrivate ?? false,
-    maxParticipants:editingJam.maxParticipants != null ? String(editingJam.maxParticipants) : '',
-    locationQuery:  editingJam.locationName ?? editingJam.location ?? editingJam.subtitle ?? '',
-  } : undefined
+  const editInitialValues = (() => {
+    if (!editingJam) return undefined;
+    const dt  = editingJam.dateTimeRaw    ? new Date(editingJam.dateTimeRaw)    : null;
+    const edt = editingJam.endDateTimeRaw ? new Date(editingJam.endDateTimeRaw) : null;
+    const pad = (n) => String(n).padStart(2, '0');
+    const toDate = (d) => d ? `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` : '';
+    const toTime = (d) => d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
+    return {
+      jamId:           editingJam.id,
+      title:           editingJam.title ?? '',
+      description:     editingJam.description ?? '',
+      isPrivate:       editingJam.isPrivate ?? false,
+      maxParticipants: editingJam.capacity != null ? String(editingJam.capacity) : '',
+      date:            toDate(dt),
+      startTime:       toTime(dt),
+      endTime:         toTime(edt),
+      locationQuery:   editingJam.locationName ?? '',
+      selectedPlace:   editingJam.coordinates ? {
+        placeName: editingJam.locationName ?? '',
+        address:   editingJam.locationAddress ?? '',
+        latitude:  editingJam.coordinates.latitude,
+        longitude: editingJam.coordinates.longitude,
+      } : null,
+      locationGuide:          editingJam.locationGuide ?? '',
+      genres:                 { presetIds: editingJam.genreIds ?? [],        customValues: [] },
+      vibes:                  { presetIds: editingJam.vibeIds ?? [],         customValues: [] },
+      instrumentsNeeded:      { presetIds: editingJam.instrumentIds ?? [],   customValues: [] },
+      rolesNeeded:            { presetIds: editingJam.roleIds ?? [],         customValues: [] },
+      equipmentAvailable:     { presetIds: editingJam.gearProvidedIds ?? [], customValues: [] },
+      equipmentNeeded:        { presetIds: editingJam.gearNeededIds ?? [],   customValues: [] },
+      jamTypes:               { presetIds: editingJam.jamType ? [editingJam.jamType] : [], customValues: [] },
+      skillLevel:             editingJam.skillLevel ?? null,
+      isOpenToAllGenres:      false,
+      isOpenToAllVibes:       false,
+      isOpenToAllInstruments: false,
+      coverImage:             null,
+    };
+  })()
+
+  const editShowInitialValues = (() => {
+    if (!editingShow) return undefined;
+    const dt  = editingShow.dateTimeRaw    ? new Date(editingShow.dateTimeRaw)    : null;
+    const edt = editingShow.endDateTimeRaw ? new Date(editingShow.endDateTimeRaw) : null;
+    const pad = (n) => String(n).padStart(2, '0');
+    const toDate = (d) => d ? `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` : '';
+    const toTime = (d) => d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
+    return {
+      showId:        editingShow.id,
+      title:         editingShow.title ?? '',
+      description:   editingShow.description ?? '',
+      isPrivate:     editingShow.isPrivate ?? false,
+      maxCapacity:   editingShow.capacity != null ? String(editingShow.capacity) : '',
+      date:          toDate(dt),
+      startTime:     toTime(dt),
+      endTime:       toTime(edt),
+      locationQuery: editingShow.locationName ?? '',
+      selectedPlace: editingShow.coordinates ? {
+        placeName: editingShow.locationName ?? '',
+        address:   editingShow.locationAddress ?? '',
+        latitude:  editingShow.coordinates.latitude,
+        longitude: editingShow.coordinates.longitude,
+      } : null,
+      locationGuide: editingShow.locationGuide ?? '',
+      genres:        { selectedIds: editingShow.genreIds ?? [], customValues: [] },
+      ticketPrice:   editingShow.ticketPrice != null ? String(editingShow.ticketPrice) : '',
+      ticketLink:    editingShow.ticketLink ?? '',
+      lineup:        editingShow.lineup ?? [],
+      coverImage:    editingShow.coverImageUrl ? { file: null, previewUrl: editingShow.coverImageUrl } : null,
+    };
+  })()
 
   // ── Search filter ────────────────────────────────────────────
 
@@ -1243,7 +1311,11 @@ const MyJams = () => {
         }}
         onEdit={(item) => {
           setDiscoveryModal({ open: false, item: null, openedFrom: null })
-          if (item?.type === 'promote_show') return // Show editing not yet supported
+          if (item?.type === 'promote_show') {
+            setEditingShow(item)
+            setPromoteShowOpen(true)
+            return
+          }
           setEditingJam(item)
           setCreateOpen(true)
         }}
@@ -1295,8 +1367,9 @@ const MyJams = () => {
         open={promoteShowOpen}
         onOpenChange={(open) => {
           setPromoteShowOpen(open)
-          if (!open) loadTab(activeTab)
+          if (!open) { setEditingShow(null); loadTab(activeTab) }
         }}
+        initialValues={editShowInitialValues}
       />
 
     </div>
