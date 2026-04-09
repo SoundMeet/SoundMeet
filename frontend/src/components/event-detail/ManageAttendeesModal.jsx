@@ -35,6 +35,19 @@ const PackageIcon = () => (
   </svg>
 );
 
+const MusicIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 18V5l12-2v13" />
+    <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+  </svg>
+);
+
+const StarIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
+
 // ─── Avatar block ─────────────────────────────────────────────────────────────
 
 const AttendeeAvatar = ({ name, pfp, accent, isHost }) => {
@@ -64,9 +77,36 @@ const AttendeeAvatar = ({ name, pfp, accent, isHost }) => {
 
 // ─── Single attendee row ──────────────────────────────────────────────────────
 
+// Reusable pill row — icon + list of labels, or "Nothing listed" if empty
+const PillRow = ({ icon, items }) => (
+  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+    <span style={{ color: "rgba(229,226,225,0.2)", flexShrink: 0, display: "flex" }}>
+      {icon}
+    </span>
+    {items?.length > 0 ? (
+      items.map((label) => (
+        <span
+          key={label}
+          className="text-[11px] px-2 py-0.5 rounded-full"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            color: "rgba(229,226,225,0.55)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          {label}
+        </span>
+      ))
+    ) : (
+      <span className="text-[11px] italic" style={{ color: "rgba(229,226,225,0.22)" }}>
+        Nothing listed
+      </span>
+    )}
+  </div>
+);
+
 const AttendeeRow = ({ attendee, adminId, accent }) => {
   const isHost = String(attendee.userId) === String(adminId);
-  const hasGear = attendee.gearBringing?.length > 0;
 
   return (
     <div className="flex items-start gap-3 py-3">
@@ -97,34 +137,9 @@ const AttendeeRow = ({ attendee, adminId, accent }) => {
           )}
         </div>
 
-        {/* Gear bringing */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <PackageIcon
-            style={{ color: "rgba(229,226,225,0.2)", flexShrink: 0 }}
-          />
-          {hasGear ? (
-            attendee.gearBringing.map((g) => (
-              <span
-                key={g}
-                className="text-[11px] px-2 py-0.5 rounded-full"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  color: "rgba(229,226,225,0.55)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                {g}
-              </span>
-            ))
-          ) : (
-            <span
-              className="text-[11px] italic"
-              style={{ color: "rgba(229,226,225,0.22)" }}
-            >
-              Nothing listed
-            </span>
-          )}
-        </div>
+        <PillRow icon={<MusicIcon />}   items={attendee.instrumentsBringing} />
+        <PillRow icon={<StarIcon />}    items={attendee.rolesBringing} />
+        <PillRow icon={<PackageIcon />} items={attendee.gearBringing} />
       </div>
     </div>
   );
@@ -156,8 +171,16 @@ export function ManageAttendeesModal({ open, onClose, item, accent }) {
       .getJamAttendees(item.id)
       .then((list) => {
         if (cancelled) return;
+        // Host gear always comes from the jam's gear_provided (what they said is available at the jam)
+        const withHostGear = list.map((a) => {
+          if (String(a.userId) === String(item.admin_id)) {
+            return { ...a, gearBringing: item.gearProvidedItems ?? [] };
+          }
+          return a;
+        });
         // Host first, then alphabetical
-        const sorted = [...list].sort((a, b) => {
+        const sorted = [...withHostGear].sort((a, b) => {
+
           const aHost = String(a.userId) === String(item.admin_id);
           const bHost = String(b.userId) === String(item.admin_id);
           if (aHost && !bHost) return -1;

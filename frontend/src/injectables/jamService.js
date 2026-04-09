@@ -398,12 +398,39 @@ export const jamService = {
 
   /**
    * Join a public jam: add the user to the attendees list and the jam's chat.
+   * Resolves preset IDs to names and persists instruments, roles, and gear.
    * Returns the conversation ID so callers can navigate to the chat if needed.
    */
-  async joinJam(jamId, userId) {
+  async joinJam(jamId, userId, payload = {}) {
+    const {
+      instrumentIds = [], customInstruments = [],
+      roleIds = [],       customRoles = [],
+      gearIds = [],       customGear = [],
+    } = payload;
+
+    // Resolve all preset IDs → names in parallel
+    const [instrumentRows, roleRows, gearRows] = await Promise.all([
+      instrumentIds.length
+        ? supabase.from('chat_instrument').select('name').in('id', instrumentIds.map(Number)).then(r => r.data ?? [])
+        : Promise.resolve([]),
+      roleIds.length
+        ? supabase.from('chat_role').select('name').in('id', roleIds.map(Number)).then(r => r.data ?? [])
+        : Promise.resolve([]),
+      gearIds.length
+        ? supabase.from('chat_gear').select('name').in('id', gearIds.map(Number)).then(r => r.data ?? [])
+        : Promise.resolve([]),
+    ]);
+
+    const instruments_bringing = [...instrumentRows.map(r => r.name), ...customInstruments];
+    const roles_bringing       = [...roleRows.map(r => r.name),       ...customRoles];
+    const gear_bringing        = [...gearRows.map(r => r.name),       ...customGear];
+
     const { error } = await supabase
       .from('chat_jam_users_attending')
-      .upsert({ jam_id: Number(jamId), user_id: userId }, { onConflict: 'jam_id,user_id' });
+      .upsert(
+        { jam_id: Number(jamId), user_id: userId, instruments_bringing, roles_bringing, gear_bringing },
+        { onConflict: 'jam_id,user_id' }
+      );
     if (error) throw error;
 
     const conversationId = await chatService.getOrCreateJamChat(Number(jamId), userId);
@@ -411,21 +438,26 @@ export const jamService = {
   },
 
   /**
-   * Fetch the attendee list for a jam, enriched with profile data.
+   * Fetch the attendee list for a jam, enriched with profile data, instruments, roles, and gear.
    * Returns an array of attendee objects shaped for the ManageAttendeesModal.
-   *
-   * gearBringing is stubbed as [] until a per-attendee gear table exists.
    */
   async getJamAttendees(jamId) {
-    // 1. Get user IDs attending this jam
+    // 1. Get attending rows including all per-attendee selections
     const { data: rows, error: attErr } = await supabase
       .from('chat_jam_users_attending')
-      .select('user_id')
+      .select('user_id, instruments_bringing, roles_bringing, gear_bringing')
       .eq('jam_id', Number(jamId));
     if (attErr) throw attErr;
     if (!rows?.length) return [];
 
     const userIds = rows.map((r) => r.user_id);
+    const selectionMap = Object.fromEntries(
+      rows.map((r) => [String(r.user_id), {
+        instruments: r.instruments_bringing ?? [],
+        roles:       r.roles_bringing       ?? [],
+        gear:        r.gear_bringing        ?? [],
+      }])
+    );
 
     // 2. Fetch profiles for those users
     const { data: profiles, error: profErr } = await supabase
@@ -439,13 +471,15 @@ export const jamService = {
     );
 
     return userIds.map((uid) => {
-      const p = profileMap[String(uid)];
+      const p   = profileMap[String(uid)];
+      const sel = selectionMap[String(uid)] ?? { instruments: [], roles: [], gear: [] };
       return {
-        userId:      String(uid),
-        displayName: p?.display_name ?? `User #${uid}`,
-        pfp:         p?.pfp ?? null,
-        // Stub: no per-attendee gear table yet — wire up when backend is ready
-        gearBringing: [],
+        userId:               String(uid),
+        displayName:          p?.display_name ?? `User #${uid}`,
+        pfp:                  p?.pfp ?? null,
+        instrumentsBringing:  sel.instruments,
+        rolesBringing:        sel.roles,
+        gearBringing:         sel.gear,
       };
     });
   },
