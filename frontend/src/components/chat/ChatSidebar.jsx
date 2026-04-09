@@ -37,16 +37,16 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
       <NewChatModal open={newChatOpen} onOpenChange={setNewChatOpen} />
       {/* Floating panel */}
       <div
-        className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden bg-[#1C1B1B]/60"
+        className="flex-1 min-h-0 flex flex-col rounded-[28px] overflow-hidden bg-neutral-900/50 border border-white/10"
         style={{
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
         }}
       >
 
         {/* Header */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-3 bg-[#232323]/50 rounded-t-2xl">
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 rounded-t-[28px]">
           <div className="flex items-center justify-between mb-3">
             <span className="font-bold text-lg text-[#E5E2E1]" style={{ fontFamily: 'Sora, sans-serif' }}>
               Chats

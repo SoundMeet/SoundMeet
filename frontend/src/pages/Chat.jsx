@@ -323,7 +323,7 @@ const Chat = () => {
   if (!authLoading && !isLoggedIn) {
     return (
       <div
-        className="flex overflow-hidden bg-[#141414] items-center justify-center"
+        className="flex overflow-hidden items-center justify-center"
         style={{ height: 'calc(100vh - 4rem)' }}
       >
         <div className="text-center px-6">
@@ -355,7 +355,7 @@ const Chat = () => {
   if (authLoading || isLoadingConvs) {
     return (
       <div
-        className="flex overflow-hidden bg-[#141414] items-center justify-center"
+        className="flex overflow-hidden items-center justify-center"
         style={{ height: 'calc(100vh - 4rem)' }}
       >
         <div className="w-8 h-8 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
@@ -366,7 +366,7 @@ const Chat = () => {
   // ─── Main chat layout ────────────────────────────────────────────────────
   return (
     <div
-      className="flex overflow-hidden bg-[#141414]"
+      className="flex overflow-hidden"
       style={{ height: 'calc(100vh - 4rem)' }}
     >
       {isSidebarOpen && (
@@ -398,7 +398,6 @@ const Chat = () => {
 
       <div
         className="flex flex-col flex-1 overflow-hidden"
-        style={{ backgroundColor: '#141414' }}
       >
         <div className="flex items-center lg:hidden px-3 py-1.5 flex-shrink-0">
           <button

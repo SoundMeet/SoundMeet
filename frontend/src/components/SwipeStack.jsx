@@ -310,7 +310,7 @@ export default function SoundMeetDiscovery() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0F0F0F]">
+      <div className="flex items-center justify-center h-screen">
         <Loader2 className="w-8 h-8 text-[#DC2E73] animate-spin" />
       </div>
     );
@@ -318,7 +318,7 @@ export default function SoundMeetDiscovery() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0F0F0F] text-white/40">
+      <div className="flex items-center justify-center h-screen text-white/40">
         Please log in to discover artists.
       </div>
     );

@@ -24,7 +24,6 @@ const MessageList = ({ messages, currentUserId, users }) => {
     <div
       className="flex-1 overflow-y-auto"
       style={{
-        backgroundColor: '#141414',
         padding: '20px 24px 8px',
         scrollbarWidth: 'thin',
         scrollbarColor: 'rgba(255,255,255,0.08) transparent',
