@@ -43,8 +43,6 @@ const CATEGORY_HEADINGS = {
 const Home = () => {
   const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
-  const location = useLocation();
-  const navigate = useNavigate();
 
   // ── Category filter ────────────────────────────────────────────────────────
   // Empty array = "All" (no restriction). Populated = specific categories selected.

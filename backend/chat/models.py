@@ -2,6 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.auth.models import User
 import uuid
 
+
 class Instrument(models.Model):
     class families(models.TextChoices):
         STRINGS = 'STRINGS'
@@ -9,21 +10,16 @@ class Instrument(models.Model):
         BRASS = 'BRASS'
         PERCUSSION = 'PERCUSSION'
         NULL = 'NULL'
-        
+
     name = models.CharField(max_length=100, unique=True)
     family = models.CharField(choices=families.choices, default=families.NULL)
 
     def __str__(self):
         return self.name
 
+
 class Genre(models.Model):
     name = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.name
-
-class Vibe(models.Model):
-    name = models.CharField(blank=True, max_length=100, unique=True)
 
     def __str__(self):
         return self.name
@@ -48,6 +44,12 @@ class Artist(models.Model):
     def __str__(self):
         return self.name
 
+class Vibe(models.Model):
+    name = models.CharField(blank=True, max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
 class Profile(models.Model):
     class genders(models.TextChoices):
         MAN = 'MAN'
@@ -55,11 +57,17 @@ class Profile(models.Model):
         NONBINARY = 'NON-BINARY'
         PREFERNOTTOSAY = 'PREFER NOT TO SAY'
 
+    class SkillLevels(models.TextChoices):
+        BEGINNER = 'beginner'
+        INTERMEDIATE = 'intermediate'
+        ADVANCED = 'advanced'
+        PROFESSIONAL = 'professional'
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     display_name = models.CharField(max_length=15, blank=True)
-    pfp = models.ImageField(upload_to='pfp_images/',blank=True, null=True)
+    pfp = models.ImageField(upload_to='pfp_images/', blank=True, null=True)
     about = models.TextField(max_length=500, blank=True, null=True)
-    
+
     # MetaData
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True)
@@ -68,12 +76,23 @@ class Profile(models.Model):
     age = models.PositiveIntegerField(null=True, blank=True)
     gender = models.CharField(max_length=100, choices=genders.choices, blank=True)
     spectator = models.BooleanField(default=False)
+    onboarding_complete = models.BooleanField(default=False)
+    skill_level = models.CharField(max_length=20, choices=SkillLevels.choices, blank=True, default='')
+
+    # Music links
+    spotify = models.URLField(blank=True, null=True)
+    soundcloud = models.URLField(blank=True, null=True)
+    bandcamp = models.URLField(blank=True, null=True)
+    youtube = models.URLField(blank=True, null=True)
+    instagram = models.URLField(blank=True, null=True)
+    tiktok = models.URLField(blank=True, null=True)
 
     # Relationships
     instruments_liked = models.ManyToManyField(Instrument, related_name="profiles", blank=True)
     genres_liked = models.ManyToManyField(Genre, related_name="profiles", blank=True)
     vibes_liked = models.ManyToManyField(Vibe, related_name="profiles", blank=True)
     friends = models.ManyToManyField(User, blank=True, related_name="friends_of")
+    artists_liked = models.ManyToManyField(Artist, blank=True, related_name='profiles')
 
     @property
     def friends_count(self):
@@ -81,6 +100,7 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+
 
 class Jam(models.Model):
     class JamTypes(models.TextChoices):
@@ -110,23 +130,22 @@ class Jam(models.Model):
     
     description = models.TextField(blank=True, null=True)
     cover_image = models.ImageField(upload_to='jam_images/', blank=True, null=True)
-    
+
     admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name="admin_jams")
     jam_type = models.CharField(max_length=50, choices=JamTypes.choices, default=JamTypes.OPEN_JAM)
     skill_level = models.CharField(max_length=50, choices=SkillLevels.choices, default=SkillLevels.ALL_LEVELS)
     access = models.BooleanField(default=False, help_text="True means public, False means private")
     max_attendees = models.PositiveIntegerField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
-    
     users_attending = models.ManyToManyField(User, blank=True, related_name="attending_jams")
     spectators = models.ManyToManyField(User, blank=True, related_name="spectating_jams")
-    
+
     genre = models.ManyToManyField(Genre, blank=True)
     vibe = models.ManyToManyField(Vibe, blank=True)
-    
+
     instruments_needed = models.ManyToManyField(Instrument, blank=True, related_name="jams_needing_instrument")
     roles_needed = models.ManyToManyField(Role, blank=True, related_name="jams_needing_role")
-    
+
     gear_provided = models.ManyToManyField(Gear, blank=True, related_name="jams_providing_gear")
     gear_needed = models.ManyToManyField(Gear, blank=True, related_name="jams_needing_gear")
 
@@ -171,6 +190,7 @@ class Band(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class BandmateListing(models.Model):
     class Statuses(models.TextChoices):
@@ -219,6 +239,7 @@ class Conversation(models.Model):
         if self.show: return f"Show Chat: {self.show.name}"
         return f"DM: {self.id}"
 
+
 class Message(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
@@ -229,10 +250,10 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['timestamp']
-    
+
     def __str__(self):
         return f"{self.sender.username}: {self.content[:20]}..."
-    
+
 class Post(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
     content = models.TextField(max_length=1000, blank=True, null=True)
@@ -287,10 +308,10 @@ class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
     notification_type = models.CharField(max_length=20, choices=NotificationTypes.choices)
     message = models.CharField(max_length=255)
-    
+
     reference_id = models.IntegerField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
-    
+
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
