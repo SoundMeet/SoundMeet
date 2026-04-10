@@ -10,7 +10,7 @@ from django.db import transaction
 from .models import (
     Profile, Post, Comment, FriendRequest, Notification,
     BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation,
-    Artist, Instrument, Vibe
+    Artist, Instrument, Vibe, MusicSnip
 )
 
 @api_view(['POST'])
@@ -51,6 +51,62 @@ def register_user(request):
         'username': user.username,
     })
 
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def music_snips(request):
+    
+    if request.method == 'GET':
+        profile_id = request.query_params.get('profile_id')
+        
+        if not profile_id:
+            return Response({'error': 'profile_id is required.'}, status=400)
+            
+        snips = MusicSnip.objects.filter(profile_id=profile_id)
+        
+        snips_data = [
+            {
+                'id': snip.id,
+                'name': snip.name,
+                'musicFile': snip.musicFile.url if snip.musicFile else None
+            }
+            for snip in snips
+        ]
+        return Response({'snips': snips_data}, status=200)
+
+    elif request.method == 'PATCH':
+        snip_id = request.data.get('snip_id')
+        
+        if not snip_id:
+            return Response({'error': 'snip_id is required.'}, status=400)
+
+        snip = get_object_or_404(MusicSnip, id=snip_id, profile__user=request.user)
+
+        if 'name' in request.data:
+            snip.name = request.data['name']
+        if 'musicFile' in request.FILES:
+            snip.musicFile = request.FILES['musicFile']
+
+        snip.save()
+
+        return Response({
+            'status': 'Snip updated successfully',
+            'snip': {
+                'id': snip.id,
+                'name': snip.name,
+                'musicFile': snip.musicFile.url if snip.musicFile else None
+            }
+        }, status=200)
+
+    elif request.method == 'DELETE':
+        snip_id = request.data.get('snip_id') or request.query_params.get('snip_id')
+        
+        if not snip_id:
+            return Response({'error': 'snip_id is required.'}, status=400)
+
+        snip = get_object_or_404(MusicSnip, id=snip_id, profile__user=request.user)
+        snip.delete()
+        
+        return Response({'status': 'Music snip deleted successfully.'}, status=204)
 
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])

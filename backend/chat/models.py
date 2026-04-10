@@ -101,6 +101,14 @@ class Profile(models.Model):
     def __str__(self):
         return self.user.username
 
+class MusicSnip(models.Model):
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='audio_snips')
+    name = models.CharField(max_length=100, blank=True, null=True)
+    musicFile = models.FileField(upload_to='audio_snips/', blank=True, null=True)
+
+    def __str__(self):
+        return self.name or f"Audio Snip {self.id}"
+
 
 class Jam(models.Model):
     class JamTypes(models.TextChoices):
