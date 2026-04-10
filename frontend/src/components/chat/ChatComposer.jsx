@@ -1,16 +1,51 @@
 import { useState } from 'react'
-import { Paperclip, Mic, SendHorizontal } from 'lucide-react'
+import { Mic, SendHorizontal } from 'lucide-react'
+import { extractEventLink } from '../../utils/eventLinkParser'
+import { EventInviteCard } from '../event-invite/EventInviteCard'
+
+// Small X icon for the dismiss button
+const DismissIcon = () => (
+  <svg width="8" height="8" viewBox="0 0 14 14" fill="none">
+    <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+  </svg>
+)
 
 const ChatComposer = ({ threadName, onSend }) => {
   const [input, setInput] = useState('')
   const [focused, setFocused] = useState(false)
+  // Track which specific event link has been dismissed so the user can freely edit
+  // text around the link without the preview instantly re-appearing.
+  const [dismissedLink, setDismissedLink] = useState(null)
 
   const hasText = input.trim().length > 0
+
+  // Derive event link from current input on every render (cheap string match)
+  const detectedLink = extractEventLink(input)
+  const showPreview  = !!detectedLink &&
+    !(dismissedLink?.type === detectedLink?.type && dismissedLink?.id === detectedLink?.id)
+
+  const handleChange = (e) => {
+    const val = e.target.value
+    setInput(val)
+    // If the input no longer contains the previously dismissed link, clear the dismiss state
+    // so a newly pasted URL shows a fresh preview.
+    if (dismissedLink) {
+      const still = extractEventLink(val)
+      if (!still || still.type !== dismissedLink.type || still.id !== dismissedLink.id) {
+        setDismissedLink(null)
+      }
+    }
+  }
+
+  const handleDismissPreview = () => {
+    setDismissedLink(detectedLink)
+  }
 
   const handleSend = () => {
     if (!hasText) return
     onSend(input.trim())
     setInput('')
+    setDismissedLink(null)
   }
 
   const handleKeyDown = (e) => {
@@ -25,6 +60,27 @@ const ChatComposer = ({ threadName, onSend }) => {
       className="flex-shrink-0 px-4 pb-4 pt-3"
       style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
     >
+      {/* Event invite preview — appears above the input row when a link is detected */}
+      {showPreview && (
+        <div className="relative mb-2">
+          <EventInviteCard
+            type={detectedLink.type}
+            id={detectedLink.id}
+            compact={true}
+            previewOnly={true}
+          />
+          <button
+            onClick={handleDismissPreview}
+            aria-label="Remove event preview"
+            className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/20"
+            style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(229,226,225,0.8)' }}
+          >
+            <DismissIcon />
+          </button>
+        </div>
+      )}
+
+      {/* Input row */}
       <div
         className="flex items-center gap-2"
         style={{
@@ -42,7 +98,7 @@ const ChatComposer = ({ threadName, onSend }) => {
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -55,26 +111,15 @@ const ChatComposer = ({ threadName, onSend }) => {
           }}
         />
 
-        {/* Icon actions */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10"
-            style={{ width: 32, height: 32, color: 'rgba(229,226,225,0.4)' }}
-            onClick={() => {}}
-            aria-label="Attach file"
-            tabIndex={-1}
-          >
-            <Paperclip size={16} />
-          </button>
-          <button
-            className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10"
-            style={{ width: 32, height: 32, color: 'rgba(220,46,115,0.75)' }}
-            aria-label="Record voice"
-            tabIndex={-1}
-          >
-            <Mic size={17} />
-          </button>
-        </div>
+        {/* Mic */}
+        <button
+          className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10 flex-shrink-0"
+          style={{ width: 32, height: 32, color: 'rgba(229,226,225,0.35)' }}
+          aria-label="Record voice"
+          tabIndex={-1}
+        >
+          <Mic size={16} />
+        </button>
 
         {/* Send button */}
         <button

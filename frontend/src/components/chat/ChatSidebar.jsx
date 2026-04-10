@@ -37,7 +37,7 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
       <NewChatModal open={newChatOpen} onOpenChange={setNewChatOpen} />
       {/* Floating panel */}
       <div
-        className="flex-1 min-h-0 flex flex-col rounded-[28px] overflow-hidden bg-neutral-900/50 border border-white/10"
+        className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden bg-neutral-900/50 border border-white/10"
         style={{
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
@@ -46,18 +46,18 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
       >
 
         {/* Header */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-3 rounded-t-[28px]">
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 rounded-t-2xl">
           <div className="flex items-center justify-between mb-3">
             <span className="font-bold text-lg text-[#E5E2E1]" style={{ fontFamily: 'Sora, sans-serif' }}>
               Chats
             </span>
             <button
               onClick={() => setNewChatOpen(true)}
-              className="flex items-center justify-center rounded-full cursor-pointer hover:brightness-110 transition-all"
-              style={{ width: 32, height: 32, backgroundColor: '#2A2A2A' }}
+              className="flex items-center justify-center rounded-xl cursor-pointer transition-colors hover:bg-white/10"
+              style={{ width: 30, height: 30, background: 'rgba(255,255,255,0.06)' }}
               aria-label="New chat"
             >
-              <Plus size={15} color="#E5E2E1" />
+              <Plus size={14} color="rgba(229,226,225,0.7)" />
             </button>
           </div>
 
@@ -65,7 +65,7 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
           <div className="relative flex items-center">
             <span
               className="absolute left-3 pointer-events-none"
-              style={{ color: 'rgba(229,226,225,0.35)' }}
+              style={{ color: 'rgba(229,226,225,0.3)' }}
             >
               <SearchIcon />
             </span>
@@ -73,21 +73,22 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search chats"
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm outline-none transition-all"
+              placeholder="Search chats…"
+              className="w-full pl-8 pr-3 rounded-xl text-[13px] outline-none transition-all"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.06)',
                 color: '#E5E2E1',
                 fontFamily: 'Sora, sans-serif',
                 caretColor: '#DC2E73',
+                padding: '7px 12px 7px 30px',
               }}
               onFocus={(e) => {
-                e.target.style.border = '1px solid rgba(220,46,115,0.35)'
+                e.target.style.border = '1px solid rgba(220,46,115,0.3)'
                 e.target.style.background = 'rgba(255,255,255,0.07)'
               }}
               onBlur={(e) => {
-                e.target.style.border = '1px solid rgba(255,255,255,0.07)'
+                e.target.style.border = '1px solid rgba(255,255,255,0.06)'
                 e.target.style.background = 'rgba(255,255,255,0.05)'
               }}
             />

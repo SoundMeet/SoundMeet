@@ -324,6 +324,19 @@ export const showService = {
     return (data ?? []).map((r) => String(r.show_id));
   },
 
+  async getMyCreatedShows(userId, userLocation = null) {
+    const { data, error } = await supabase
+      .from('chat_show')
+      .select(SHOW_SELECT)
+      .eq('admin_id', userId)
+      .order('date_time', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      ...normalizeShowRow(row, userLocation),
+      canEdit: true,
+    }));
+  },
+
   async getMyRsvpdShows(userId, userLocation = null) {
     const { data: rsvps, error: rsvpError } = await supabase
       .from('chat_show_users_attending')

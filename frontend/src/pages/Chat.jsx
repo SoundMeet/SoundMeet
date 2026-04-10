@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Menu } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import ChatSidebar from '../components/chat/ChatSidebar'
@@ -7,6 +7,7 @@ import MessageList from '../components/chat/MessageList'
 import TypingIndicator from '../components/chat/TypingIndicator'
 import ChatComposer from '../components/chat/ChatComposer'
 import EventDetailModal from '../components/event-detail/EventDetailModal'
+import { ManageAttendeesModal } from '../components/event-detail/ManageAttendeesModal'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
@@ -25,16 +26,23 @@ function formatAvatarUrl(path) {
   return `${BUCKET_URL}${cleanPath}`;
 }
 
+// ─── Jam role helper — jam-specific role only, never global profile data ──────
+function deriveRole(attendee) {
+  if (attendee.rolesBringing?.length > 0)       return attendee.rolesBringing[0]
+  if (attendee.instrumentsBringing?.length > 0) return attendee.instrumentsBringing[0]
+  return null
+}
+
 function normalizeMessage(row) {
+  const d = new Date(row.timestamp)
   return {
-    id: String(row.id),
-    senderId: String(row.sender_id),
-    type: 'text',
-    content: row.content ?? '',
-    timestamp: new Date(row.timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
+    id:        String(row.id),
+    senderId:  String(row.sender_id),
+    type:      'text',
+    content:   row.content ?? '',
+    timestamp: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    rawDate:   d.toDateString(),   // used for date-separator grouping
+    isoDate:   d.toISOString(),    // full ISO for display label formatting
   }
 }
 
@@ -55,8 +63,11 @@ const Chat = () => {
   const [convError, setConvError]           = useState(null)
   const [sendError, setSendError]           = useState(null)
   const [jamDetailModal, setJamDetailModal] = useState({ open: false, item: null })
+  const [attendeesModal, setAttendeesModal] = useState({ open: false, item: null })
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false)
   const [isTyping, setIsTyping]             = useState(false)
+  // { [jamId]: { adminId: string|null, attendees: JamAttendee[] } }
+  const [jamAttendeeCache, setJamAttendeeCache] = useState({})
 
   const unsubRef = useRef(null)
 
@@ -307,6 +318,19 @@ const Chat = () => {
     }
   }
 
+  // ─── Header click → attendees modal ───────────────────────────────────────
+  const handleHeaderClick = async () => {
+    if (!activeThread?.jamId) return
+    try {
+      const item = await jamService.getJamById(activeThread.jamId)
+      if (!item) return
+      setAttendeesModal({ open: true, item })
+    } catch (err) {
+      console.error('[Chat] Failed to load jam for attendees:', err)
+      showToast('Could not load attendees.', 'error')
+    }
+  }
+
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectThread = (id) => {
     setActiveThreadId(id)
@@ -334,6 +358,60 @@ const Chat = () => {
   const allThreads   = [...jamThreads, ...dmThreads]
   const activeThread = allThreads.find(t => t.id === activeThreadId)
   const messages     = messagesByThread[activeThreadId] ?? []
+
+  // ─── Load jam attendees when switching to a jam thread ───────────────────
+  // Must live AFTER activeThread is declared (activeThread is used in deps + body)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (activeThread?.type !== 'jam' || !activeThread.jamId) return
+    const jamId = activeThread.jamId
+    if (jamAttendeeCache[jamId]) return           // already cached
+
+    Promise.all([
+      jamService.getJamAttendees(jamId),
+      jamService.getJamById(jamId),
+    ])
+      .then(([attendees, jam]) => {
+        setJamAttendeeCache((prev) => ({
+          ...prev,
+          [jamId]: {
+            adminId:   jam?.admin_id ? String(jam.admin_id) : null,
+            attendees: attendees ?? [],
+          },
+        }))
+      })
+      .catch((err) => {
+        console.error('[Chat] Failed to load jam attendees:', err)
+      })
+  }, [activeThread?.jamId, activeThread?.type]) // jamAttendeeCache excluded intentionally
+
+  // ─── Jam role metadata derived from cache ────────────────────────────────
+  const activeJamData = jamAttendeeCache[activeThread?.jamId] ?? null
+
+  const jamParticipantMeta = useMemo(() => {
+    if (!activeJamData || activeThread?.type !== 'jam') return {}
+    const { adminId, attendees } = activeJamData
+    return Object.fromEntries(
+      attendees.map((a) => [a.userId, {
+        role:     deriveRole(a),
+        isHost:   a.userId === adminId,
+        bringing: a.gearBringing ?? [],
+      }])
+    )
+  }, [activeJamData, activeThread?.type])
+
+  const headerParticipants = useMemo(() => {
+    if (!activeJamData || activeThread?.type !== 'jam') return []
+    const { adminId, attendees } = activeJamData
+    return attendees
+      .map((a) => ({
+        userId: a.userId,
+        name:   a.displayName,
+        role:   deriveRole(a),
+        isHost: a.userId === adminId,
+      }))
+      .sort((a, b) => (b.isHost ? 1 : 0) - (a.isHost ? 1 : 0))
+  }, [activeJamData, activeThread?.type])
 
   const getThreadName = () => {
     if (!activeThread) return ''
@@ -446,15 +524,27 @@ const Chat = () => {
         )}
 
         {!activeThread && !isLoadingConvs && (
-          <div className="flex-1 flex items-center justify-center">
-            <p
-              className="text-white/30 text-sm text-center px-6"
-              style={{ fontFamily: 'Sora, sans-serif' }}
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
+            <div
+              className="flex items-center justify-center rounded-2xl"
+              style={{ width: 52, height: 52, background: 'rgba(220,46,115,0.08)', color: 'rgba(220,46,115,0.45)' }}
             >
-              {allThreads.length === 0
-                ? 'No conversations yet.\nJoin a jam to start chatting!'
-                : 'Select a conversation to get started.'}
-            </p>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <div className="text-center" style={{ maxWidth: 220 }}>
+              <p className="text-sm font-semibold mb-1" style={{ color: 'rgba(229,226,225,0.55)' }}>
+                {allThreads.length === 0 ? 'No conversations yet' : 'No conversation selected'}
+              </p>
+              <p className="text-xs leading-relaxed" style={{ color: 'rgba(229,226,225,0.28)' }}>
+                {allThreads.length === 0
+                  ? 'Join or create a jam to start chatting with other musicians.'
+                  : 'Choose a direct message or jam group from the sidebar.'}
+              </p>
+            </div>
           </div>
         )}
 
@@ -463,7 +553,9 @@ const Chat = () => {
             <ChatHeader
               thread={activeThread}
               users={chatUsers}
+              participants={headerParticipants}
               onJamLinkClick={handleViewJam}
+              onHeaderClick={handleHeaderClick}
             />
 
             {isLoadingMsgs ? (
@@ -475,6 +567,7 @@ const Chat = () => {
                 messages={messages}
                 currentUserId={chatCurrentUser?.id}
                 users={chatUsers}
+                jamMeta={jamParticipantMeta}
               />
             )}
 
@@ -508,6 +601,21 @@ const Chat = () => {
         }
         openedFrom="chat"
       />
+
+      {attendeesModal.item && (
+        <ManageAttendeesModal
+          open={attendeesModal.open}
+          onClose={() => setAttendeesModal({ open: false, item: null })}
+          item={attendeesModal.item}
+          accent="#DC2E73"
+          currentUserId={user ? String(user.id) : null}
+          isAdminMode={
+            attendeesModal.item && user
+              ? String(attendeesModal.item.admin_id) === String(user.id)
+              : false
+          }
+        />
+      )}
     </div>
   )
 }

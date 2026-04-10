@@ -21,21 +21,97 @@ function FallbackAvatar({ name, size }) {
   )
 }
 
-const ChatHeader = ({ thread, users, onJamLinkClick }) => {
+// ─── Compact participant chips rendered below the jam name ─────────────────────
+// participants: { userId, name, role, isHost }[]
+function ParticipantChips({ participants }) {
+  if (!participants?.length) return null
+
+  return (
+    <div
+      style={{
+        display:         'flex',
+        alignItems:      'center',
+        gap:             0,
+        overflowX:       'auto',
+        scrollbarWidth:  'none',
+        WebkitOverflowScrolling: 'touch',
+        marginTop:       3,
+      }}
+    >
+      {participants.map((p, i) => {
+        const firstName = p.name?.split(' ')[0] ?? p.name
+        return (
+          <span
+            key={p.userId}
+            style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
+          >
+            {/* Separator between chips */}
+            {i > 0 && (
+              <span
+                aria-hidden="true"
+                style={{
+                  color:   'rgba(229,226,225,0.15)',
+                  margin:  '0 6px',
+                  fontSize: '0.58rem',
+                  flexShrink: 0,
+                }}
+              >
+                ·
+              </span>
+            )}
+
+            {/* Chip content */}
+            <span
+              style={{
+                fontSize:      '0.62rem',
+                letterSpacing: '0.01em',
+                lineHeight:    1.2,
+                whiteSpace:    'nowrap',
+              }}
+            >
+              <span style={{ color: 'rgba(229,226,225,0.48)' }}>{firstName}</span>
+              {p.role && (
+                <span style={{ color: 'rgba(229,226,225,0.26)' }}> — {p.role}</span>
+              )}
+              {p.isHost && (
+                <span
+                  style={{
+                    color:       'rgba(220,46,115,0.65)',
+                    marginLeft:  3,
+                    fontSize:    '0.58rem',
+                    fontWeight:  600,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  host
+                </span>
+              )}
+            </span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── ChatHeader ───────────────────────────────────────────────────────────────
+// participants: derived from jam attendee data; empty array = still loading or DM
+const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick }) => {
   const isJam = thread?.type === 'jam'
 
-  let threadName = ''
-  let subInfo = ''
+  let threadName  = ''
+  let subInfo     = ''
   let participant = null
 
   if (isJam) {
     threadName = thread.name
-    subInfo = `${thread.memberCount} members · ${thread.onlineCount} online`
+    subInfo    = `${thread.memberCount} members · ${thread.onlineCount} online`
   } else if (thread?.type === 'dm') {
     participant = (users || []).find((u) => u.id === thread.participantId)
-    threadName = participant?.name || ''
-    const s = participant?.status
-    subInfo = s === 'online' ? 'Online' : s === 'away' ? 'Away' : 'Offline'
+    threadName  = participant?.name || ''
+    const s     = participant?.status
+    subInfo     = s === 'online' ? 'Online' : s === 'away' ? 'Away' : 'Offline'
   }
 
   const statusDotColor =
@@ -45,16 +121,35 @@ const ChatHeader = ({ thread, users, onJamLinkClick }) => {
 
   return (
     <div
-      className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 flex-shrink-0"
+      className="sticky top-0 z-10 flex items-center justify-between px-5 flex-shrink-0"
       style={{
-        backdropFilter: 'blur(20px)',
+        paddingTop:           isJam && participants.length > 0 ? 10 : 12,
+        paddingBottom:        isJam && participants.length > 0 ? 10 : 12,
+        backdropFilter:       'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        boxShadow: '0 1px 0 rgba(0,0,0,0.2)',
+        borderBottom:         '1px solid rgba(255,255,255,0.06)',
+        boxShadow:            '0 1px 0 rgba(0,0,0,0.2)',
       }}
     >
-      <div className="flex items-center gap-3 min-w-0">
-        {/* Avatar */}
+      {/* ── Left: identity block ────────────────────────────────────────────── */}
+      <div
+        className={[
+          'flex items-center gap-3 min-w-0 flex-1',
+          isJam && onHeaderClick
+            ? 'cursor-pointer rounded-xl px-2 py-1 -mx-2 -my-1 transition-colors duration-150 hover:bg-white/5 active:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2E73]/50'
+            : '',
+        ].join(' ')}
+        role={isJam && onHeaderClick ? 'button' : undefined}
+        tabIndex={isJam && onHeaderClick ? 0 : undefined}
+        aria-label={isJam && onHeaderClick ? `View attendees for ${threadName}` : undefined}
+        onClick={isJam && onHeaderClick ? onHeaderClick : undefined}
+        onKeyDown={
+          isJam && onHeaderClick
+            ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onHeaderClick() } }
+            : undefined
+        }
+      >
+        {/* Avatar / jam icon */}
         {!isJam && (
           <div className="flex-shrink-0">
             {participant?.avatar ? (
@@ -75,7 +170,12 @@ const ChatHeader = ({ thread, users, onJamLinkClick }) => {
             className="flex items-center justify-center flex-shrink-0 rounded-xl"
             style={{ width: 36, height: 36, background: 'rgba(220,46,115,0.12)', color: '#DC2E73' }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="16" height="16" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="M9 18V5l12-2v13" />
               <circle cx="6" cy="18" r="3" />
               <circle cx="18" cy="16" r="3" />
@@ -83,8 +183,9 @@ const ChatHeader = ({ thread, users, onJamLinkClick }) => {
           </div>
         )}
 
-        {/* Name + status */}
-        <div className="min-w-0">
+        {/* Name + status + participant chips */}
+        <div className="min-w-0 flex-1">
+          {/* Thread name */}
           <div
             className="truncate"
             style={{ fontSize: '0.95rem', fontWeight: 600, color: '#E5E2E1', lineHeight: '1.2' }}
@@ -94,41 +195,49 @@ const ChatHeader = ({ thread, users, onJamLinkClick }) => {
               : threadName
             }
           </div>
+
+          {/* Status / member count */}
           <div className="flex items-center gap-1.5 mt-0.5">
             {!isJam && (
               <span
                 style={{
-                  display: 'inline-block',
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
+                  display:         'inline-block',
+                  width:           6,
+                  height:          6,
+                  borderRadius:    '50%',
                   backgroundColor: statusDotColor,
-                  flexShrink: 0,
+                  flexShrink:      0,
                 }}
               />
             )}
             <span
               style={{
-                fontSize: '0.68rem',
-                color: 'rgba(229,226,225,0.42)',
+                fontSize:      '0.68rem',
+                color:         'rgba(229,226,225,0.38)',
                 letterSpacing: '0.02em',
               }}
             >
               {subInfo}
             </span>
           </div>
+
+          {/* Participant chips — jam chats only, shown once attendee data is available */}
+          {isJam && (
+            <ParticipantChips participants={participants} />
+          )}
         </div>
       </div>
 
+      {/* ── Right: View Jam CTA ──────────────────────────────────────────────── */}
       {isJam && (
         <button
-          onClick={onJamLinkClick}
-          className="flex items-center gap-1.5 text-white font-semibold cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+          onClick={(e) => { e.stopPropagation(); onJamLinkClick?.() }}
+          className="flex items-center gap-1.5 text-white font-semibold cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0 ml-3"
           style={{
-            background: 'linear-gradient(135deg, #DC2E73, #FB4040)',
+            background:   'linear-gradient(135deg, #DC2E73, #FB4040)',
             borderRadius: '3rem',
-            padding: '0.4rem 0.85rem',
-            fontSize: '0.8rem',
+            padding:      '0.4rem 0.85rem',
+            fontSize:     '0.8rem',
           }}
         >
           <Music2 size={14} />
