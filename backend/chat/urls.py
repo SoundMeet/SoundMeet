@@ -12,6 +12,7 @@ urlpatterns = [
     path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
     path('api/register/', views.register_user, name='register'),
     path('api/profiles/me/', views.get_profile, name='get_profile'),
+    path('api/music-snips/', views.music_snips, name='music_snips'),
 
     path('api/posts/create/', views.create_post, name='create_post'),
     path('api/posts/<int:post_id>/like/', views.like_notify, name='like_notify'),
