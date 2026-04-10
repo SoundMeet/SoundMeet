@@ -61,7 +61,7 @@ const App = () => {
       <NotificationsProvider>
         <AuthModalProvider>
           <div className='bg-linear-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
-            <div className="sticky top-0 z-50">
+            <div className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur">
               <Navbar />
             </div>
           <div className="pb-[60px] md:pb-0">

@@ -488,6 +488,7 @@ const Profile = () => {
   // stub is closed. Driving open/closed from data (the jam itself) rather
   // than a separate boolean means the stub always has what it needs to render.
   const [selectedJam, setSelectedJam] = useState(null);
+  const [selectedPost, setSelectedPost] = useState(null);
 
   const [profilePic, setProfilePic] = useState(null);
   const [banner,     setBanner]     = useState(null);
@@ -727,13 +728,22 @@ const Profile = () => {
   const removeJam = (jamId) => setJams((prev) => prev.filter((j) => j.id !== jamId));
 
   // ── Profile posts — up to 3 most recent ──────────────────────────────────────
+  const timeAgo = (iso) => {
+    if (!iso) return "";
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
   const [profilePosts, setProfilePosts] = useState([]);
   const [profilePostsLoading, setProfilePostsLoading] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
     setProfilePostsLoading(true);
-    postService.getPostsByUser(user.id, loggedInUser?.id, 3)
+    postService.getPostsByUser(user.id, loggedInUser?.id, 5)
       .then(setProfilePosts)
       .catch(console.error)
       .finally(() => setProfilePostsLoading(false));
@@ -1251,7 +1261,7 @@ const Profile = () => {
                   className="text-2xl"
                   style={{ color: needsDarkText(cardColors.musicSnips.bg, cardTextOverrides.musicSnips) ? "#111" : "#fff", transition: "color 0.4s ease" }}
                 >
-                  Your Music Snips
+                  Music Snips
                 </h2>
                 {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
                   <button
@@ -1624,15 +1634,6 @@ const Profile = () => {
                 const postsCardBg    = postsDark ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.03)";
                 const postsCardBorder= postsDark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)";
 
-                function timeAgo(iso) {
-                  if (!iso) return "";
-                  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-                  if (diff < 60)   return "just now";
-                  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-                  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
-                  return `${Math.floor(diff / 86400)}d ago`;
-                }
-
                 return (
                   <>
                     <div className="flex items-center justify-between shrink-0">
@@ -1649,7 +1650,7 @@ const Profile = () => {
                     </div>
 
                     {/* post stubs */}
-                    <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                    <div className="flex flex-row gap-2 flex-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
                       {profilePostsLoading ? (
                         <div className="flex flex-1 items-center justify-center">
                           <div
@@ -1672,23 +1673,25 @@ const Profile = () => {
                         profilePosts.map((post) => (
                           <div
                             key={post.id}
-                            className="rounded-xl p-3 flex gap-3"
+                            className="rounded-xl overflow-hidden flex flex-col flex-1 cursor-pointer transition-all duration-150 hover:brightness-110"
+                            style={{ minWidth: "130px", maxWidth: "180px" }}
                             style={{
                               background: postsCardBg,
                               border: `1px solid ${postsCardBorder}`,
                             }}
+                            onClick={() => setSelectedPost(post)}
                           >
-                            {/* avatar */}
-                            <div className="shrink-0">
+                            {/* top — avatar + name */}
+                            <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
                               {post.author.avatarUrl ? (
                                 <img
                                   src={post.author.avatarUrl}
                                   alt={post.author.displayName}
-                                  className="w-8 h-8 rounded-full object-cover"
+                                  className="w-6 h-6 rounded-full object-cover shrink-0"
                                 />
                               ) : (
                                 <div
-                                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                                   style={{
                                     background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))",
                                     color: "#DC2E73",
@@ -1697,50 +1700,47 @@ const Profile = () => {
                                   {post.author.displayName?.[0]?.toUpperCase()}
                                 </div>
                               )}
+                              <span className="text-[10px] font-semibold truncate" style={{ color: postsText }}>
+                                {post.author.displayName}
+                              </span>
                             </div>
 
-                            {/* body */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-baseline gap-1.5 mb-1">
-                                <span className="text-xs font-semibold truncate" style={{ color: postsText }}>
-                                  {post.author.displayName}
-                                </span>
-                                <span className="text-[10px] shrink-0" style={{ color: postsTextDimmer }}>
-                                  {timeAgo(post.createdAt)}
-                                </span>
-                              </div>
-                              {post.content && (
-                                <p
-                                  className="text-xs leading-relaxed"
-                                  style={{
-                                    color: postsTextDim,
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  {post.content}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-3 mt-1.5">
-                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>
-                                  ♥ {post.likes}
-                                </span>
-                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>
-                                  💬 {post.comments}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* image thumbnail */}
-                            {post.media?.images?.[0] && (
-                              <img
-                                src={post.media.images[0]}
-                                alt=""
-                                className="w-12 h-12 rounded-lg object-cover shrink-0"
-                              />
+                            {/* text content — always right below header */}
+                            {post.content && (
+                              <p
+                                className="text-[11px] leading-relaxed px-3"
+                                style={{
+                                  color: postsTextDim,
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: post.media?.images?.[0] ? 2 : 4,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {post.content}
+                              </p>
                             )}
+
+                            {/* image — contained with gap */}
+                            {post.media?.images?.[0] && (
+                              <div className="px-3 mt-2">
+                                <img
+                                  src={post.media.images[0]}
+                                  alt=""
+                                  className="w-full rounded-lg object-cover"
+                                  style={{ height: "90px" }}
+                                />
+                              </div>
+                            )}
+
+                            {/* bottom — likes + comments + time */}
+                            <div className="flex items-center justify-between px-3 py-2 mt-auto">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>♥ {post.likes}</span>
+                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>💬 {post.comments}</span>
+                              </div>
+                              <span className="text-[10px]" style={{ color: postsTextDimmer }}>{timeAgo(post.createdAt)}</span>
+                            </div>
                           </div>
                         ))
                       )}
@@ -1789,13 +1789,12 @@ const Profile = () => {
             );
 
             return (
-              <div className="w-[210px] shrink-0 flex flex-col">
-                <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col flex-1"
+              <div className="w-[210px] shrink-0 flex flex-col self-stretch">
+                <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col h-full"
                   style={{
                     background: cardColors.jams.bg,
                     border: `1px solid ${cardColors.jams.border}`,
                     boxShadow: `0 0 40px ${cardColors.jams.glow}`,
-                    minHeight: "1295px",
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
@@ -1825,7 +1824,7 @@ const Profile = () => {
                     ) : jams.length === 0 ? (
                       <p className="text-sm" style={{ color: textSecondary }}>No jams yet.</p>
                     ) : (
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 overflow-y-auto pr-0.5" style={{ maxHeight: "380px", scrollbarWidth: "none" }}>
                         {jams.map((jam) => {
                           const isDragging   = jamDragging === jam.id;
                           const offsetX      = isDragging ? jamDragX : 0;
@@ -1946,44 +1945,50 @@ const Profile = () => {
                     </div>
                   </div>
 
-                  <SectionDivider />
-
-                  {/* ── AVAILABILITY TOGGLE ── */}
-                  <div className="px-5 py-4">
-                    {isOwnProfile ? (
-                      <button onClick={() => setAvailableToJam(v => !v)}
-                        className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200"
-                        style={{ background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}` }}>
-                        <div className="flex items-center gap-2">
-                          <span className="relative flex h-2 w-2 shrink-0">
-                            {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
-                            <span className="relative inline-flex rounded-full h-2 w-2"
-                              style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
-                          </span>
-                          <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
-                            {availableToJam ? "Open to Jam" : "Not Available"}
-                          </span>
-                        </div>
-                        <div className="relative w-8 h-4 rounded-full transition-colors duration-200 shrink-0"
-                          style={{ background: availableToJam ? "rgba(220,46,115,0.30)" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)") }}>
-                          <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
-                            style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)"), left: availableToJam ? "calc(100% - 14px)" : "2px" }} />
-                        </div>
+                  {/* ── ADD FRIEND — only visible on other people's profiles ── */}
+                  {!isOwnProfile && (
+                    <div className="p-5 mt-auto">
+                      <button
+                        onClick={handleAddFriend}
+                        disabled={friendLoading || friendStatus !== "none"}
+                        className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 group relative overflow-hidden"
+                        style={{
+                          background: friendStatus === "friends"
+                            ? "rgba(22,163,74,0.15)"
+                            : friendStatus === "pending"
+                            ? "rgba(202,138,4,0.12)"
+                            : "rgba(220,46,115,0.12)",
+                          border: friendStatus === "friends"
+                            ? "1px solid rgba(22,163,74,0.35)"
+                            : friendStatus === "pending"
+                            ? "1px solid rgba(202,138,4,0.30)"
+                            : "1px solid rgba(220,46,115,0.30)",
+                          color: friendStatus === "friends"
+                            ? "#16a34a"
+                            : friendStatus === "pending"
+                            ? "#ca8a04"
+                            : "#DC2E73",
+                          boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.15)" : "none",
+                          opacity: friendLoading ? 0.6 : 1,
+                          cursor: friendStatus !== "none" ? "default" : "pointer",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (friendStatus !== "none") return;
+                          e.currentTarget.style.background = "rgba(220,46,115,0.22)";
+                          e.currentTarget.style.boxShadow = "0 0 28px rgba(220,46,115,0.35)";
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (friendStatus !== "none") return;
+                          e.currentTarget.style.background = "rgba(220,46,115,0.12)";
+                          e.currentTarget.style.boxShadow = "0 0 20px rgba(220,46,115,0.15)";
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                      >
+                        {friendLoading ? "…" : friendStatus === "friends" ? "✓ Friends" : friendStatus === "pending" ? "Request Sent" : "+ Add Friend"}
                       </button>
-                    ) : (
-                      <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-                        style={{ background: availableToJam ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.25)" : tileBorder}` }}>
-                        <span className="relative flex h-2 w-2 shrink-0">
-                          {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
-                          <span className="relative inline-flex rounded-full h-2 w-2"
-                            style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
-                        </span>
-                        <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
-                          {availableToJam ? "Open to Jam" : "Not Available"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                 </div>
               </div>
@@ -2212,6 +2217,80 @@ const Profile = () => {
                 <div className="text-base">
                   {live ? "🎸🔥🎶" : "🎵✨🎹"}
                 </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Post Stub Modal ────────────────────────────────────────────────────── */}
+      {selectedPost && (() => {
+        const post = selectedPost;
+        return (
+          <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4">
+            <div onClick={() => setSelectedPost(null)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+            <div
+              className="relative z-10 w-[480px] max-w-[96vw] rounded-3xl overflow-hidden flex flex-col"
+              style={{
+                backgroundColor: "#0f0f0f",
+                border: "1px solid rgba(255,255,255,0.1)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 32px 80px rgba(0,0,0,0.9)",
+                animation: "stubSlideIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards",
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* header */}
+              <div
+                className="px-6 pt-6 pb-4 flex items-center justify-between"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
+              >
+                <div className="flex items-center gap-3">
+                  {post.author.avatarUrl ? (
+                    <img src={post.author.avatarUrl} alt={post.author.displayName} className="w-9 h-9 rounded-full object-cover" />
+                  ) : (
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
+                      style={{ background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))", color: "#DC2E73" }}
+                    >
+                      {post.author.displayName?.[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold text-white">{post.author.displayName}</p>
+                    <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
+                      {post.author.username} · {timeAgo(post.createdAt)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedPost(null)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* image */}
+              {post.media?.images?.[0] && (
+                <img src={post.media.images[0]} alt="" className="w-full max-h-72 object-cover" />
+              )}
+
+              {/* content */}
+              {post.content && (
+                <div className="px-6 py-5">
+                  <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.75)" }}>
+                    {post.content}
+                  </p>
+                </div>
+              )}
+
+              {/* footer */}
+              <div
+                className="px-6 py-4 flex items-center gap-4"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <span className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>♥ {post.likes}</span>
+                <span className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>💬 {post.comments}</span>
               </div>
             </div>
           </div>
@@ -2721,7 +2800,7 @@ const Profile = () => {
                   />
                   <div className="h-px bg-white/[0.06]" />
                   <CardColorRow
-                    label="Friends"
+                    label="Posts"
                     value={cardColors.posts}
                     onChange={(c) => setCardColor("posts", c)}
                   />
