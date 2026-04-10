@@ -204,7 +204,7 @@ export default function SoundMeetDiscovery() {
           socialService.getMyFriends(user.id)
         ]);
         
-        const otherProfiles = profilesData.filter(p => p.id !== user.id);
+        const otherProfiles = profilesData.filter(p => p.user_id !== user.id);
         
         setProfiles(otherProfiles);
         setFriends(friendsData || []);
