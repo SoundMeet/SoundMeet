@@ -51,7 +51,7 @@ def register_user(request):
         'username': user.username,
     })
 
-@api_view(['GET', 'PATCH', 'DELETE'])
+@api_view(['GET', 'POST', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def music_snips(request):
     
@@ -72,6 +72,28 @@ def music_snips(request):
             for snip in snips
         ]
         return Response({'snips': snips_data}, status=200)
+    
+    elif request.method == 'POST':
+        name = request.data.get('name', 'Untitled Snip')
+        music_file = request.FILES.get('musicFile')
+
+        if not music_file:
+            return Response({'error': 'An audio file is required to create a snip.'}, status=400)
+
+        snip = MusicSnip.objects.create(
+            profile=request.user.profile,
+            name=name,
+            musicFile=music_file
+        )
+
+        return Response({
+            'status': 'Snip created successfully',
+            'snip': {
+                'id': snip.id,
+                'name': snip.name,
+                'musicFile': snip.musicFile.url if snip.musicFile else None
+            }
+        }, status=201)
 
     elif request.method == 'PATCH':
         snip_id = request.data.get('snip_id')
