@@ -1,3 +1,7 @@
+import random
+from django.core.mail import send_mail
+from django.utils import timezone
+from .models import EmailVerification
 from django.shortcuts import render, get_object_or_404
 import json
 from rest_framework.decorators import api_view, permission_classes
@@ -658,3 +662,59 @@ def apply_for_bandmate(request, listing_id):
             metadata={'applicant_id': request.user.id, 'listing_id': listing.id}
         )
     return Response({'status': 'Application submitted'})
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_verification_code(request):
+    email = request.data.get('email')
+    if not email:
+        return Response({'error': 'Email is required'}, status=400)
+
+    # Generate 6-digit code
+    code = str(random.randint(100000, 999999))
+
+    # Delete any existing unused codes for this email
+    EmailVerification.objects.filter(email=email, is_used=False).delete()
+
+    # Save new code
+    EmailVerification.objects.create(email=email, code=code)
+
+    # Send email
+    try:
+        send_mail(
+            subject='Your SoundMeet verification code',
+            message=f'Your verification code is: {code}\n\nThis code expires in 10 minutes.',
+            from_email=None,  # uses DEFAULT_FROM_EMAIL
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        return Response({'error': 'Failed to send email'}, status=500)
+
+    return Response({'status': 'Code sent'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_code(request):
+    email = request.data.get('email')
+    code = request.data.get('code')
+
+    if not email or not code:
+        return Response({'error': 'Email and code are required'}, status=400)
+
+    try:
+        verification = EmailVerification.objects.filter(
+            email=email,
+            code=code,
+            is_used=False
+        ).latest('created_at')
+    except EmailVerification.DoesNotExist:
+        return Response({'error': 'Invalid code'}, status=400)
+
+    if verification.is_expired():
+        return Response({'error': 'Code has expired'}, status=400)
+
+    verification.is_used = True
+    verification.save()
+
+    return Response({'status': 'verified'})
