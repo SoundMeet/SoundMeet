@@ -11,9 +11,16 @@ import { PostReviewBody } from './PostReviewBody'
 import { PostActions } from './PostActions'
 import { CommentSection } from './CommentSection'
 
+// Subtle top-border accent per post type — gives each card a quiet musical identity
+const TYPE_TOP_COLOR = {
+  jam:    'rgba(220,46,115,0.38)',
+  clip:   'rgba(167,139,250,0.38)',
+  show:   'rgba(252,211,77,0.38)',
+  gear:   'rgba(52,211,153,0.38)',
+  review: 'rgba(251,146,60,0.38)',
+}
+
 function normalizeComment(c) {
-  // Supabase can return [null] for empty one-to-many joins in some PostgREST versions.
-  // Guard here so a null entry doesn't throw during the useState initializer.
   if (!c) return null
   return {
     id:        c.id ?? `unknown-${Math.random()}`,
@@ -33,12 +40,12 @@ export function FeedPost({ post }) {
 
   const isOwn = !!user && author.id === user.id
 
-  const [content, setContent]           = useState(post.content)
-  const [deleted, setDeleted]           = useState(false)
-  const [isEditing, setIsEditing]       = useState(false)
-  const [editText, setEditText]         = useState(post.content)
-  const [commentsOpen, setComments]     = useState(false)
-  const [commentCount, setCommentCount] = useState(comments)
+  const [content, setContent]             = useState(post.content)
+  const [deleted, setDeleted]             = useState(false)
+  const [isEditing, setIsEditing]         = useState(false)
+  const [editText, setEditText]           = useState(post.content)
+  const [commentsOpen, setComments]       = useState(false)
+  const [commentCount, setCommentCount]   = useState(comments)
   const [localComments, setLocalComments] = useState(
     () => (post._rawComments ?? []).map(normalizeComment).filter(Boolean)
   )
@@ -96,12 +103,28 @@ export function FeedPost({ post }) {
     setCommentCount((c) => Math.max(0, c - 1))
   }
 
+  const topBorderColor = TYPE_TOP_COLOR[postType] ?? 'rgba(255,255,255,0.06)'
+
   return (
     <div
-      className="rounded-2xl p-4 transition-all duration-200 hover:border-white/[0.11] hover:bg-[#1e1e1e]"
+      className="rounded-2xl transition-all duration-200"
       style={{
         background: '#1a1a1a',
         border: '1px solid rgba(255,255,255,0.06)',
+        borderTopColor: topBorderColor,
+        padding: '18px 18px 14px',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = `rgba(255,255,255,0.11)`
+        e.currentTarget.style.borderTopColor = topBorderColor
+        e.currentTarget.style.background = '#1d1d1d'
+        e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.28)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+        e.currentTarget.style.borderTopColor = topBorderColor
+        e.currentTarget.style.background = '#1a1a1a'
+        e.currentTarget.style.boxShadow = 'none'
       }}
     >
       <PostHeader
@@ -116,7 +139,7 @@ export function FeedPost({ post }) {
 
       {/* Body */}
       {isEditing ? (
-        <div className="mt-3">
+        <div className="mt-3.5">
           <textarea
             ref={editRef}
             value={editText}

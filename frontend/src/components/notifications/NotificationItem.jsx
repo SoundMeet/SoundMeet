@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { X, UserPlus, UserCheck, Heart, MessageCircle, Music, Bell, UserRound } from 'lucide-react'
 import { useNotifications } from '../../context/NotificationsContext'
 import { useLiveTick } from '../../hooks/useLiveTick'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Time formatting ───────────────────────────────────────────────────────────
 
 function timeAgo(isoString) {
   const diff = Date.now() - new Date(isoString).getTime()
@@ -14,46 +15,102 @@ function timeAgo(isoString) {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
-  return `${days}d ago`
+  if (days < 7) return `${days}d ago`
+  return `${Math.floor(days / 7)}w ago`
 }
 
-function getDisplayMessage(type, message, fromUser, accepted, declined) {
+// ── Sentence builders (plain text — for aria-label) ───────────────────────────
+
+function buildSentence(type, fromUser, accepted, declined) {
   const name = fromUser?.displayName || 'Someone'
-  if (type === 'friend_request') {
-    if (accepted) return `You and ${name} are now friends`
-    if (declined) return `Friend request from ${name} declined`
-    return `${name} sent you a friend request`
+  switch (type) {
+    case 'friend_request':
+      if (accepted) return `You and ${name} are now friends`
+      if (declined) return `Friend request from ${name} declined`
+      return `${name} sent you a friend request`
+    case 'friend_request_accepted':
+      return `${name} accepted your friend request`
+    case 'post_like':    return `${name} liked your post`
+    case 'post_comment': return `${name} commented on your post`
+    case 'jam_invite':   return `${name} invited you to a jam`
+    case 'new_follower': return `${name} started following you`
+    default:             return 'New notification'
   }
-  if (type === 'friend_request_accepted') {
-    return `${name} accepted your friend request`
-  }
-  return message || 'New notification'
 }
 
-function getGroupMessage(g) {
-  const { type, _members, _count } = g
+function buildGroupSentence(group) {
+  const { type, _members, _count } = group
   if (_count === 1) {
-    return getDisplayMessage(type, g.message, g.fromUser, g.accepted, g.declined)
+    const m = _members[0]
+    return buildSentence(type, m.fromUser, m.accepted, m.declined)
   }
-  const first = _members[0]?.fromUser?.displayName || 'Someone'
-  const second = _members[1]?.fromUser?.displayName || 'Someone'
-  const rest = _count - 2
-  const suffix = rest > 0 ? ` and ${rest} other${rest > 1 ? 's' : ''}` : ''
-  const names = rest > 0 ? `${first}, ${second}${suffix}` : `${first} and ${second}`
-  if (type === 'post_like') return `${names} liked your post`
-  if (type === 'new_follower') return `${names} started following you`
-  return g.message
+  const firstName = _members[0]?.fromUser?.displayName || 'Someone'
+  if (_count === 2) {
+    const secondName = _members[1]?.fromUser?.displayName || 'Someone'
+    if (type === 'post_like')    return `${firstName} and ${secondName} liked your post`
+    if (type === 'new_follower') return `${firstName} and ${secondName} started following you`
+  }
+  const others = _count - 1
+  const plural = others > 1 ? 'others' : 'other'
+  if (type === 'post_like')    return `${firstName} and ${others} ${plural} liked your post`
+  if (type === 'new_follower') return `${firstName} and ${others} ${plural} started following you`
+  return group.message || 'New notification'
 }
 
-/**
- * Returns the destination for clicking this notification, or null if no
- * navigation should happen (e.g. pending friend requests with inline actions).
- */
+// ── JSX sentence renderers (bold usernames) ───────────────────────────────────
+
+function N({ children }) {
+  return (
+    <span style={{ fontWeight: 600, color: 'rgba(229,226,225,0.92)' }}>
+      {children}
+    </span>
+  )
+}
+
+function renderSentence(type, fromUser, accepted, declined) {
+  const name = fromUser?.displayName || 'Someone'
+  switch (type) {
+    case 'friend_request':
+      if (accepted) return <>You and <N>{name}</N> are now friends</>
+      if (declined) return <>Friend request from <N>{name}</N> declined</>
+      return <><N>{name}</N> sent you a friend request</>
+    case 'friend_request_accepted': return <><N>{name}</N> accepted your friend request</>
+    case 'post_like':               return <><N>{name}</N> liked your post</>
+    case 'post_comment':            return <><N>{name}</N> commented on your post</>
+    case 'jam_invite':              return <><N>{name}</N> invited you to a jam</>
+    case 'new_follower':            return <><N>{name}</N> started following you</>
+    default:                        return <>New notification</>
+  }
+}
+
+function renderGroupSentence(group) {
+  const { type, _members, _count } = group
+  if (_count === 1) {
+    const m = _members[0]
+    return renderSentence(type, m.fromUser, m.accepted, m.declined)
+  }
+  const firstName = _members[0]?.fromUser?.displayName || 'Someone'
+  if (_count === 2) {
+    const secondName = _members[1]?.fromUser?.displayName || 'Someone'
+    if (type === 'post_like')
+      return <><N>{firstName}</N> and <N>{secondName}</N> liked your post</>
+    if (type === 'new_follower')
+      return <><N>{firstName}</N> and <N>{secondName}</N> started following you</>
+  }
+  const others = _count - 1
+  const plural  = others > 1 ? 'others' : 'other'
+  if (type === 'post_like')
+    return <><N>{firstName}</N> and {others} {plural} liked your post</>
+  if (type === 'new_follower')
+    return <><N>{firstName}</N> and {others} {plural} started following you</>
+  return <>{group.message || 'New notification'}</>
+}
+
+// ── Deep-link routing ─────────────────────────────────────────────────────────
+
 function getDeepLink(type, referenceId, accepted, declined) {
   if (type === 'friend_request') {
-    // Pending request → no navigation; the Accept/Decline buttons handle it
     if (!accepted && !declined) return null
-    // Accepted/declined → chat with new friend
     return { path: '/chat' }
   }
   if (type === 'friend_request_accepted') return { path: '/chat' }
@@ -63,96 +120,128 @@ function getDeepLink(type, referenceId, accepted, declined) {
   return null
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
+// ── Type metadata ─────────────────────────────────────────────────────────────
 
-function AvatarFallback({ displayName, size = 10 }) {
-  const initial = (displayName || '?')[0].toUpperCase()
-  const dim = size === 10 ? 'w-10 h-10 text-[13px]' : 'w-7 h-7 text-[10px]'
-  return (
-    <div
-      className={`${dim} rounded-full flex items-center justify-center font-bold text-white select-none flex-shrink-0`}
-      style={{ background: 'linear-gradient(135deg, #DC2E73 0%, #c02460 100%)' }}
-    >
-      {initial}
-    </div>
-  )
-}
-
-function Avatar({ user, size = 10 }) {
-  const dim = size === 10 ? 'w-10 h-10' : 'w-7 h-7'
-  if (user?.avatarUrl) {
-    return (
-      <img
-        src={user.avatarUrl}
-        alt={user.displayName}
-        className={`${dim} rounded-full object-cover flex-shrink-0`}
-        style={{ background: '#1a1a1a' }}
-        onError={(e) => {
-          e.currentTarget.style.display = 'none'
-          const sib = e.currentTarget.nextElementSibling
-          if (sib) sib.style.display = 'flex'
-        }}
-      />
-    )
-  }
-  return <AvatarFallback displayName={user?.displayName} size={size} />
-}
-
-function GroupAvatarStack({ members }) {
-  const shown = members.slice(0, 3)
-  return (
-    <div className="relative w-10 h-10 flex-shrink-0">
-      {shown.map((m, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: 28, height: 28,
-            top: i === 0 ? 0 : i * 7,
-            left: i === 0 ? 0 : i * 5,
-            zIndex: shown.length - i,
-            outline: '2px solid rgba(13,13,13,0.98)',
-          }}
-        >
-          <Avatar user={m.fromUser} size={7} />
-        </div>
-      ))}
-    </div>
-  )
+const TYPE_META = {
+  friend_request:          { label: 'Friend request' },
+  friend_request_accepted: { label: 'Friend request' },
+  post_like:               { label: 'Like'           },
+  post_comment:            { label: 'Comment'        },
+  jam_invite:              { label: 'Jam invite'     },
+  new_follower:            { label: 'Follower'       },
 }
 
 // ── Type badge ────────────────────────────────────────────────────────────────
 
-const TYPE_BADGE = {
-  friend_request: { Icon: UserPlus, bg: '#1a1a2e', color: '#DC2E73' },
-  friend_request_accepted: { Icon: UserCheck, bg: '#0f2010', color: '#3ecf5a' },
-  post_like: { Icon: Heart, bg: '#1f1014', color: '#e05080' },
-  post_comment: { Icon: MessageCircle, bg: '#101820', color: '#5b9cf6' },
-  jam_invite: { Icon: Music, bg: '#1a1020', color: '#b06eff' },
-  new_follower: { Icon: UserRound, bg: '#111a1f', color: '#38bdf8' },
+const TYPE_BADGE_CFG = {
+  friend_request:          { Icon: UserPlus,      color: '#DC2E73' },
+  friend_request_accepted: { Icon: UserCheck,     color: '#3ecf5a' },
+  post_like:               { Icon: Heart,          color: '#e05080' },
+  post_comment:            { Icon: MessageCircle,  color: '#5b9cf6' },
+  jam_invite:              { Icon: Music,           color: '#b06eff' },
+  new_follower:            { Icon: UserRound,       color: '#38bdf8' },
 }
 
 function TypeBadge({ type }) {
-  const cfg = TYPE_BADGE[type] ?? { Icon: Bell, bg: '#1a1a1a', color: 'rgba(255,255,255,0.4)' }
-  const { Icon, bg, color } = cfg
+  const cfg = TYPE_BADGE_CFG[type] ?? { Icon: Bell, color: 'rgba(229,226,225,0.45)' }
+  const { Icon, color } = cfg
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
-      style={{ background: bg, border: '1.5px solid rgba(13,13,13,0.98)' }}
+      className="absolute -bottom-[3px] -right-[3px] w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
+      style={{
+        background: '#111111',
+        boxShadow: '0 0 0 1.5px #111111',
+        border: '1px solid rgba(255,255,255,0.07)',
+      }}
     >
       <Icon size={9} style={{ color }} strokeWidth={2.5} />
     </div>
   )
 }
 
-function CountBadge({ count }) {
-  if (count <= 1) return null
+// ── Avatar primitives ─────────────────────────────────────────────────────────
+
+function SingleAvatar({ user }) {
+  const [imgErr, setImgErr] = useState(false)
+  const initial = (user?.displayName || '?')[0].toUpperCase()
+  const showImg = !!user?.avatarUrl && !imgErr
+
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[8px] font-bold text-white"
-      style={{ background: '#DC2E73', border: '1.5px solid rgba(13,13,13,0.98)' }}
+      className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0"
+      style={{ background: 'linear-gradient(135deg, #DC2E73, #c02460)' }}
     >
-      {count > 99 ? '99+' : `+${count - 1}`}
+      {showImg ? (
+        <img
+          src={user.avatarUrl}
+          alt={user.displayName || ''}
+          className="w-full h-full object-cover"
+          onError={() => setImgErr(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-[13px] font-bold text-white select-none">
+          {initial}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniAvatar({ user, textSizeClass }) {
+  const [imgErr, setImgErr] = useState(false)
+  const ini    = (user?.displayName || '?')[0].toUpperCase()
+  const showImg = !!user?.avatarUrl && !imgErr
+
+  if (showImg) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt=""
+        className="w-full h-full object-cover"
+        onError={() => setImgErr(true)}
+      />
+    )
+  }
+  return (
+    <div
+      className={`w-full h-full flex items-center justify-center font-bold text-white select-none ${textSizeClass}`}
+      style={{ background: 'linear-gradient(135deg, #DC2E73, #c02460)' }}
+    >
+      {ini}
+    </div>
+  )
+}
+
+function GroupAvatarStack({ members, count }) {
+  const first    = members[0]
+  const second   = members[1]
+  const overflow = count > 2 ? count - 2 : 0
+
+  return (
+    <div className="relative w-10 h-10 flex-shrink-0">
+      {/* Back slot */}
+      <div
+        className="absolute bottom-0 right-0 w-[22px] h-[22px] rounded-full overflow-hidden"
+        style={{ boxShadow: '0 0 0 2px #111111', zIndex: 1 }}
+      >
+        {overflow > 0 ? (
+          <div
+            className="w-full h-full flex items-center justify-center text-[8px] font-bold text-white"
+            style={{ background: 'rgba(255,255,255,0.1)' }}
+          >
+            +{overflow}
+          </div>
+        ) : second ? (
+          <MiniAvatar user={second.fromUser} textSizeClass="text-[8px]" />
+        ) : null}
+      </div>
+      {/* Front slot */}
+      <div
+        className="absolute top-0 left-0 w-[28px] h-[28px] rounded-full overflow-hidden"
+        style={{ boxShadow: '0 0 0 2px #111111', zIndex: 2 }}
+      >
+        {first && <MiniAvatar user={first.fromUser} textSizeClass="text-[10px]" />}
+      </div>
     </div>
   )
 }
@@ -163,136 +252,147 @@ export function NotificationItem({ notification, isLast, isNew }) {
   const { markRead, acceptRequest, declineRequest, loadingIds, dismissNotification } =
     useNotifications()
   const navigate = useNavigate()
-
-  // Trigger re-render every 60s so "5m ago" stays accurate
   useLiveTick()
 
-  const isGroup = notification._group === true
-  const { id, type, fromUser, message, isRead, createdAt, referenceId, accepted, declined } =
-    notification
+  const isGroup  = notification._group === true
+  const { id, type, fromUser, isRead, createdAt, referenceId, accepted, declined } = notification
 
-  const isLoading = loadingIds.has(id)
+  const isLoading  = loadingIds.has(id)
+  const isPending  = type === 'friend_request' && !accepted && !declined
   const isResolved = type === 'friend_request' && (accepted || declined)
+  const isUnread   = !isRead && !isResolved
 
-  const displayMessage = isGroup
-    ? getGroupMessage(notification)
-    : getDisplayMessage(type, message, fromUser, accepted, declined)
+  // Plain text for accessibility
+  const ariaLabel = isGroup
+    ? buildGroupSentence(notification)
+    : buildSentence(type, fromUser, accepted, declined)
 
-  const deepLink = getDeepLink(type, referenceId, accepted, declined)
+  // JSX with bold names for display
+  const sentenceJsx = isGroup
+    ? renderGroupSentence(notification)
+    : renderSentence(type, fromUser, accepted, declined)
+
+  const typeLabel = TYPE_META[type]?.label ?? null
+  const time      = timeAgo(createdAt)
+  const deepLink  = getDeepLink(type, referenceId, accepted, declined)
 
   const handleClick = () => {
     if (!isRead) markRead(id)
-    if (deepLink) {
-      navigate(deepLink.path, deepLink.state ? { state: deepLink.state } : undefined)
-    }
+    if (deepLink) navigate(deepLink.path, deepLink.state ? { state: deepLink.state } : undefined)
   }
 
-  const handleAccept = (e) => {
-    e.stopPropagation()
-    acceptRequest(id, referenceId)
-  }
-
-  const handleDecline = (e) => {
-    e.stopPropagation()
-    declineRequest(id, referenceId)
-  }
-
+  const handleAccept  = (e) => { e.stopPropagation(); acceptRequest(id, referenceId) }
+  const handleDecline = (e) => { e.stopPropagation(); declineRequest(id, referenceId) }
   const handleDismiss = (e) => {
     e.stopPropagation()
-    const ids = isGroup ? notification._members.map((m) => m.id) : [id]
-    dismissNotification(ids)
+    dismissNotification(isGroup ? notification._members.map((m) => m.id) : [id])
   }
+
+  const showTypeBadge = !isGroup || notification._count === 1
+
+  // Text color: dimmer for resolved, normal for read, brighter for unread
+  const textColor = isResolved
+    ? 'rgba(229,226,225,0.32)'
+    : isUnread
+    ? 'rgba(229,226,225,0.82)'
+    : 'rgba(229,226,225,0.55)'
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={handleClick}
-      className="relative flex items-start gap-3 px-4 py-3.5 cursor-pointer group transition-colors duration-150 overflow-hidden"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() }
+      }}
+      aria-label={ariaLabel}
+      className="relative flex items-start gap-3 px-5 py-3 cursor-pointer group outline-none transition-colors duration-100 focus-visible:bg-white/[0.04]"
       style={{
-        background: !isRead && !isResolved ? 'rgba(220,46,115,0.03)' : 'transparent',
-        borderLeft: !isRead && !isResolved ? '2px solid #DC2E73' : '2px solid transparent',
-        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
+        background: isUnread ? 'rgba(220,46,115,0.028)' : 'transparent',
+        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.038)',
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(255,255,255,0.025)'
-      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background =
-          !isRead && !isResolved ? 'rgba(220,46,115,0.03)' : 'transparent'
+        e.currentTarget.style.background = isUnread ? 'rgba(220,46,115,0.028)' : 'transparent'
       }}
     >
-      {/* New-notification highlight pulse (fades out over 2.5s) */}
+      {/* Unread left accent bar */}
+      {isUnread && (
+        <div
+          className="absolute left-0 top-[22%] bottom-[22%] w-[2px] rounded-r-full"
+          style={{ background: '#DC2E73', opacity: 0.55 }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* New-notification pulse */}
       {isNew && (
         <motion.div
           className="absolute inset-0 pointer-events-none"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 2.5, ease: 'easeOut' }}
-          style={{ background: 'rgba(220,46,115,0.10)' }}
+          style={{ background: 'rgba(220,46,115,0.08)' }}
         />
       )}
 
-      {/* Avatar + badge */}
+      {/* Avatar + type badge */}
       <div className="relative flex-shrink-0 mt-0.5">
         {isGroup && notification._count > 1 ? (
-          <>
-            <GroupAvatarStack members={notification._members} />
-            <CountBadge count={notification._count} />
-          </>
+          <GroupAvatarStack members={notification._members} count={notification._count} />
         ) : (
-          <>
-            <Avatar user={fromUser} size={10} />
-            <TypeBadge type={type} />
-          </>
+          <SingleAvatar user={fromUser} />
         )}
+        {showTypeBadge && <TypeBadge type={type} />}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0 pr-5">
+        {/* Primary sentence */}
         <p
-          className="text-[13px] leading-snug"
-          style={{
-            color: isResolved
-              ? 'rgba(229,226,225,0.4)'
-              : isRead
-              ? 'rgba(229,226,225,0.65)'
-              : 'rgba(229,226,225,0.92)',
-          }}
+          className="text-[13px] leading-[1.45]"
+          style={{ color: textColor }}
         >
-          {displayMessage}
+          {sentenceJsx}
         </p>
 
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <p className="text-[11px]" style={{ color: 'rgba(229,226,225,0.28)' }}>
-            {timeAgo(createdAt)}
-          </p>
-          {/* Deep link hint — only for navigable notifications */}
-          {deepLink && !isResolved && (
-            <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ color: 'rgba(220,46,115,0.6)' }}>
-              ↗
-            </span>
+        {/* Metadata */}
+        <div className="flex items-center gap-[5px] mt-[3px]">
+          {typeLabel && (
+            <>
+              <span className="text-[11px]" style={{ color: 'rgba(229,226,225,0.25)' }}>
+                {typeLabel}
+              </span>
+              <span style={{ color: 'rgba(229,226,225,0.15)', fontSize: 10 }}>·</span>
+            </>
           )}
+          <span
+            className="text-[11px] tabular-nums"
+            style={{ color: isUnread ? 'rgba(220,46,115,0.55)' : 'rgba(229,226,225,0.25)' }}
+          >
+            {time}
+          </span>
         </div>
 
-        {/* Friend request actions — pending only */}
-        {type === 'friend_request' && !accepted && !declined && (
-          <div className="flex gap-2 mt-2.5">
+        {/* Friend request — pending accept / decline */}
+        {isPending && (
+          <div className="flex items-center gap-2 mt-2.5">
             <button
               type="button"
               onClick={handleAccept}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 focus:outline-none"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-pink-500"
               style={{ background: 'linear-gradient(135deg, #DC2E73, #c02460)' }}
             >
               {isLoading ? (
                 <>
                   <span className="w-3 h-3 rounded-full border border-white/50 border-t-white animate-spin inline-block" />
-                  <span>Accepting…</span>
+                  Accepting…
                 </>
               ) : (
                 <>
-                  <UserCheck size={12} strokeWidth={2.5} />
-                  <span>Accept</span>
+                  <UserCheck size={11} strokeWidth={2.5} />
+                  Accept
                 </>
               )}
             </button>
@@ -304,8 +404,8 @@ export function NotificationItem({ notification, isLast, isNew }) {
                 className="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors hover:bg-white/[0.07] disabled:opacity-50 focus:outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  color: 'rgba(229,226,225,0.55)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(229,226,225,0.48)',
+                  border: '1px solid rgba(255,255,255,0.07)',
                 }}
               >
                 Decline
@@ -314,9 +414,9 @@ export function NotificationItem({ notification, isLast, isNew }) {
           </div>
         )}
 
-        {/* Accepted confirmation */}
+        {/* Friend request accepted */}
         {type === 'friend_request' && accepted && (
-          <div className="flex items-center gap-1.5 mt-2">
+          <div className="flex items-center gap-1.5 mt-1.5">
             <UserCheck size={11} style={{ color: '#3ecf5a' }} strokeWidth={2.5} />
             <span className="text-[11px] font-medium" style={{ color: '#3ecf5a' }}>Friends</span>
           </div>
@@ -332,11 +432,11 @@ export function NotificationItem({ notification, isLast, isNew }) {
                 markRead(id)
                 navigate('/', { state: { openJamId: referenceId } })
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors hover:bg-white/[0.07] focus:outline-none"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors hover:bg-white/[0.07] focus:outline-none"
               style={{
                 background: 'rgba(176,110,255,0.1)',
                 color: '#b06eff',
-                border: '1px solid rgba(176,110,255,0.2)',
+                border: '1px solid rgba(176,110,255,0.18)',
               }}
             >
               <Music size={11} strokeWidth={2.5} />
@@ -346,24 +446,23 @@ export function NotificationItem({ notification, isLast, isNew }) {
         )}
       </div>
 
-      {/* Unread dot */}
-      {!isRead && !isResolved && (
-        <div className="absolute right-4 top-4">
-          <div
-            className="w-[7px] h-[7px] rounded-full"
-            style={{ background: '#DC2E73', boxShadow: '0 0 5px rgba(220,46,115,0.55)' }}
-          />
-        </div>
+      {/* Unread dot (fades out on hover, replaced by dismiss X) */}
+      {isUnread && (
+        <div
+          className="absolute right-4 top-4 w-[6px] h-[6px] rounded-full transition-opacity duration-150 group-hover:opacity-0 pointer-events-none"
+          style={{ background: '#DC2E73' }}
+          aria-label="Unread"
+        />
       )}
 
-      {/* Dismiss × — appears on hover */}
+      {/* Dismiss X (visible on hover) */}
       <button
         type="button"
         onClick={handleDismiss}
-        className="absolute right-3.5 top-3.5 p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none hover:bg-white/[0.08]"
+        className="absolute right-3.5 top-3.5 w-[18px] h-[18px] flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-white/[0.08] focus:outline-none focus-visible:opacity-100"
         aria-label="Dismiss notification"
       >
-        <X size={12} style={{ color: 'rgba(229,226,225,0.4)' }} />
+        <X size={10} style={{ color: 'rgba(229,226,225,0.4)' }} />
       </button>
     </div>
   )

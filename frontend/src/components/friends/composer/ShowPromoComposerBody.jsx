@@ -1,60 +1,221 @@
-import { MdStars, MdCalendarToday, MdLocationOn, MdCheck, MdOpenInNew } from 'react-icons/md'
+import { motion, AnimatePresence } from 'framer-motion'
+import { MdStars, MdClose } from 'react-icons/md'
 import { hexToRgba } from '../../../utils/discovery'
+import { useEligibleEvents } from '../../../hooks/useEligibleEvents'
+import { useAuth } from '../../../injectables/Auth'
+import { EventInviteCard } from '../../event-invite/EventInviteCard'
 
 const ACCENT = '#F7C10D'
 
-// Mock shows created/promoted by the current user
-// TODO: replace with api.getMyShows() when backend is ready
-const MY_SHOWS = [
-  {
-    id: 'ms-1',
-    title: 'Little Havana Late Set',
-    date: '2026-04-11',
-    venueName: 'Ball & Chain',
-    genres: ['Latin Jazz', 'Afrobeat'],
-  },
-  {
-    id: 'ms-2',
-    title: 'Wynwood Rooftop Session',
-    date: '2026-04-18',
-    venueName: 'The Deck — Wynwood Marketplace',
-    genres: ['Indie Soul'],
-  },
-  {
-    id: 'ms-3',
-    title: 'Downtown Loft Showcase',
-    date: '2026-04-25',
-    venueName: 'Flagler Sound Loft',
-    genres: ['Alt Pop', 'Indie Rock'],
-  },
-]
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDate(iso) {
+  if (!iso) return null
   return new Date(iso).toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   })
 }
 
+// ── Section divider ────────────────────────────────────────────────────────────
+
+function GroupDivider({ label }) {
+  return (
+    <div className="flex items-center gap-2.5 my-2">
+      <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.05)' }} />
+      <span
+        className="text-[9px] font-semibold uppercase tracking-[0.12em] flex-shrink-0"
+        style={{ color: 'rgba(229,226,225,0.2)' }}
+      >
+        {label}
+      </span>
+      <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.05)' }} />
+    </div>
+  )
+}
+
+// ── Single unselected show row ─────────────────────────────────────────────────
+
+function ShowRow({ show, onSelect, index }) {
+  const dateStr = formatDate(show.dateTimeRaw ?? show.date)
+  const venue   = show.venueName ?? show.locationName ?? show.neighborhood ?? null
+  const meta    = [dateStr, venue].filter(Boolean).join(' · ')
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => onSelect(show)}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
+      whileTap={{ scale: 0.985 }}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150"
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border:     '1px solid rgba(255,255,255,0.06)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background  = hexToRgba(ACCENT, 0.05)
+        e.currentTarget.style.borderColor = hexToRgba(ACCENT, 0.18)
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background  = 'rgba(255,255,255,0.03)'
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+      }}
+    >
+      {/* Icon */}
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(255,255,255,0.05)' }}
+      >
+        <MdStars style={{ color: 'rgba(229,226,225,0.28)', fontSize: 15 }} />
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p
+          className="text-[13px] font-semibold leading-tight truncate"
+          style={{ color: 'rgba(229,226,225,0.82)' }}
+        >
+          {show.title}
+        </p>
+        {meta && (
+          <p
+            className="text-[11px] leading-tight truncate mt-0.5"
+            style={{ color: 'rgba(229,226,225,0.35)' }}
+          >
+            {meta}
+          </p>
+        )}
+      </div>
+
+      {/* Select indicator */}
+      <div
+        className="w-4 h-4 rounded-full flex-shrink-0"
+        style={{
+          border:     '1.5px solid rgba(255,255,255,0.12)',
+          background: 'transparent',
+        }}
+      />
+    </motion.button>
+  )
+}
+
+// ── Selected show — transforms into the invite card preview ───────────────────
+
+function SelectedShowCard({ show, onDeselect }) {
+  return (
+    <motion.div
+      key="selected"
+      initial={{ opacity: 0, scale: 0.97, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97, y: -4 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+      className="relative"
+    >
+      <EventInviteCard
+        type="show"
+        id={String(show.id)}
+        compact={false}
+        previewOnly={true}
+      />
+      {/* Deselect */}
+      <button
+        type="button"
+        onClick={onDeselect}
+        aria-label="Remove selection"
+        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-full transition-colors hover:bg-white/20"
+        style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(229,226,225,0.8)' }}
+      >
+        <MdClose style={{ fontSize: 10 }} />
+      </button>
+    </motion.div>
+  )
+}
+
+// ── Skeleton rows ──────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <div
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl animate-pulse"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+    >
+      <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }} />
+      <div className="flex-1 space-y-1.5">
+        <div className="h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', width: '62%' }} />
+        <div className="h-2.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', width: '42%' }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Empty state ────────────────────────────────────────────────────────────────
+
+function EmptyState() {
+  return (
+    <div
+      className="flex flex-col items-center gap-1.5 py-7 rounded-xl"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}
+    >
+      <MdStars style={{ fontSize: 26, color: 'rgba(229,226,225,0.18)' }} />
+      <p className="text-[12px]" style={{ color: 'rgba(229,226,225,0.35)' }}>
+        No upcoming shows to promote
+      </p>
+      <p className="text-[11px]" style={{ color: 'rgba(229,226,225,0.2)' }}>
+        Create or RSVP to a show first
+      </p>
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 /**
- * ShowPromoComposerBody — body for the "Promote Show" composer.
+ * ShowPromoComposerBody
  *
- * Lets the user pick one of their existing shows to promote in the feed,
- * with an optional promo caption. A "Promote a new show" CTA lets them
- * open the dedicated PromoteShowModal (handled by the parent via onCreateNew).
+ * State: { caption: string, selectedShow: NormalizedItem | null }
  *
- * Props:
- *   state         { caption: string, selectedShow: object | null }
- *   onChange      (patch) => void
- *   onCreateNew   () => void  — opens PromoteShowModal (parent handles this)
- *
- * Backend note:
- *   MY_SHOWS = GET /api/shows/?author={userId}&upcoming=true
- *   selected show id → posts.show_ref_id (FK → events.id)
+ * When a show is selected, its row transforms into the rich EventInviteCard
+ * preview inline. Other rows remain compact. Deselect via the × button.
  */
-export function ShowPromoComposerBody({ state, onChange, onCreateNew }) {
+export function ShowPromoComposerBody({ state, onChange }) {
+  const { user } = useAuth()
+  const { loading, yours, attending } = useEligibleEvents(user?.id, 'show')
+
+  const selectedId = state.selectedShow ? String(state.selectedShow.id) : null
+  const allEmpty   = !loading && yours.length === 0 && attending.length === 0
+
+  const allShows  = [...yours, ...attending]
+  const dividerAt = yours.length
+
+  const renderRow = (show, globalIndex, localIndex) => {
+    const isSelected = selectedId === String(show.id)
+
+    if (isSelected) {
+      return (
+        <div key={show.id}>
+          <SelectedShowCard
+            show={show}
+            onDeselect={() => onChange({ selectedShow: null })}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div key={show.id}>
+        <ShowRow
+          show={show}
+          onSelect={(s) => onChange({ selectedShow: s })}
+          index={localIndex}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      {/* Caption */}
+      {/* Optional promo note */}
       <textarea
         rows={2}
         value={state.caption}
@@ -66,96 +227,38 @@ export function ShowPromoComposerBody({ state, onChange, onCreateNew }) {
       />
 
       {/* Show picker */}
-      <div className="space-y-2">
+      <div>
         <p
-          className="text-[11px] font-medium uppercase tracking-[0.1em]"
-          style={{ color: 'rgba(229,226,225,0.35)' }}
+          className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-3"
+          style={{ color: 'rgba(229,226,225,0.42)' }}
         >
           Select a Show
         </p>
 
-        {MY_SHOWS.map((show) => {
-          const selected = state.selectedShow?.id === show.id
-          return (
-            <button
-              key={show.id}
-              type="button"
-              onClick={() => onChange({ selectedShow: selected ? null : show })}
-              className="w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all duration-150"
-              style={{
-                background: selected ? hexToRgba(ACCENT, 0.08) : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${selected ? hexToRgba(ACCENT, 0.28) : 'rgba(255,255,255,0.07)'}`,
-              }}
-            >
-              {/* Icon */}
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: selected ? hexToRgba(ACCENT, 0.18) : 'rgba(255,255,255,0.06)' }}
-              >
-                {selected
-                  ? <MdCheck style={{ color: ACCENT, fontSize: 18 }} />
-                  : <MdStars style={{ color: 'rgba(229,226,225,0.35)', fontSize: 18 }} />
-                }
-              </div>
+        {loading ? (
+          <div className="space-y-1.5">
+            <SkeletonRow /><SkeletonRow /><SkeletonRow />
+          </div>
+        ) : allEmpty ? (
+          <EmptyState />
+        ) : (
+          <div className="space-y-1.5">
+            {allShows.map((show, i) => {
+              const localIndex  = i < dividerAt ? i : i - dividerAt
+              const showDivider = dividerAt > 0 && i === dividerAt && attending.length > 0
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p
-                  className="text-sm font-semibold leading-tight truncate"
-                  style={{ color: selected ? '#fff' : 'rgba(229,226,225,0.8)' }}
-                >
-                  {show.title}
-                </p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px]"
-                    style={{ color: 'rgba(229,226,225,0.4)' }}
-                  >
-                    <MdCalendarToday className="text-xs" />
-                    {formatDate(show.date)}
-                  </span>
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px]"
-                    style={{ color: 'rgba(229,226,225,0.4)' }}
-                  >
-                    <MdLocationOn className="text-xs" />
-                    {show.venueName}
-                  </span>
+              return (
+                <div key={show.id}>
+                  {showDivider && <GroupDivider label="Also Going To" />}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {renderRow(show, i, localIndex)}
+                  </AnimatePresence>
                 </div>
-                <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {show.genres.map((g) => (
-                    <span
-                      key={g}
-                      className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                      style={{
-                        background: selected ? hexToRgba(ACCENT, 0.14) : 'rgba(255,255,255,0.06)',
-                        color: selected ? '#1a1200' : 'rgba(229,226,225,0.4)',
-                      }}
-                    >
-                      {g}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </button>
-          )
-        })}
+              )
+            })}
+          </div>
+        )}
       </div>
-
-      {/* Promote a new show CTA */}
-      <button
-        type="button"
-        onClick={onCreateNew}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-medium transition-colors duration-150"
-        style={{
-          background: 'rgba(255,255,255,0.04)',
-          border: `1.5px dashed ${hexToRgba(ACCENT, 0.25)}`,
-          color: hexToRgba(ACCENT, 0.7),
-        }}
-      >
-        <MdOpenInNew className="text-sm" />
-        Promote a new show
-      </button>
     </div>
   )
 }

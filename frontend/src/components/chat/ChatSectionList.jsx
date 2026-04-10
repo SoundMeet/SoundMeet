@@ -22,14 +22,14 @@ const ChatSectionList = ({ title, items, activeId, onSelect, users, showEmptySta
   return (
     <div className="mb-1">
       <div
-        className="px-3 pt-2.5 pb-1.5"
+        className="px-3 pt-3 pb-1"
         style={{
-          fontSize: '0.62rem',
-          color: 'rgba(229,226,225,0.35)',
+          fontSize:      '0.6rem',
+          color:         'rgba(229,226,225,0.3)',
           textTransform: 'uppercase',
-          letterSpacing: '0.09em',
-          fontFamily: 'Sora, sans-serif',
-          fontWeight: 600,
+          letterSpacing: '0.1em',
+          fontFamily:    'Sora, sans-serif',
+          fontWeight:    700,
         }}
       >
         {title}

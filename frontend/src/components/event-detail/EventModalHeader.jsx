@@ -36,6 +36,14 @@ const CopyIcon = () => (
   </svg>
 );
 
+const ShareIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+  </svg>
+);
+
 const CheckIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12"/>
@@ -76,11 +84,13 @@ const EventModalHeader = ({
   relationship,
   accent,
   onClose,
+  onShare,
   canSeeLocation,
   description,
   isEditing = false,
 }) => {
   const [addressCopied, setAddressCopied] = useState(false);
+  const [shareCopied,   setShareCopied]   = useState(false);
   const [posterOpen, setPosterOpen]       = useState(false);
 
   // Close lightbox on Escape
@@ -159,17 +169,42 @@ const EventModalHeader = ({
 
   // ── Reusable sub-elements ─────────────────────────────────────────────────────
 
-  const closeButton = (
-    <button
-      onClick={onClose}
-      aria-label="Close event details"
-      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 hover:text-white transition-all duration-150"
-      style={{ background: "rgba(255,255,255,0.07)" }}
-    >
-      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-        <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      </svg>
-    </button>
+  const handleShare = () => {
+    if (!onShare) return;
+    onShare();
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 1600);
+  };
+
+  const headerActions = (
+    <div className="flex items-center gap-1.5 shrink-0">
+      {onShare && (
+        <button
+          onClick={handleShare}
+          aria-label={shareCopied ? "Link copied!" : "Copy share link"}
+          title={shareCopied ? "Copied!" : "Share event"}
+          className="w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150"
+          style={{
+            background: "rgba(255,255,255,0.07)",
+            color: shareCopied ? "rgba(229,226,225,0.75)" : "rgba(229,226,225,0.4)",
+          }}
+          onMouseEnter={(e) => { if (!shareCopied) e.currentTarget.style.color = "rgba(229,226,225,0.65)"; }}
+          onMouseLeave={(e) => { if (!shareCopied) e.currentTarget.style.color = "rgba(229,226,225,0.4)"; }}
+        >
+          {shareCopied ? <CheckIcon /> : <ShareIcon />}
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        aria-label="Close event details"
+        className="w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 hover:text-white transition-all duration-150"
+        style={{ background: "rgba(255,255,255,0.07)" }}
+      >
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+        </svg>
+      </button>
+    </div>
   );
 
   const badgePills = (
@@ -375,7 +410,7 @@ const EventModalHeader = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 mb-2">
                 {badgePills}
-                {closeButton}
+                {headerActions}
               </div>
               <h2 id="event-detail-title" className={posterTitleClass}>
                 {item.title}
@@ -389,7 +424,7 @@ const EventModalHeader = ({
           <>
             <div className="flex items-start justify-between gap-3 mb-2.5">
               {badgePills}
-              {closeButton}
+              {headerActions}
             </div>
             <h2 id="event-detail-title" className={noPosterTitleClass}>
               {item.title}

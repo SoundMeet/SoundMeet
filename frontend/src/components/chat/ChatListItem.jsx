@@ -1,5 +1,3 @@
-import PresenceDot from './PresenceDot'
-
 const AVATAR_PALETTE = ['#C2185B', '#7B1FA2', '#1565C0', '#00695C', '#E65100', '#4527A0']
 
 function FallbackAvatar({ name, size }) {
@@ -21,14 +19,34 @@ function FallbackAvatar({ name, size }) {
   )
 }
 
+// ─── Inline presence dot for DM avatar corner ────────────────────────────────
+function PresencePip({ status }) {
+  if (!status || status === 'offline') return null
+  const color = status === 'online' ? '#22C55E' : '#F7C10D'
+  return (
+    <div
+      style={{
+        position:        'absolute',
+        bottom:          0,
+        right:           0,
+        width:           9,
+        height:          9,
+        borderRadius:    '50%',
+        backgroundColor: color,
+        border:          '1.5px solid rgba(15,15,15,0.9)',
+        boxShadow:       status === 'online' ? '0 0 4px rgba(34,197,94,0.5)' : 'none',
+      }}
+    />
+  )
+}
+
 const ChatListItem = ({ item, isActive, onClick, users }) => {
   const base = [
     'flex items-center gap-3 mx-1 px-3 py-2.5 cursor-pointer',
     'rounded-xl transition-all duration-150',
-    'border-l-2',
     isActive
-      ? 'bg-white/[0.07] border-[#DC2E73]'
-      : 'border-transparent hover:bg-white/[0.04]',
+      ? 'bg-white/[0.09]'
+      : 'hover:bg-white/[0.05]',
   ].join(' ')
 
   if (item.type === 'dm') {
@@ -46,8 +64,8 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
 
     return (
       <div className={base} onClick={onClick}>
-        {/* Avatar with unread badge */}
-        <div className="relative flex-shrink-0">
+        {/* Avatar with presence pip + unread badge */}
+        <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
           {participant.avatar ? (
             <img
               src={participant.avatar}
@@ -58,6 +76,7 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
           ) : (
             <FallbackAvatar name={participant.name} size={36} />
           )}
+          <PresencePip status={participant.status} />
           {item.unread > 0 && (
             <div
               className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
@@ -72,19 +91,17 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
         <div className="flex-1 min-w-0">
           <div
             className="truncate leading-tight"
-            style={{ fontSize: '0.85rem', fontWeight: 500, color: '#E5E2E1' }}
+            style={{ fontSize: '0.84rem', fontWeight: 600, color: isActive ? '#E5E2E1' : 'rgba(229,226,225,0.88)' }}
           >
             {participant.name}
           </div>
           <div
             className="truncate leading-tight mt-0.5"
-            style={{ fontSize: '0.7rem', color: statusColor }}
+            style={{ fontSize: '0.69rem', color: statusColor }}
           >
             {statusLabel}
           </div>
         </div>
-
-        <PresenceDot status={participant.status} />
       </div>
     )
   }
@@ -113,7 +130,7 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
       <div className="flex-1 min-w-0">
         <div
           className="truncate leading-tight"
-          style={{ fontSize: '0.85rem', fontWeight: 500, color: '#E5E2E1' }}
+          style={{ fontSize: '0.84rem', fontWeight: 600, color: isActive ? '#E5E2E1' : 'rgba(229,226,225,0.88)' }}
         >
           {item.name}
         </div>
@@ -121,8 +138,8 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
           <div
             className="truncate leading-tight mt-0.5"
             style={{
-              fontSize: '0.7rem',
-              color: item.active ? 'rgba(220,46,115,0.8)' : 'rgba(229,226,225,0.35)',
+              fontSize: '0.69rem',
+              color: item.active ? 'rgba(220,46,115,0.75)' : 'rgba(229,226,225,0.32)',
             }}
           >
             {item.active ? 'Active' : memberText}

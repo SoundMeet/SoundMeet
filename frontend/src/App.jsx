@@ -30,6 +30,7 @@ const PrivateRoute = ({ children }) => {
   return children
 }
 import Onboarding from "./pages/Onboarding";
+import EventDetailPage from "./pages/EventDetailPage";
 
 
 
@@ -72,6 +73,8 @@ const App = () => {
               <Route path="/feed" element={<OnboardingGuard><PrivateRoute><Feed /></PrivateRoute></OnboardingGuard>} />
               <Route path="/profile" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
               <Route path="/settings" element={<OnboardingGuard><Settings /></OnboardingGuard>} />
+              <Route path="/jam/:id"  element={<EventDetailPage type="jam" />} />
+              <Route path="/show/:id" element={<EventDetailPage type="show" />} />
               <Route path="*" element={<NotFound />} />
               <Route path="/onboarding" element={<Onboarding />} />
       </Routes>

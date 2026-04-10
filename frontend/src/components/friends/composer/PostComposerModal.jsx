@@ -7,20 +7,17 @@ import { hexToRgba } from '../../../utils/discovery'
 /**
  * PostComposerModal — shared shell for all post creation flows.
  *
- * Wraps the type-specific body (children) with a consistent header,
- * optional location capture row, and a Cancel/Submit footer.
- *
  * Props:
  *   open         boolean
  *   onClose      () => void
- *   title        string          — "Post a Clip", "Invite to Jam", etc.
- *   accent       string          — hex from TYPE_BADGE colors
- *   submitLabel  string          — "Post Clip", "Share", etc.
- *   canSubmit    boolean         — driven by each body's own validation
+ *   title        string
+ *   accent       string hex
+ *   submitLabel  string
+ *   canSubmit    boolean
  *   isSubmitting boolean
- *   onSubmit     (location) => void  — receives location object (or null)
- *   author       { displayName, avatarUrl } — current user
- *   children     ReactNode       — type-specific composer body
+ *   onSubmit     (location) => void
+ *   author       { displayName, avatarUrl }
+ *   children     ReactNode
  */
 export function PostComposerModal({
   open,
@@ -53,18 +50,17 @@ export function PostComposerModal({
     return () => document.removeEventListener('keydown', handle)
   }, [open, onClose])
 
-  // Derive text color — yellow needs dark text, others get white
+  // Yellow accent needs dark text on the submit button
   const isYellow   = accent === '#F7C10D' || accent === '#FCD34D'
   const buttonText = isYellow ? '#1a1200' : '#ffffff'
 
+  const locationClickable = status === 'idle' || status === 'denied' || status === 'error'
   const locationLabel =
     status === 'requesting' ? 'Locating…' :
-    status === 'denied'     ? 'Location unavailable' :
-    status === 'error'      ? 'Location unavailable' :
+    status === 'denied'     ? 'Unavailable' :
+    status === 'error'      ? 'Unavailable' :
     location               ? location.name :
     'Add location'
-
-  const locationClickable = status === 'idle' || status === 'denied' || status === 'error'
 
   return (
     <AnimatePresence>
@@ -93,24 +89,24 @@ export function PostComposerModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
               transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.9 }}
-              className="w-full sm:max-w-lg flex flex-col pointer-events-auto overflow-hidden"
+              className="w-full sm:max-w-[540px] flex flex-col pointer-events-auto overflow-hidden
+                         rounded-t-[24px] sm:rounded-3xl"
               style={{
                 background: '#1a1a1a',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '24px 24px 0 0',
-                maxHeight: '90vh',
-                boxShadow: `0 -8px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)`,
+                border:     '1px solid rgba(255,255,255,0.08)',
+                maxHeight:  '90vh',
+                boxShadow:  '0 -8px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Drag handle — visual only */}
+              {/* Drag handle (mobile) */}
               <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
-                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.14)' }} />
               </div>
 
-              {/* Header */}
+              {/* ── Header ──────────────────────────────────────────────── */}
               <div
-                className="flex items-center gap-3 px-5 py-4 flex-shrink-0"
+                className="flex items-center gap-3 px-5 py-3.5 flex-shrink-0"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
               >
                 {/* Author avatar */}
@@ -118,22 +114,22 @@ export function PostComposerModal({
                   <img
                     src={author.avatarUrl}
                     alt={author.displayName}
-                    className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
                   <div
-                    className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
-                    style={{ background: `linear-gradient(135deg, ${hexToRgba(accent, 0.6)}, ${hexToRgba(accent, 0.3)})` }}
+                    className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${hexToRgba(accent, 0.6)}, ${hexToRgba(accent, 0.28)})` }}
                   >
                     {author?.displayName?.[0] ?? '?'}
                   </div>
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-bold text-white leading-tight">{title}</p>
+                  <p className="text-[13px] font-semibold text-white leading-tight">{title}</p>
                   {author && (
-                    <p className="text-[11px] mt-0.5" style={{ color: 'rgba(229,226,225,0.35)' }}>
-                      as {author.displayName}
+                    <p className="text-[11px] mt-0.5 leading-none" style={{ color: 'rgba(229,226,225,0.3)' }}>
+                      {author.displayName}
                     </p>
                   )}
                 </div>
@@ -141,14 +137,15 @@ export function PostComposerModal({
                 <button
                   onClick={onClose}
                   aria-label="Close"
-                  className="w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0 transition-colors hover:bg-white/10"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(229,226,225,0.5)' }}
+                  className="w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0
+                             transition-colors hover:bg-white/10"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(229,226,225,0.4)' }}
                 >
                   <MdClose className="text-sm" />
                 </button>
               </div>
 
-              {/* Scrollable body */}
+              {/* ── Scrollable body ──────────────────────────────────────── */}
               <div
                 ref={bodyRef}
                 className="flex-1 overflow-y-auto px-5 py-4"
@@ -157,82 +154,83 @@ export function PostComposerModal({
                 {children}
               </div>
 
-              {/* Location row */}
+              {/* ── Footer: location (left) + cancel / submit (right) ────── */}
               <div
-                className="px-5 py-3 flex-shrink-0"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+                className="flex items-center gap-2 px-4 flex-shrink-0"
+                style={{
+                  borderTop:     '1px solid rgba(255,255,255,0.05)',
+                  paddingTop:    10,
+                  paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+                }}
               >
+                {/* Location — secondary metadata action, left-anchored */}
                 {status === 'granted' && location ? (
-                  /* Location granted — show dismissible chip */
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-shrink-0 mr-auto">
                     <span
-                      className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full"
                       style={{
-                        background: hexToRgba(accent, 0.12),
-                        color: accent,
-                        border: `1px solid ${hexToRgba(accent, 0.25)}`,
+                        background: hexToRgba(accent, 0.1),
+                        color:      accent,
+                        border:     `1px solid ${hexToRgba(accent, 0.2)}`,
                       }}
                     >
-                      <MdLocationOn className="text-sm" />
+                      <MdLocationOn className="text-xs" />
                       {location.name}
                     </span>
                     <button
                       onClick={clearLocation}
-                      className="text-[11px] transition-colors hover:opacity-80"
-                      style={{ color: 'rgba(229,226,225,0.3)' }}
+                      className="text-[10px] transition-opacity hover:opacity-60 flex-shrink-0"
+                      style={{ color: 'rgba(229,226,225,0.28)' }}
                     >
                       Remove
                     </button>
                   </div>
                 ) : (
-                  /* Idle / denied / requesting — show pill button */
                   <button
                     onClick={locationClickable ? requestLocation : undefined}
                     disabled={status === 'requesting'}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full transition-all duration-150 disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[11px] transition-all duration-150
+                               disabled:opacity-40 hover:opacity-80 flex-shrink-0 mr-auto"
                     style={{
-                      background: 'rgba(255,255,255,0.05)',
                       color: status === 'denied' || status === 'error'
-                        ? 'rgba(229,226,225,0.25)'
-                        : 'rgba(229,226,225,0.45)',
-                      border: '1px solid rgba(255,255,255,0.08)',
+                        ? 'rgba(229,226,225,0.18)'
+                        : 'rgba(229,226,225,0.35)',
                     }}
                   >
                     <MdLocationOn
                       className="text-sm"
                       style={{
                         color: status === 'denied' || status === 'error'
-                          ? 'rgba(229,226,225,0.2)'
-                          : accent,
+                          ? 'rgba(229,226,225,0.15)'
+                          : hexToRgba(accent, 0.6),
                       }}
                     />
                     {locationLabel}
                   </button>
                 )}
-              </div>
 
-              {/* Footer */}
-              <div
-                className="flex items-center gap-3 px-5 pb-5 pt-3 flex-shrink-0"
-                style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
-              >
+                {/* Cancel */}
                 <button
                   onClick={onClose}
-                  className="flex-1 py-2.5 rounded-full text-sm font-semibold transition-all duration-150 hover:bg-white/10 active:scale-95"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    color: 'rgba(229,226,225,0.5)',
-                  }}
+                  className="px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-150
+                             hover:bg-white/[0.06] active:scale-95 flex-shrink-0"
+                  style={{ color: 'rgba(229,226,225,0.32)' }}
                 >
                   Cancel
                 </button>
+
+                {/* Submit — primary CTA */}
                 <button
                   onClick={() => onSubmit(location)}
                   disabled={!canSubmit || isSubmitting}
-                  className="flex-1 py-2.5 rounded-full text-sm font-semibold transition-all duration-150 hover:brightness-110 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100"
+                  className="px-5 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-150
+                             hover:brightness-110 active:scale-95
+                             disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100
+                             flex-shrink-0"
                   style={{
-                    background: `linear-gradient(135deg, ${accent}, ${hexToRgba(accent, 0.75)})`,
-                    color: buttonText,
+                    background: `linear-gradient(135deg, ${accent}, ${hexToRgba(accent, 0.7)})`,
+                    color:      buttonText,
+                    minWidth:   88,
                   }}
                 >
                   {isSubmitting ? 'Posting…' : submitLabel}

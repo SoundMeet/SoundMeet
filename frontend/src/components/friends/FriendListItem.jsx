@@ -35,12 +35,11 @@ function FriendAvatar({ displayName, avatarUrl }) {
 }
 
 export function FriendListItem({ friend }) {
-  const { displayName, instruments, avatarUrl, isOnline } = friend
+  const { displayName, instruments, avatarUrl } = friend
   const [menuOpen, setMenuOpen] = useState(false)
   const containerRef = useRef(null)
   const navigate = useNavigate()
 
-  // Close on outside click
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e) => {
@@ -54,7 +53,6 @@ export function FriendListItem({ friend }) {
 
   const handleChat = () => {
     setMenuOpen(false)
-    // Navigate to /chat and pass the friend so Chat can open/create the DM
     navigate('/chat', {
       state: {
         openDmWith: {
@@ -69,7 +67,6 @@ export function FriendListItem({ friend }) {
 
   const handleViewProfile = () => {
     setMenuOpen(false)
-    // Stub — profile page will be linked once implemented
     navigate('/profile')
   }
 
@@ -77,27 +74,25 @@ export function FriendListItem({ friend }) {
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setMenuOpen((v) => !v)}
-        className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 hover:bg-white/5"
+        className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 hover:bg-white/[0.05]"
         type="button"
       >
-        {/* Avatar with online indicator */}
-        <div className="relative flex-shrink-0">
+        <div className="flex-shrink-0">
           <FriendAvatar displayName={displayName} avatarUrl={avatarUrl} />
-          {isOnline && (
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 ring-2 ring-black" />
-          )}
         </div>
 
-        {/* Text */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{displayName}</p>
-          <p className="text-[11px] truncate" style={{ color: 'rgba(229,226,225,0.4)' }}>
-            {instruments.slice(0, 2).join(' · ')}
-          </p>
+          {instruments?.length > 0 ? (
+            <p className="text-[11px] truncate" style={{ color: 'rgba(167,139,250,0.65)' }}>
+              {instruments.slice(0, 2).join(' · ')}
+            </p>
+          ) : (
+            <p className="text-[11px]" style={{ color: 'rgba(229,226,225,0.28)' }}>Musician</p>
+          )}
         </div>
       </button>
 
-      {/* Context menu */}
       {menuOpen && (
         <div
           className="absolute left-0 right-0 z-50 mt-0.5 rounded-xl overflow-hidden"
@@ -111,7 +106,7 @@ export function FriendListItem({ friend }) {
         >
           <button
             onClick={handleViewProfile}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-white/5"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-white/[0.05]"
             style={{ color: 'rgba(229,226,225,0.85)' }}
           >
             <MdPerson className="text-base flex-shrink-0" style={{ color: 'rgba(229,226,225,0.4)' }} />
@@ -120,7 +115,7 @@ export function FriendListItem({ friend }) {
           <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
           <button
             onClick={handleChat}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-white/5"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-white/[0.05]"
             style={{ color: 'rgba(229,226,225,0.85)' }}
           >
             <MdChat className="text-base flex-shrink-0" style={{ color: '#DC2E73' }} />

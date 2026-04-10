@@ -1,65 +1,224 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { MdMusicNote, MdCalendarToday, MdLocationOn, MdCheck } from 'react-icons/md'
+import { MdMusicNote, MdCheck, MdClose } from 'react-icons/md'
 import { hexToRgba } from '../../../utils/discovery'
+import { useEligibleEvents } from '../../../hooks/useEligibleEvents'
+import { useAuth } from '../../../injectables/Auth'
+import { EventInviteCard } from '../../event-invite/EventInviteCard'
 
 const ACCENT = '#DC2E73'
 
-// Mock upcoming jams owned by / joined by the current user
-// TODO: replace with api.getMyJams() when backend is ready
-const MY_JAMS = [
-  {
-    id: 'mj-1',
-    title: 'Saturday Funk Collective',
-    date: '2026-04-05',
-    locationName: 'Wynwood Arts District',
-    genres: ['Funk', 'Soul'],
-  },
-  {
-    id: 'mj-2',
-    title: 'Late Night Jazz Improv',
-    date: '2026-04-07',
-    locationName: 'Little Havana',
-    genres: ['Jazz'],
-  },
-  {
-    id: 'mj-3',
-    title: 'Sunday Acoustic Session',
-    date: '2026-04-13',
-    locationName: 'Coconut Grove',
-    genres: ['Acoustic', 'Folk'],
-  },
-  {
-    id: 'mj-4',
-    title: 'Groove Lab Session #5',
-    date: '2026-04-18',
-    locationName: 'Midtown Miami',
-    genres: ['R&B', 'Neo Soul'],
-  },
-]
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDate(iso) {
+  if (!iso) return null
   return new Date(iso).toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   })
 }
 
+// ── Section divider (between "your" and "attending" groups) ───────────────────
+
+function GroupDivider({ label }) {
+  return (
+    <div className="flex items-center gap-2.5 my-2">
+      <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.05)' }} />
+      <span
+        className="text-[9px] font-semibold uppercase tracking-[0.12em] flex-shrink-0"
+        style={{ color: 'rgba(229,226,225,0.2)' }}
+      >
+        {label}
+      </span>
+      <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.05)' }} />
+    </div>
+  )
+}
+
+// ── Single unselected jam row ──────────────────────────────────────────────────
+
+function JamRow({ jam, onSelect, index }) {
+  const dateStr  = formatDate(jam.dateTimeRaw ?? jam.date)
+  const location = jam.locationName ?? jam.neighborhood ?? null
+  const meta     = [dateStr, location].filter(Boolean).join(' · ')
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => onSelect(jam)}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
+      whileTap={{ scale: 0.985 }}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150"
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border:     '1px solid rgba(255,255,255,0.06)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background  = hexToRgba(ACCENT, 0.05)
+        e.currentTarget.style.borderColor = hexToRgba(ACCENT, 0.18)
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background  = 'rgba(255,255,255,0.03)'
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+      }}
+    >
+      {/* Icon */}
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(255,255,255,0.05)' }}
+      >
+        <MdMusicNote style={{ color: 'rgba(229,226,225,0.28)', fontSize: 15 }} />
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p
+          className="text-[13px] font-semibold leading-tight truncate"
+          style={{ color: 'rgba(229,226,225,0.82)' }}
+        >
+          {jam.title}
+        </p>
+        {meta && (
+          <p
+            className="text-[11px] leading-tight truncate mt-0.5"
+            style={{ color: 'rgba(229,226,225,0.35)' }}
+          >
+            {meta}
+          </p>
+        )}
+      </div>
+
+      {/* Select indicator */}
+      <div
+        className="w-4 h-4 rounded-full flex-shrink-0"
+        style={{
+          border: '1.5px solid rgba(255,255,255,0.12)',
+          background: 'transparent',
+        }}
+      />
+    </motion.button>
+  )
+}
+
+// ── Selected jam — transforms into the invite card preview ────────────────────
+
+function SelectedJamCard({ jam, onDeselect }) {
+  return (
+    <motion.div
+      key="selected"
+      initial={{ opacity: 0, scale: 0.97, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97, y: -4 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+      className="relative"
+    >
+      <EventInviteCard
+        type="jam"
+        id={String(jam.id)}
+        compact={false}
+        previewOnly={true}
+      />
+      {/* Deselect */}
+      <button
+        type="button"
+        onClick={onDeselect}
+        aria-label="Remove selection"
+        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-full transition-colors hover:bg-white/20"
+        style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(229,226,225,0.8)' }}
+      >
+        <MdClose style={{ fontSize: 10 }} />
+      </button>
+    </motion.div>
+  )
+}
+
+// ── Skeleton rows ──────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <div
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl animate-pulse"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+    >
+      <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }} />
+      <div className="flex-1 space-y-1.5">
+        <div className="h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', width: '62%' }} />
+        <div className="h-2.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', width: '42%' }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Empty state ────────────────────────────────────────────────────────────────
+
+function EmptyState() {
+  return (
+    <div
+      className="flex flex-col items-center gap-1.5 py-7 rounded-xl"
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}
+    >
+      <MdMusicNote style={{ fontSize: 26, color: 'rgba(229,226,225,0.18)' }} />
+      <p className="text-[12px]" style={{ color: 'rgba(229,226,225,0.35)' }}>
+        No upcoming jams to invite to
+      </p>
+      <p className="text-[11px]" style={{ color: 'rgba(229,226,225,0.2)' }}>
+        Create or join a jam first
+      </p>
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 /**
- * JamInviteComposerBody — body for the "Invite to Jam" composer.
+ * JamInviteComposerBody
  *
- * Props:
- *   state    { message: string, selectedJam: object | null }
- *   onChange (patch) => void
+ * State: { message: string, selectedJam: NormalizedItem | null }
  *
- * Backend note:
- *   MY_JAMS should be fetched from GET /api/jams/?author={userId}&upcoming=true
- *   The selected jam's id maps to posts.jam_ref_id (FK → events.id).
+ * When a jam is selected, its row transforms into the rich EventInviteCard
+ * preview inline. Other rows remain compact. Deselect via the × button.
  */
 export function JamInviteComposerBody({ state, onChange }) {
+  const { user } = useAuth()
+  const { loading, yours, attending } = useEligibleEvents(user?.id, 'jam')
+
+  const selectedId = state.selectedJam ? String(state.selectedJam.id) : null
+  const allEmpty   = !loading && yours.length === 0 && attending.length === 0
+
+  // Flatten both groups to render the list; track where the divider goes
+  const allJams    = [...yours, ...attending]
+  const dividerAt  = yours.length  // index where second section starts
+
+  const renderRow = (jam, globalIndex, localIndex) => {
+    const isSelected = selectedId === String(jam.id)
+
+    if (isSelected) {
+      return (
+        <div key={jam.id}>
+          <SelectedJamCard
+            jam={jam}
+            onDeselect={() => onChange({ selectedJam: null })}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div key={jam.id}>
+        <JamRow
+          jam={jam}
+          onSelect={(j) => onChange({ selectedJam: j })}
+          index={localIndex}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      {/* Message */}
+      {/* Optional message */}
       <textarea
-        rows={3}
+        rows={2}
         value={state.message}
         onChange={(e) => onChange({ message: e.target.value })}
         placeholder="Write a message to go with the invite… (optional)"
@@ -69,107 +228,37 @@ export function JamInviteComposerBody({ state, onChange }) {
       />
 
       {/* Jam picker */}
-      <div className="space-y-2">
+      <div>
         <p
-          className="text-[11px] font-medium uppercase tracking-[0.1em]"
-          style={{ color: 'rgba(229,226,225,0.35)' }}
+          className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-3"
+          style={{ color: 'rgba(229,226,225,0.42)' }}
         >
           Select a Jam
         </p>
-        <div className="space-y-2">
-          {MY_JAMS.map((jam, i) => {
-            const selected = state.selectedJam?.id === jam.id
-            return (
-              <motion.button
-                key={jam.id}
-                type="button"
-                onClick={() => onChange({ selectedJam: selected ? null : jam })}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.055, type: 'spring', stiffness: 400, damping: 28 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors duration-150"
-                style={{
-                  background: selected ? hexToRgba(ACCENT, 0.1) : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${selected ? hexToRgba(ACCENT, 0.3) : 'rgba(255,255,255,0.07)'}`,
-                }}
-              >
-                {/* Icon */}
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors duration-200"
-                  style={{
-                    background: selected ? hexToRgba(ACCENT, 0.2) : 'rgba(255,255,255,0.06)',
-                  }}
-                >
+
+        {loading ? (
+          <div className="space-y-1.5">
+            <SkeletonRow /><SkeletonRow /><SkeletonRow />
+          </div>
+        ) : allEmpty ? (
+          <EmptyState />
+        ) : (
+          <div className="space-y-1.5">
+            {allJams.map((jam, i) => {
+              const localIndex = i < dividerAt ? i : i - dividerAt
+              const showDivider = dividerAt > 0 && i === dividerAt && attending.length > 0
+
+              return (
+                <div key={jam.id}>
+                  {showDivider && <GroupDivider label="Also Going To" />}
                   <AnimatePresence mode="wait" initial={false}>
-                    {selected ? (
-                      <motion.span
-                        key="check"
-                        initial={{ scale: 0, rotate: -20 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        exit={{ scale: 0, rotate: 20 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-                      >
-                        <MdCheck style={{ color: ACCENT, fontSize: 18 }} />
-                      </motion.span>
-                    ) : (
-                      <motion.span
-                        key="note"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-                      >
-                        <MdMusicNote style={{ color: 'rgba(229,226,225,0.35)', fontSize: 18 }} />
-                      </motion.span>
-                    )}
+                    {renderRow(jam, i, localIndex)}
                   </AnimatePresence>
                 </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-sm font-semibold leading-tight truncate transition-colors duration-150"
-                    style={{ color: selected ? '#fff' : 'rgba(229,226,225,0.8)' }}
-                  >
-                    {jam.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span
-                      className="inline-flex items-center gap-1 text-[11px]"
-                      style={{ color: 'rgba(229,226,225,0.4)' }}
-                    >
-                      <MdCalendarToday className="text-xs" />
-                      {formatDate(jam.date)}
-                    </span>
-                    <span
-                      className="inline-flex items-center gap-1 text-[11px]"
-                      style={{ color: 'rgba(229,226,225,0.4)' }}
-                    >
-                      <MdLocationOn className="text-xs" />
-                      {jam.locationName}
-                    </span>
-                  </div>
-                  {/* Genre tags */}
-                  <div className="flex gap-1 mt-1.5 flex-wrap">
-                    {jam.genres.map((g) => (
-                      <span
-                        key={g}
-                        className="text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-150"
-                        style={{
-                          background: selected ? hexToRgba(ACCENT, 0.15) : 'rgba(255,255,255,0.06)',
-                          color: selected ? ACCENT : 'rgba(229,226,225,0.4)',
-                        }}
-                      >
-                        {g}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </motion.button>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
