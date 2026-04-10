@@ -764,7 +764,19 @@ const Profile = () => {
     setPlayingIndex(null);
   };
 
-  const saveSnippet = () => {
+  // ── BACKEND NEEDED: fetch snippets on mount ───────────────────────────────
+  // Uncomment and replace stub once GET /api/snippets/ (or /api/profiles/<username>/snippets/) exists.
+  // Shape expected per snippet: { id, title, audio: <served URL>, background: <served URL or null> }
+  //
+  // useEffect(() => {
+  //   if (!user?.id) return;
+  //   const endpoint = isOwnProfile ? "api/snippets/" : `api/profiles/${routeUsername}/snippets/`;
+  //   apiFetch(endpoint)
+  //     .then((data) => setSnippets(data.map(s => ({ ...s, audioFile: null, audioName: s.title }))))
+  //     .catch(console.error);
+  // }, [user?.id, isOwnProfile, routeUsername]);
+
+  const saveSnippet = async () => {
     if (!newSnippet.title.trim() && !newSnippet.audioFile) {
       showToast("Please add a title and audio file.");
       return;
@@ -781,23 +793,55 @@ const Profile = () => {
       showToast(`Maximum ${MAX_SNIPPETS} snippets reached.`);
       return;
     }
-    // Create a fresh blob URL from the File at save time — fully detached
-    // from the file input so it will never be prematurely garbage collected.
+
+    // ── BACKEND NEEDED: POST /api/snippets/ ─────────────────────────────────
+    // Uncomment once the endpoint exists. Remove the local blob fallback below.
+    //
+    // try {
+    //   const form = new FormData();
+    //   form.append("title", newSnippet.title);
+    //   form.append("audio", newSnippet.audioFile);
+    //   if (newSnippet.background) {
+    //     const bgBlob = await fetch(newSnippet.background).then(r => r.blob());
+    //     form.append("background", bgBlob, "bg.jpg");
+    //   }
+    //   const saved = await apiFetch("api/snippets/", { method: "POST", body: form });
+    //   setSnippets((prev) => [...prev, { ...saved, audioFile: null, audioName: saved.title }]);
+    // } catch (err) {
+    //   showToast("Failed to save snippet.");
+    //   return;
+    // }
+
+    // ── LOCAL FALLBACK (remove once backend is wired) ────────────────────────
     const audioUrl = URL.createObjectURL(newSnippet.audioFile);
     setSnippets((prev) => [...prev, { ...newSnippet, audio: audioUrl }]);
+    // ─────────────────────────────────────────────────────────────────────────
+
     setNewSnippet({ title: "", audioFile: null, audioName: null, background: null });
     setSnippetModalOpen(false);
   };
 
-  const deleteSnippet = (indexToDelete) => {
-    setSnippets((prev) => {
-      const target = prev[indexToDelete];
-      if (target) {
-        revokeObjectUrl(target.audio);
-        revokeObjectUrl(target.background);
-      }
-      return prev.filter((_, i) => i !== indexToDelete);
-    });
+  const deleteSnippet = async (indexToDelete) => {
+    const target = snippets[indexToDelete];
+
+    // ── BACKEND NEEDED: DELETE /api/snippets/<id>/ ───────────────────────────
+    // Uncomment once the endpoint exists.
+    //
+    // if (target?.id) {
+    //   try {
+    //     await apiFetch(`api/snippets/${target.id}/`, { method: "DELETE" });
+    //   } catch (err) {
+    //     showToast("Failed to delete snippet.");
+    //     return;
+    //   }
+    // }
+
+    // ── LOCAL CLEANUP ────────────────────────────────────────────────────────
+    if (target) {
+      revokeObjectUrl(target.audio);
+      revokeObjectUrl(target.background);
+    }
+    setSnippets((prev) => prev.filter((_, i) => i !== indexToDelete));
 
     if (playingIndex === indexToDelete) {
       stopPlayback();
