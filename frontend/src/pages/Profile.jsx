@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useParams } from "react-router-dom";
-import { jamService } from "../services/jamService";
+import { jamService } from "../injectables/jamService";
 import { apiService } from "../injectables/apiCalls";
+import { postService } from "../injectables/postService";
 import CropperThings from "../components/CropperThings";
 import { useAuth } from "../injectables/Auth";
 import { useAuthModal } from "../context/AuthModalContext";
@@ -277,15 +278,11 @@ function InterestsSidebar({ pills, jams, user, city, country, availableToJam, on
         <div className="p-5 flex flex-col gap-3">
           <SectionHeading>Interests</SectionHeading>
 
-          {/* Sound chips */}
+          {/* Sound chips — color pulled from the pill itself */}
           {pills.length > 0 && (() => {
-            const chips = [
-              { key: "g", color: "#DC2E73" },
-              { key: "i", color: "#0891B2" },
-              { key: "v", color: "#7C3AED" },
-            ].map(cat => {
-              const match = pills.find(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_"));
-              return match ? { ...cat, text: match.text, emoji: getPillEmoji(match.text) } : null;
+            const chips = ["g", "i", "v"].map(key => {
+              const match = pills.find(p => typeof p.id === "string" && p.id.startsWith(key + "_"));
+              return match ? { key, color: match.color, text: match.text, emoji: getPillEmoji(match.text) } : null;
             }).filter(Boolean);
             if (chips.length === 0) return null;
             return (
@@ -436,45 +433,6 @@ function InterestsSidebar({ pills, jams, user, city, country, availableToJam, on
           </div>
         </div>
 
-        <SectionDivider />
-
-        {/* ── AVAILABILITY TOGGLE ── */}
-        <div className="px-5 py-4">
-          {isOwnProfile ? (
-            <button onClick={onToggleAvailable}
-              className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200"
-              style={{ background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}` }}>
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2 shrink-0">
-                  {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
-                  <span className="relative inline-flex rounded-full h-2 w-2"
-                    style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
-                </span>
-                <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
-                  {availableToJam ? "Open to Jam" : "Not Available"}
-                </span>
-              </div>
-              <div className="relative w-8 h-4 rounded-full transition-colors duration-200 shrink-0"
-                style={{ background: availableToJam ? "rgba(220,46,115,0.30)" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)") }}>
-                <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
-                  style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)"), left: availableToJam ? "calc(100% - 14px)" : "2px" }} />
-              </div>
-            </button>
-          ) : (
-            // Read-only availability indicator for other users' profiles
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-              style={{ background: availableToJam ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.25)" : tileBorder}` }}>
-              <span className="relative flex h-2 w-2 shrink-0">
-                {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
-                <span className="relative inline-flex rounded-full h-2 w-2"
-                  style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
-              </span>
-              <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
-                {availableToJam ? "Open to Jam" : "Not Available"}
-              </span>
-            </div>
-          )}
-        </div>
 
       </div>
     </div>
@@ -493,7 +451,7 @@ const Profile = () => {
   // If a username is present in the URL we're viewing someone else's profile.
   // If not, we're viewing our own. isOwnProfile gates all edit affordances.
   const { username: routeUsername } = useParams();
-  const { user: loggedInUser, isLoggedIn } = useAuth();
+  const { user: loggedInUser, isLoggedIn, updateProfile } = useAuth();
   const { openModal } = useAuthModal();
 
   // viewedUser — the profile being displayed. Starts as the logged-in user,
@@ -544,6 +502,24 @@ const Profile = () => {
   // Availability toggle — local state, shown in the Interests sidebar
   const [availableToJam, setAvailableToJam] = useState(false);
 
+  // ── Add Friend state — only relevant when viewing someone else's profile ──
+  const [friendStatus, setFriendStatus] = useState("none"); // "none" | "pending" | "friends"
+  const [friendLoading, setFriendLoading] = useState(false);
+
+  const handleAddFriend = async () => {
+    if (!isLoggedIn) { openModal("login"); return; }
+    if (friendLoading || friendStatus !== "none") return;
+    setFriendLoading(true);
+    try {
+      await apiService.sendFriendRequest(user?.id);
+      setFriendStatus("pending");
+    } catch (err) {
+      console.error("Failed to send friend request:", err);
+    } finally {
+      setFriendLoading(false);
+    }
+  };
+
   // pills – seeded from user.genres_liked, instruments_liked, vibes_liked
   const [pills, setPills] = useState([]);
 
@@ -555,7 +531,7 @@ const Profile = () => {
   const [tagsLoading, setTagsLoading] = useState(false);
 
   const PILL_COLORS = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
-  const MAX_PILLS = 9;
+  const MAX_PILLS = 12;
 
   // Toggle a tag in the picker — single source of truth, rebuilds pills from selection
   const toggleTag = (tag) => {
@@ -749,6 +725,19 @@ const Profile = () => {
   }, [user?.id]);
 
   const removeJam = (jamId) => setJams((prev) => prev.filter((j) => j.id !== jamId));
+
+  // ── Profile posts — up to 3 most recent ──────────────────────────────────────
+  const [profilePosts, setProfilePosts] = useState([]);
+  const [profilePostsLoading, setProfilePostsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setProfilePostsLoading(true);
+    postService.getPostsByUser(user.id, loggedInUser?.id, 3)
+      .then(setProfilePosts)
+      .catch(console.error)
+      .finally(() => setProfilePostsLoading(false));
+  }, [user?.id, loggedInUser?.id]);
 
   const revokeObjectUrl = (url) => {
     if (typeof url === "string" && url.startsWith("blob:")) {
@@ -1023,13 +1012,13 @@ const Profile = () => {
     <div className="min-h-screen bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
       <main className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-6">
 
-        {/* ── Top-level layout: [left+center content area] + [sidebar] ── */}
+        {/* ── Top-level layout: [content area] + [jams sidebar] ── */}
         <div className="flex gap-4 items-start">
 
           {/* ── LEFT+CENTER CONTENT AREA ── */}
           <div className="flex flex-col gap-4 flex-1 min-w-0">
 
-            {/* Banner — scoped to left+center only */}
+            {/* Banner — scoped to left+center only, sidebar breaks through above it */}
             <div
               className="relative flex h-[260px] w-full items-center overflow-visible rounded-2xl bg-neutral-200 px-6 md:px-10"
               onMouseEnter={() => setNameHover(true)}
@@ -1046,7 +1035,6 @@ const Profile = () => {
                     cardColors.posts.glow,
                     cardColors.interests.glow,
                   ];
-                  // Count non-black glows; pick the most frequent colored one
                   const colored = allGlows.filter(g =>
                     !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0")
                   );
@@ -1065,6 +1053,62 @@ const Profile = () => {
                   className="absolute inset-0 z-30 cursor-pointer opacity-0"
                   aria-label="Open profile editor"
                 />
+              )}
+
+              {/* ── Add Friend button — only visible on other people's profiles, hidden when edit modal is open ── */}
+              {!isOwnProfile && !editOpen && (
+                <button
+                  onClick={handleAddFriend}
+                  disabled={friendLoading || friendStatus !== "none"}
+                  className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200"
+                  style={{
+                    background: friendStatus === "friends"
+                      ? "rgba(22,163,74,0.15)"
+                      : friendStatus === "pending"
+                        ? "rgba(255,255,255,0.10)"
+                        : "#DC2E73",
+                    border: friendStatus === "friends"
+                      ? "1px solid rgba(22,163,74,0.4)"
+                      : friendStatus === "pending"
+                        ? "1px solid rgba(255,255,255,0.2)"
+                        : "1px solid rgba(220,46,115,0.6)",
+                    color: friendStatus === "friends"
+                      ? "#4ade80"
+                      : friendStatus === "pending"
+                        ? "rgba(255,255,255,0.5)"
+                        : "#fff",
+                    boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.35)" : "none",
+                    opacity: friendLoading ? 0.6 : 1,
+                    cursor: friendStatus !== "none" ? "default" : "pointer",
+                  }}
+                >
+                  {friendLoading ? (
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  ) : friendStatus === "friends" ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Friends
+                    </>
+                  ) : friendStatus === "pending" ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+                        <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                      Request Sent
+                    </>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/>
+                        <path d="M20 8v3M18.5 9.5h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                      Add Friend
+                    </>
+                  )}
+                </button>
               )}
               <div className="relative z-10 flex items-center">
                 <div
@@ -1313,179 +1357,254 @@ const Profile = () => {
 
           </div>{/* end LEFT COLUMN */}
 
-          {/* ── RIGHT COLUMN ── */}
+          {/* ── RIGHT COLUMN — Interests + Posts ── */}
           <div className="flex flex-col gap-4">
 
-            {/* Jams Attended container */}
-            <div
-              className="h-[500px] rounded-2xl p-6 backdrop-blur-md flex flex-col gap-4"
-              style={{
-                background: cardColors.jams.bg,
-                border: `1px solid ${cardColors.jams.border}`,
-                boxShadow: `0 0 40px ${cardColors.jams.glow}`,
-                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
-              }}
-            >
-              <div className="flex items-center justify-between shrink-0">
-                <h2
-                  className="text-2xl"
-                  style={{ color: needsDarkText(cardColors.jams.bg, cardTextOverrides.jams) ? "#111" : "#fff", transition: "color 0.4s ease" }}
-                >
-                  Jams Attended
-                </h2>
-              </div>
+            {/* Interests card — full drag+drop with favorites chips */}
+            {(() => {
+              const dark          = needsDarkText(cardColors.interests.bg, cardTextOverrides.interests);
+              const textPrimary   = dark ? "#111"             : "#fff";
+              const textSecondary = dark ? "#444"             : "#d4d4d4";
+              const textDim       = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
+              const dividerCol    = dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.18)";
+              const tileBg        = dark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.03)";
+              const tileBorder    = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
 
-              {jamsLoading ? (
-                <div className="flex flex-1 items-center justify-center">
-                  <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
-                </div>
-              ) : jams.length === 0 ? (
-                <Link
-                  to="/jams"
-                  className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm cursor-pointer"
+              const CATEGORIES = [
+                { key: "g", label: "Genres" },
+                { key: "i", label: "Instruments" },
+                { key: "v", label: "Vibes" },
+              ];
+              const grouped = CATEGORIES.map(cat => ({
+                ...cat,
+                pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_")),
+              })).filter(cat => cat.pills.length > 0);
+              const ungrouped = pills.filter(p => !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
+
+              // Per-category drag state — inline mirror of InterestsSidebar logic
+              const [intDragState, setIntDragState] = useState(null);
+              const intDragStartY    = useRef(0);
+              const intMovedRef      = useRef(false);
+              const intContainerRefs = useRef({});
+
+              const handleIntPillDown = (e, catKey, localIdx) => {
+                if (!isOwnProfile) return;
+                e.preventDefault();
+                intDragStartY.current = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+                intMovedRef.current   = false;
+                setIntDragState({ catKey, fromIdx: localIdx, overIdx: localIdx });
+              };
+
+              useEffect(() => {
+                if (!intDragState) return;
+                const onMove = (e) => {
+                  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                  if (Math.abs(clientY - intDragStartY.current) > 5) intMovedRef.current = true;
+                  const container = intContainerRefs.current[intDragState.catKey];
+                  if (!container) return;
+                  const items = container.querySelectorAll("[data-pill-item]");
+                  let closest = intDragState.overIdx, closestDist = Infinity;
+                  items.forEach((el, i) => {
+                    const rect = el.getBoundingClientRect();
+                    const dist = Math.abs(clientY - (rect.top + rect.height / 2));
+                    if (dist < closestDist) { closestDist = dist; closest = i; }
+                  });
+                  setIntDragState(prev => prev ? { ...prev, overIdx: closest } : null);
+                };
+                const onUp = () => {
+                  if (intMovedRef.current && intDragState && intDragState.fromIdx !== intDragState.overIdx) {
+                    const catPills  = pills.filter(p => typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_"));
+                    const reordered = [...catPills];
+                    const [moved]   = reordered.splice(intDragState.fromIdx, 1);
+                    reordered.splice(intDragState.overIdx, 0, moved);
+                    let copy = [...reordered];
+                    const newPills = pills.map(p => {
+                      if (typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_")) return copy.shift();
+                      return p;
+                    });
+                    setPills(newPills);
+                  }
+                  setIntDragState(null);
+                  intMovedRef.current = false;
+                };
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup",   onUp);
+                window.addEventListener("touchmove", onMove, { passive: false });
+                window.addEventListener("touchend",  onUp);
+                return () => {
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup",   onUp);
+                  window.removeEventListener("touchmove", onMove);
+                  window.removeEventListener("touchend",  onUp);
+                };
+              }, [intDragState, pills]);
+
+              return (
+                <div
+                  className="relative h-[500px] rounded-2xl p-5 backdrop-blur-md flex flex-col gap-3"
                   style={{
-                    borderColor: needsDarkText(cardColors.jams.bg, cardTextOverrides.jams) ? "rgba(0,0,0,0.2)" : "#404040",
-                    background: needsDarkText(cardColors.jams.bg, cardTextOverrides.jams) ? "rgba(0,0,0,0.05)" : "rgba(23,23,23,0.5)",
-                    color: needsDarkText(cardColors.jams.bg, cardTextOverrides.jams) ? "#666" : "#a3a3a3",
+                    background: cardColors.interests.bg,
+                    border: `1px solid ${cardColors.interests.border}`,
+                    boxShadow: `0 0 40px ${cardColors.interests.glow}`,
+                    transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
-                  No jams yet. Find one!
-                </Link>
-              ) : (
-                <div className="flex flex-col gap-3 overflow-y-auto hide-scrollbar flex-1 min-h-0 pr-1">
-                  {jams.map((jam) => {
-                    const isDragging = jamDragging === jam.id;
-                    const offsetX    = isDragging ? jamDragX : 0;
-                    const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
+                  <h2 className="text-2xl shrink-0" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Interests</h2>
 
-                    // Past jams render fully greyed — kept in list for history
-                    const isPast = jam.timeSlot === "past";
+                  {/* ── Availability toggle — top-right corner ── */}
+                  {isOwnProfile ? (
+                    <button
+                      onClick={() => setAvailableToJam(v => !v)}
+                      className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all duration-200"
+                      style={{
+                        background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg,
+                        border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}`,
+                      }}
+                    >
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
+                      </span>
+                      <span className="text-[11px] font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
+                        {availableToJam ? "Open to Jam" : "Not Available"}
+                      </span>
+                    </button>
+                  ) : (
+                    <div
+                      className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
+                      style={{
+                        background: availableToJam ? "rgba(220,46,115,0.08)" : tileBg,
+                        border: `1px solid ${availableToJam ? "rgba(220,46,115,0.25)" : tileBorder}`,
+                      }}
+                    >
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
+                      </span>
+                      <span className="text-[11px] font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
+                        {availableToJam ? "Open to Jam" : "Not Available"}
+                      </span>
+                    </div>
+                  )}
 
-                    // Accent colors — desaturate to grey if past
-                    const accentPink = isPast ? "rgba(255,255,255,0.25)" : "#DC2E73";
-                    const accentGold = isPast ? "rgba(255,255,255,0.20)" : "#ca8a04";
-                    const noteColor  = isPast ? "rgba(255,255,255,0.18)" : jam.isLive ? accentPink : accentGold;
-
-                    // Text luminance blend — keep the pink/gold hue but lighten/darken
-                    // based on the jam card background so text stays readable.
-                    // bgLum: 0 = very dark, 255 = very light
-                    const bgLum = bgLuminance(jamCardColor.bg);
-                    // Blend factor: 0 on dark bg (no change), 1 on light bg (crush toward dark)
-                    const blendTowardDark = Math.max(0, (bgLum - 80) / 175); // ramps from lum=80 to lum=255
-                    // For pink #DC2E73 → darkened version #7a1940, for gold #ca8a04 → #6b4902
-                    // We express as rgba overlay: mix the accent with a dark tint
-                    const titleColorLive    = isPast ? `rgba(180,180,180,${0.4 - blendTowardDark * 0.15})`
-                      : `color-mix(in srgb, #DC2E73 ${Math.round(100 - blendTowardDark * 45)}%, #000)`;
-                    const titleColorUpcoming = isPast ? `rgba(160,160,160,${0.35 - blendTowardDark * 0.1})`
-                      : `color-mix(in srgb, #ca8a04 ${Math.round(100 - blendTowardDark * 45)}%, #000)`;
-                    const titleColor = jam.isLive ? titleColorLive : titleColorUpcoming;
-
-                    const subtitleAlpha = isPast ? 0.22 : (0.35 + blendTowardDark * 0.3);
-                    const subtitleColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${subtitleAlpha})`;
-
-                    const dateColorLive     = isPast ? `rgba(160,160,160,0.35)`
-                      : `color-mix(in srgb, #DC2E73 ${Math.round(90 - blendTowardDark * 40)}%, #000)`;
-                    const dateColorUpcoming = isPast ? `rgba(140,140,140,0.28)`
-                      : bgLum > 140
-                        ? `color-mix(in srgb, #ca8a04 ${Math.round(90 - blendTowardDark * 40)}%, #000)`
-                        : `color-mix(in srgb, #ca8a04 85%, rgba(255,255,255,0.0))`;
-                    const dateColor = jam.isLive ? dateColorLive : dateColorUpcoming;
-
-                    const lockColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.18 : (0.4 - blendTowardDark * 0.2)})`;
-                    const dividerColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.06 : 0.12})`;
-
-                    // Card background — blend jamCardColor over the existing dark gradient
-                    const cardBg = jamCardColor.label === "Dark"
-                      ? (isPast ? "linear-gradient(135deg,#181818 60%,#1f1f1f 100%)" : "linear-gradient(135deg,#1e1e1e 60%,#2a2a2a 100%)")
-                      : jamCardColor.bg;
-
-                    const cardBorder = isPast
-                      ? `1px solid rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},0.06)`
-                      : jam.isLive
-                        ? `1px solid color-mix(in srgb, rgba(220,46,115,0.35) 100%, ${jamCardColor.border})`
-                        : `1px solid color-mix(in srgb, rgba(202,138,4,0.25) 100%, ${jamCardColor.border})`;
-
+                  {/* Favorites chips — first pill per category, color pulled from the pill itself */}
+                  {pills.length > 0 && (() => {
+                    const chips = ["g", "i", "v"].map(key => {
+                      const match = pills.find(p => typeof p.id === "string" && p.id.startsWith(key + "_"));
+                      return match ? { key, color: match.color, text: match.text, emoji: getPillEmoji(match.text) } : null;
+                    }).filter(Boolean);
+                    if (chips.length === 0) return null;
                     return (
-                      <div key={jam.id} className="relative">
-                        {isDragging && dragProgress > 0.45 && (
-                          <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-5 z-10">
-                            <span className="text-xs font-medium text-red-300">Release to delete</span>
-                          </div>
-                        )}
-                        {isDragging && (
-                          <div className="pointer-events-none absolute inset-0 rounded-full bg-red-500/10 z-0" />
-                        )}
-
-                        <div
-                          onMouseDown={(e) => handleJamDragStart(jam.id, e)}
-                          onTouchStart={(e) => handleJamDragStart(jam.id, e)}
-                          onClick={() => { if (!jamMovedRef.current) setSelectedJam(jam); jamMovedRef.current = false; }}
-                          className="relative z-10 flex items-center cursor-pointer select-none"
-                          style={{
-                            background: cardBg,
-                            borderRadius: "20px",
-                            border: cardBorder,
-                            padding: "18px 20px",
-                            boxShadow: isPast
-                              ? "0 4px 12px -2px rgba(0,0,0,0.3)"
-                              : jam.isLive
-                                ? "0 0 0 1px rgba(220,46,115,0.1), 0 12px 28px -4px rgba(220,46,115,0.15), 0 6px 12px -2px rgba(0,0,0,0.5)"
-                                : "0 0 0 1px rgba(202,138,4,0.08), 0 12px 28px -4px rgba(202,138,4,0.12), 0 6px 12px -2px rgba(0,0,0,0.5)",
-                            transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
-                            opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : isPast ? 0.6 : 1,
-                            transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
-                          }}
-                        >
-                          <div className="flex items-center justify-center shrink-0" style={{ width: "44px" }}>
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                              <path d="M9 18V5l12-2v13" stroke={noteColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                              <circle cx="6" cy="18" r="3" fill={noteColor}/>
-                              <circle cx="18" cy="16" r="3" fill={noteColor}/>
-                            </svg>
-                          </div>
-
-                          <div style={{ width: "1px", height: "40px", background: dividerColor, margin: "0 16px", flexShrink: 0 }} />
-
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate" style={{ fontSize: "15px", margin: 0, color: titleColor }}>
-                              {jam.title}
-                            </p>
-                            <p className="truncate" style={{ fontSize: "11px", margin: "3px 0 0", color: subtitleColor }}>
-                              {[jam.genre, jam.vibe].filter(Boolean).join(" · ")}
-                            </p>
-                            <p className="font-semibold" style={{ fontSize: "11px", margin: "3px 0 0", color: dateColor }}>
-                              {isPast ? "Past"
-                                : jam.isLive ? "Live Now"
-                                : jam.timeSlot === "tonight" ? "Tonight"
-                                : jam.timeSlot === "tomorrow" ? "Tomorrow"
-                                : jam.timeSlot === "week" ? "This Week"
-                                : "Upcoming"}
-                              {jam.dateTime ? ` · ${jam.dateTime}` : ""}
-                            </p>
-                          </div>
-
-                          <div className="shrink-0 flex items-center justify-center" style={{ width: "44px" }}>
-                            {jam.isPrivate ? (
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <rect x="3" y="11" width="18" height="11" rx="2" stroke={lockColor} strokeWidth="1.8"/>
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke={lockColor} strokeWidth="1.8" strokeLinecap="round"/>
-                              </svg>
-                            ) : (
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <rect x="3" y="11" width="18" height="11" rx="2" stroke={lockColor} strokeWidth="1.8"/>
-                                <path d="M7 11V7a5 5 0 0 1 9.9-1" stroke={lockColor} strokeWidth="1.8" strokeLinecap="round"/>
-                              </svg>
-                            )}
-                          </div>
-                        </div>
+                      <div className="flex flex-wrap gap-1.5 shrink-0">
+                        {chips.map(chip => (
+                          <span key={chip.key} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
+                            style={{ background: chip.color + "18", border: `1px solid ${chip.color}35`, color: chip.color }}>
+                            <span style={{ fontSize: "11px" }}>{chip.emoji}</span>
+                            <span className="truncate" style={{ maxWidth: "90px" }}>{chip.text}</span>
+                          </span>
+                        ))}
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </div>
+                  })()}
 
-            {/* Friends container — posts scrapped, links to friends page */}
+                  {/* Pill list — scrollable, drag-to-reorder */}
+                  <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
+                    {pills.length === 0 ? (
+                      <p className="text-sm" style={{ color: textSecondary }}>No interests added yet.</p>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {grouped.map((cat, catIdx) => {
+                          const isVibes = cat.key === "v";
+                          return (
+                            <div key={cat.key} className="flex flex-col gap-1.5">
+                              <span className="text-sm font-semibold" style={{ color: textSecondary, transition: "color 0.4s ease" }}>
+                                {cat.label}
+                              </span>
+                              <div ref={el => { intContainerRefs.current[cat.key] = el; }} className="flex flex-col gap-1.5">
+                                {cat.pills.map((pill, localIdx) => {
+                                  const isDragging = intDragState?.catKey === cat.key && intDragState.fromIdx === localIdx;
+                                  const isOver     = intDragState?.catKey === cat.key && intDragState.overIdx === localIdx && intDragState.fromIdx !== localIdx;
+                                  const isTop      = localIdx < 3;
+                                  return (
+                                    <div key={pill.id ?? localIdx} data-pill-item
+                                      style={{
+                                        transition: intDragState?.catKey === cat.key && !isDragging ? "transform 0.15s ease" : "none",
+                                        transform: isOver ? (intDragState.fromIdx < localIdx ? "translateY(4px)" : "translateY(-4px)") : "none",
+                                        opacity: isDragging ? 0.35 : 1,
+                                      }}
+                                    >
+                                      <div
+                                        onMouseDown={e => handleIntPillDown(e, cat.key, localIdx)}
+                                        onTouchStart={e => handleIntPillDown(e.touches[0], cat.key, localIdx)}
+                                        className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${isOwnProfile ? "cursor-grab active:cursor-grabbing" : ""}`}
+                                        style={{
+                                          background: pill.color + "12", border: `1px solid ${pill.color}28`,
+                                          boxShadow: isDragging ? `0 0 14px ${pill.color}44` : "none",
+                                          transition: "box-shadow 0.15s ease",
+                                        }}
+                                      >
+                                        <span className="shrink-0 flex items-center justify-center rounded-lg"
+                                          style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
+                                          {getPillEmoji(pill.text)}
+                                        </span>
+                                        <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>
+                                          {pill.text}
+                                        </span>
+                                        {isTop && (
+                                          <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                                            style={{ background: pill.color + "22", border: `1px solid ${pill.color}40`, color: pill.color, letterSpacing: "0.02em" }}>
+                                            ★
+                                          </span>
+                                        )}
+                                        {isOwnProfile && (
+                                          <svg width="7" height="11" viewBox="0 0 7 11" fill="none" style={{ opacity: 0.22, flexShrink: 0, color: textPrimary }}>
+                                            <circle cx="1.5" cy="1.5" r="1.1" fill="currentColor"/>
+                                            <circle cx="5.5" cy="1.5" r="1.1" fill="currentColor"/>
+                                            <circle cx="1.5" cy="5.5" r="1.1" fill="currentColor"/>
+                                            <circle cx="5.5" cy="5.5" r="1.1" fill="currentColor"/>
+                                            <circle cx="1.5" cy="9.5" r="1.1" fill="currentColor"/>
+                                            <circle cx="5.5" cy="9.5" r="1.1" fill="currentColor"/>
+                                          </svg>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {isVibes && cat.pills.length > 0 && (
+                                <p className="text-[10px] font-medium mt-0.5" style={{ color: textDim }}>
+                                  ★ Top {Math.min(3, cat.pills.length)} shown as top interests
+                                </p>
+                              )}
+                              {catIdx < grouped.length - 1 && (
+                                <div className="mt-0.5" style={{ height: "1px", background: dividerCol }} />
+                              )}
+                            </div>
+                          );
+                        })}
+                        {ungrouped.length > 0 && (
+                          <div className="flex flex-col gap-1.5">
+                            {grouped.length > 0 && <div style={{ height: "1px", background: dividerCol }} />}
+                            {ungrouped.map((pill, i) => (
+                              <div key={pill.id ?? i} className="flex items-center gap-2 rounded-xl px-2.5 py-2"
+                                style={{ background: pill.color + "12", border: `1px solid ${pill.color}28` }}>
+                                <span className="shrink-0 flex items-center justify-center rounded-lg"
+                                  style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
+                                  {getPillEmoji(pill.text)}
+                                </span>
+                                <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>{pill.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Posts & Feed card — h-[500px] matching other cards */}
             <div
               className="h-[500px] rounded-2xl p-6 backdrop-blur-md flex flex-col gap-4"
               style={{
@@ -1495,25 +1614,140 @@ const Profile = () => {
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
-              <div className="flex items-center justify-between shrink-0">
-                <h2
-                  className="text-2xl"
-                  style={{ color: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "#111" : "#fff", transition: "color 0.4s ease" }}
-                >
-                  Post
-                </h2>
-              </div>
-              <Link
-                to="/feed"
-                className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm cursor-pointer"
-                style={{
-                  borderColor: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "rgba(0,0,0,0.2)" : "#404040",
-                  background: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "rgba(0,0,0,0.05)" : "rgba(23,23,23,0.5)",
-                  color: needsDarkText(cardColors.posts.bg, cardTextOverrides.posts) ? "#666" : "#a3a3a3",
-                }}
-              >
-                Find your friends
-              </Link>
+              {/* header */}
+              {(() => {
+                const postsDark = needsDarkText(cardColors.posts.bg, cardTextOverrides.posts);
+                const postsText      = postsDark ? "#111"              : "#fff";
+                const postsTextDim   = postsDark ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.4)";
+                const postsTextDimmer= postsDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.22)";
+                const postsDivider   = postsDark ? "rgba(0,0,0,0.1)"  : "rgba(255,255,255,0.07)";
+                const postsCardBg    = postsDark ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.03)";
+                const postsCardBorder= postsDark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)";
+
+                function timeAgo(iso) {
+                  if (!iso) return "";
+                  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+                  if (diff < 60)   return "just now";
+                  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+                  return `${Math.floor(diff / 86400)}d ago`;
+                }
+
+                return (
+                  <>
+                    <div className="flex items-center justify-between shrink-0">
+                      <h2 className="text-2xl" style={{ color: postsText, transition: "color 0.4s ease" }}>
+                        Posts &amp; Feed
+                      </h2>
+                      <Link
+                        to="/feed"
+                        className="text-xs font-medium transition-opacity hover:opacity-70"
+                        style={{ color: postsTextDim }}
+                      >
+                        View all →
+                      </Link>
+                    </div>
+
+                    {/* post stubs */}
+                    <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                      {profilePostsLoading ? (
+                        <div className="flex flex-1 items-center justify-center">
+                          <div
+                            className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                            style={{ borderColor: "rgba(220,46,115,0.4)", borderTopColor: "transparent" }}
+                          />
+                        </div>
+                      ) : profilePosts.length === 0 ? (
+                        <div
+                          className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm"
+                          style={{
+                            borderColor: postsDark ? "rgba(0,0,0,0.2)" : "#404040",
+                            background:  postsDark ? "rgba(0,0,0,0.05)" : "rgba(23,23,23,0.5)",
+                            color:       postsTextDimmer,
+                          }}
+                        >
+                          No posts yet
+                        </div>
+                      ) : (
+                        profilePosts.map((post) => (
+                          <div
+                            key={post.id}
+                            className="rounded-xl p-3 flex gap-3"
+                            style={{
+                              background: postsCardBg,
+                              border: `1px solid ${postsCardBorder}`,
+                            }}
+                          >
+                            {/* avatar */}
+                            <div className="shrink-0">
+                              {post.author.avatarUrl ? (
+                                <img
+                                  src={post.author.avatarUrl}
+                                  alt={post.author.displayName}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                                  style={{
+                                    background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))",
+                                    color: "#DC2E73",
+                                  }}
+                                >
+                                  {post.author.displayName?.[0]?.toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* body */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-1.5 mb-1">
+                                <span className="text-xs font-semibold truncate" style={{ color: postsText }}>
+                                  {post.author.displayName}
+                                </span>
+                                <span className="text-[10px] shrink-0" style={{ color: postsTextDimmer }}>
+                                  {timeAgo(post.createdAt)}
+                                </span>
+                              </div>
+                              {post.content && (
+                                <p
+                                  className="text-xs leading-relaxed"
+                                  style={{
+                                    color: postsTextDim,
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {post.content}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>
+                                  ♥ {post.likes}
+                                </span>
+                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>
+                                  💬 {post.comments}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* image thumbnail */}
+                            {post.media?.images?.[0] && (
+                              <img
+                                src={post.media.images[0]}
+                                alt=""
+                                className="w-12 h-12 rounded-lg object-cover shrink-0"
+                              />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
           </div>{/* end RIGHT COLUMN */}
@@ -1521,20 +1755,240 @@ const Profile = () => {
             </div>{/* end two-column content grid */}
           </div>{/* end LEFT+CENTER CONTENT AREA */}
 
-          {/* ── INTERESTS SIDEBAR ── */}
-          <InterestsSidebar
-            pills={pills}
-            jams={jams}
-            user={user}
-            city={city}
-            country={country}
-            availableToJam={availableToJam}
-            onToggleAvailable={isOwnProfile ? () => setAvailableToJam(v => !v) : null}
-            onReorderPills={isOwnProfile ? (newPills) => setPills(newPills) : null}
-            isOwnProfile={isOwnProfile}
-            cardColor={cardColors.interests}
-            textOverride={cardTextOverrides.interests}
-          />
+          {/* ── JAMS SIDEBAR — same structure as old InterestsSidebar: breaks through banner, minHeight: 1295px ── */}
+          {(() => {
+            const dark          = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
+            const textPrimary   = dark ? "#111"             : "#fff";
+            const textSecondary = dark ? "#444"             : "#d4d4d4";
+            const textDim       = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
+            const dividerColor  = dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.18)";
+            const tileBg        = dark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.03)";
+            const tileBorder    = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
+
+            const locationStr = [city, country].filter(Boolean).join(", ");
+            const joinedRaw   = user?.date_joined ?? user?.created_at ?? user?.joined_at ?? null;
+            const memberSince = joinedRaw
+              ? new Date(joinedRaw).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+              : null;
+            const totalJams    = jams.length;
+            const liveJams     = jams.filter(j => j.isLive).length;
+            const upcomingJams = jams.filter(j => !j.isLive).length;
+
+            const SectionDivider = () => (
+              <div style={{ height: "1px", background: dividerColor, margin: "0 20px" }} />
+            );
+            const SectionHeading = ({ children }) => (
+              <h2 className="text-2xl" style={{ color: textPrimary, transition: "color 0.4s ease" }}>{children}</h2>
+            );
+            const Tile = ({ left, right, accent }) => (
+              <div className="flex items-center justify-between rounded-xl px-3 py-2"
+                style={{ background: accent ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${accent ? "rgba(220,46,115,0.15)" : tileBorder}` }}>
+                <span className="text-sm" style={{ color: textSecondary }}>{left}</span>
+                <span className="text-sm font-bold" style={{ color: accent ? "#DC2E73" : textPrimary }}>{right}</span>
+              </div>
+            );
+
+            return (
+              <div className="w-[210px] shrink-0 flex flex-col">
+                <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col flex-1"
+                  style={{
+                    background: cardColors.jams.bg,
+                    border: `1px solid ${cardColors.jams.border}`,
+                    boxShadow: `0 0 40px ${cardColors.jams.glow}`,
+                    minHeight: "1295px",
+                    transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+                  }}
+                >
+
+                  {/* ── JAMS LIST ── */}
+                  <div className="p-5 flex flex-col gap-3">
+                    <SectionHeading>Jams</SectionHeading>
+
+                    {/* Live now chip */}
+                    {liveJams > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium"
+                          style={{ background: "rgba(220,46,115,0.18)", border: "1px solid rgba(220,46,115,0.35)", color: "#DC2E73" }}>
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: "#DC2E73" }} />
+                          </span>
+                          {liveJams} Live Now
+                        </span>
+                      </div>
+                    )}
+
+                    {jamsLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="w-5 h-5 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+                      </div>
+                    ) : jams.length === 0 ? (
+                      <p className="text-sm" style={{ color: textSecondary }}>No jams yet.</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {jams.map((jam) => {
+                          const isDragging   = jamDragging === jam.id;
+                          const offsetX      = isDragging ? jamDragX : 0;
+                          const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
+                          const isPast       = jam.timeSlot === "past";
+                          const bgLum        = bgLuminance(jamCardColor.bg);
+                          const blendD       = Math.max(0, (bgLum - 80) / 175);
+                          const noteColor    = isPast ? "rgba(255,255,255,0.18)" : jam.isLive ? "#DC2E73" : "#ca8a04";
+                          const titleColor   = jam.isLive
+                            ? (isPast ? `rgba(180,180,180,0.4)` : `color-mix(in srgb, #DC2E73 ${Math.round(100 - blendD * 45)}%, #000)`)
+                            : (isPast ? `rgba(160,160,160,0.35)` : `color-mix(in srgb, #ca8a04 ${Math.round(100 - blendD * 45)}%, #000)`);
+                          const subtitleColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.22 : (0.35 + blendD * 0.3)})`;
+                          const dateColor    = jam.isLive
+                            ? (isPast ? `rgba(160,160,160,0.35)` : `color-mix(in srgb, #DC2E73 ${Math.round(90 - blendD * 40)}%, #000)`)
+                            : (isPast ? `rgba(140,140,140,0.28)` : bgLum > 140 ? `color-mix(in srgb, #ca8a04 ${Math.round(90 - blendD * 40)}%, #000)` : `color-mix(in srgb, #ca8a04 85%, rgba(255,255,255,0.0))`);
+                          const lockColor    = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.18 : (0.4 - blendD * 0.2)})`;
+                          const divColor     = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.06 : 0.12})`;
+                          const cardBg       = jamCardColor.label === "Dark"
+                            ? (isPast ? "linear-gradient(135deg,#181818 60%,#1f1f1f 100%)" : "linear-gradient(135deg,#1e1e1e 60%,#2a2a2a 100%)")
+                            : jamCardColor.bg;
+                          const cardBorder   = isPast
+                            ? `1px solid rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},0.06)`
+                            : jam.isLive
+                              ? `1px solid color-mix(in srgb, rgba(220,46,115,0.35) 100%, ${jamCardColor.border})`
+                              : `1px solid color-mix(in srgb, rgba(202,138,4,0.25) 100%, ${jamCardColor.border})`;
+
+                          return (
+                            <div key={jam.id} className="relative">
+                              {isDragging && dragProgress > 0.45 && (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-3 z-10">
+                                  <span className="text-[10px] font-medium text-red-300">Delete</span>
+                                </div>
+                              )}
+                              {isDragging && (
+                                <div className="pointer-events-none absolute inset-0 rounded-xl bg-red-500/10 z-0" />
+                              )}
+                              <div
+                                onMouseDown={(e) => handleJamDragStart(jam.id, e)}
+                                onTouchStart={(e) => handleJamDragStart(jam.id, e)}
+                                onClick={() => { if (!jamMovedRef.current) setSelectedJam(jam); jamMovedRef.current = false; }}
+                                className="relative z-10 flex items-center gap-2 cursor-pointer select-none"
+                                style={{
+                                  background: cardBg, borderRadius: "14px", border: cardBorder,
+                                  padding: "10px 12px",
+                                  boxShadow: isPast ? "0 2px 8px -2px rgba(0,0,0,0.3)"
+                                    : jam.isLive ? "0 0 0 1px rgba(220,46,115,0.1), 0 6px 16px -4px rgba(220,46,115,0.15)"
+                                    : "0 0 0 1px rgba(202,138,4,0.08), 0 6px 16px -4px rgba(202,138,4,0.12)",
+                                  transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
+                                  opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : isPast ? 0.6 : 1,
+                                  transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
+                                }}
+                              >
+                                <div style={{ width: "1px", height: "32px", background: divColor, marginRight: "8px", flexShrink: 0 }} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate" style={{ fontSize: "12px", margin: 0, color: titleColor }}>{jam.title}</p>
+                                  <p className="truncate" style={{ fontSize: "10px", margin: "2px 0 0", color: subtitleColor }}>
+                                    {[jam.genre, jam.vibe].filter(Boolean).join(" · ")}
+                                  </p>
+                                  <p className="font-semibold" style={{ fontSize: "10px", margin: "2px 0 0", color: dateColor }}>
+                                    {isPast ? "Past" : jam.isLive ? "Live Now" : jam.timeSlot === "tonight" ? "Tonight" : jam.timeSlot === "tomorrow" ? "Tomorrow" : jam.timeSlot === "week" ? "This Week" : "Upcoming"}
+                                    {jam.dateTime ? ` · ${jam.dateTime}` : ""}
+                                  </p>
+                                </div>
+                                {jam.isPrivate && (
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" stroke={lockColor} strokeWidth="1.8"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke={lockColor} strokeWidth="1.8" strokeLinecap="round"/>
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <SectionDivider />
+
+                  {/* ── PROFILE ── */}
+                  <div className="p-5 flex flex-col gap-3">
+                    <SectionHeading>Profile</SectionHeading>
+                    <div className="flex flex-col gap-2">
+                      {locationStr && (
+                        <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
+                          <span style={{ fontSize: "13px" }}>📍</span>
+                          <span className="text-sm truncate" style={{ color: textSecondary }}>{locationStr}</span>
+                        </div>
+                      )}
+                      {memberSince && (
+                        <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
+                          <div className="flex items-center gap-2">
+                            <span style={{ fontSize: "13px" }}>🗓️</span>
+                            <span className="text-sm" style={{ color: textSecondary }}>Joined</span>
+                          </div>
+                          <span className="text-sm font-bold" style={{ color: textPrimary }}>{memberSince}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontSize: "13px" }}>🎸</span>
+                          <span className="text-sm" style={{ color: textSecondary }}>Jams</span>
+                        </div>
+                        <span className="text-sm font-bold" style={{ color: textPrimary }}>{totalJams}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <SectionDivider />
+
+                  {/* ── STATS ── */}
+                  <div className="p-5 flex flex-col gap-3">
+                    <SectionHeading>Stats</SectionHeading>
+                    <div className="flex flex-col gap-2">
+                      <Tile left={<><span style={{marginRight:6}}>🎸</span>Total Jams</>}  right={totalJams}    accent={true} />
+                      <Tile left={<><span style={{marginRight:6}}>🔴</span>Live now</>}    right={liveJams}     accent={false} />
+                      <Tile left={<><span style={{marginRight:6}}>📅</span>Upcoming</>}    right={upcomingJams} accent={false} />
+                    </div>
+                  </div>
+
+                  <SectionDivider />
+
+                  {/* ── AVAILABILITY TOGGLE ── */}
+                  <div className="px-5 py-4">
+                    {isOwnProfile ? (
+                      <button onClick={() => setAvailableToJam(v => !v)}
+                        className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200"
+                        style={{ background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}` }}>
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
+                            <span className="relative inline-flex rounded-full h-2 w-2"
+                              style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
+                          </span>
+                          <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
+                            {availableToJam ? "Open to Jam" : "Not Available"}
+                          </span>
+                        </div>
+                        <div className="relative w-8 h-4 rounded-full transition-colors duration-200 shrink-0"
+                          style={{ background: availableToJam ? "rgba(220,46,115,0.30)" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)") }}>
+                          <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
+                            style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)"), left: availableToJam ? "calc(100% - 14px)" : "2px" }} />
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+                        style={{ background: availableToJam ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${availableToJam ? "rgba(220,46,115,0.25)" : tileBorder}` }}>
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
+                          <span className="relative inline-flex rounded-full h-2 w-2"
+                            style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
+                        </span>
+                        <span className="text-sm font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
+                          {availableToJam ? "Open to Jam" : "Not Available"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            );
+          })()}
 
         </div>{/* end top-level flex row */}
       </main>
@@ -2277,42 +2731,6 @@ const Profile = () => {
                     value={cardColors.interests}
                     onChange={(c) => setCardColor("interests", c)}
                   />
-                  {/* Interests text override */}
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm text-neutral-400 w-28 shrink-0">Interests text</span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setCardTextOverrides(p => ({ ...p, interests: null }))}
-                        className="text-[10px] font-medium px-2 py-0.5 rounded transition-all duration-150"
-                        style={{
-                          background: cardTextOverrides.interests === null ? "rgba(255,255,255,0.15)" : "transparent",
-                          color: cardTextOverrides.interests === null ? "#fff" : "#555",
-                          border: "1px solid",
-                          borderColor: cardTextOverrides.interests === null ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)",
-                        }}
-                      >Auto</button>
-                      <button
-                        onClick={() => setCardTextOverrides(p => ({ ...p, interests: true }))}
-                        title="Dark text"
-                        className="w-6 h-6 rounded transition-all duration-150 hover:scale-110"
-                        style={{
-                          background: "#111",
-                          outline: cardTextOverrides.interests === true ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
-                          outlineOffset: cardTextOverrides.interests === true ? "2px" : "0",
-                        }}
-                      />
-                      <button
-                        onClick={() => setCardTextOverrides(p => ({ ...p, interests: false }))}
-                        title="Light text"
-                        className="w-6 h-6 rounded transition-all duration-150 hover:scale-110"
-                        style={{
-                          background: "#e5e5e5",
-                          outline: cardTextOverrides.interests === false ? "2px solid #DC2E73" : "1px solid rgba(255,255,255,0.15)",
-                          outlineOffset: cardTextOverrides.interests === false ? "2px" : "0",
-                        }}
-                      />
-                    </div>
-                  </div>
 
                   {/* Global text color toggle */}
                   <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between">
@@ -2364,59 +2782,89 @@ const Profile = () => {
               )}
 
               {/*
-               * ── SAVE ─────────────────────────────────────────────────────
-               * handleSave collects every editable variable and calls
-               * updateProfile() from useAuth. Variables marked [NEW] need
-               * matching fields added to the profile model before they persist.
+               * ── SAVE — BACKEND WIRING GUIDE ──────────────────────────────
                *
-               * Call this from the Save button below. ─────────────────────── */}
+               * Call updateProfile() from useAuth (add to destructure at top).
+               * All variables listed below are live in local state right now.
+               *
+               * ── ALREADY EXISTS ON YOUR MODEL ──────────────────────────────
+               *   display_name        → name              (string, max 15)
+               *   city                → city              (string, max 15)
+               *   country             → country           (string, max 15)
+               *   about               → about             (string, max 200)
+               *   pfp                 → profilePic        (dataURL → File before PATCH)
+               *   genres_liked        → orderedGenreIds   (int[], ordered — index 0 = favorite)
+               *   instruments_liked   → orderedInstrumentIds (int[], ordered)
+               *   vibes_liked         → orderedVibeIds    (int[], ordered)
+               *
+               * ── NEW FIELDS — ADD TO PROFILE MODEL ─────────────────────────
+               *   headline            → headline          (string, max 20)
+               *   available_to_jam    → availableToJam    (boolean)
+               *   banner              → banner            (dataURL → ImageField)
+               *   about_photo         → aboutPhoto        (dataURL → ImageField)
+               *   profile_theme       → profile_theme     (JSONField) — shape:
+               *     {
+               *       cardColors:        { aboutMe, musicSnips, jams, posts, interests },
+               *       jamCardColor:      swatch object for individual jam row cards,
+               *       cardTextOverrides: { aboutMe, musicSnips, jams, posts, interests },
+               *       bannerDark:        boolean (light text on banner)
+               *     }
+               *
+               * ── FRIEND REQUEST (separate endpoint) ────────────────────────
+               *   apiService.sendFriendRequest(userId)
+               *   friendStatus local state: "none" | "pending" | "friends"
+               *   Seed friendStatus on load from the viewed user's friend relation.
+               * ─────────────────────────────────────────────────────────────── */}
               <div className="mt-6 flex gap-3">
+                {/* ▼▼▼ SAVE — calls updateProfile() → PATCH api/profiles/me/ ▼▼▼ */}
                 <button
                   onClick={async () => {
-                    // ── Derive pill order arrays from current pills state ─────
-                    // Pills are ordered — the index matters for "Top Interests"
-                    // on the sidebar. Preserve that order when saving.
+                    // ── Build ordered tag arrays from pill order ──────────────
                     const orderedGenreIds      = pills.filter(p => p.id?.startsWith("g_")).map(p => +p.id.slice(2));
                     const orderedInstrumentIds = pills.filter(p => p.id?.startsWith("i_")).map(p => +p.id.slice(2));
                     const orderedVibeIds       = pills.filter(p => p.id?.startsWith("v_")).map(p => +p.id.slice(2));
-
-                    // ── Visual theme — stored as a single JSON blob ───────────
-                    // [NEW] Add `profile_theme` JSONField to the profile model.
                     const profile_theme = {
-                      cardColors,        // { aboutMe, musicSnips, jams, posts, interests }
-                      jamCardColor,      // swatch object for individual jam row cards
-                      cardTextOverrides, // { aboutMe, musicSnips, jams, posts, interests }
-                      bannerDark,        // boolean — light text on banner
+                      cardColors,
+                      jamCardColor,
+                      cardTextOverrides,
+                      bannerDark,
+                    };
+
+                    // ── Convert a dataURL to Blob (only when image was changed locally) ──
+                    const toBlob = (dataUrl) => {
+                      if (!dataUrl || !dataUrl.startsWith("data:")) return undefined;
+                      const [header, b64] = dataUrl.split(",");
+                      const mime = header.match(/:(.*?);/)[1];
+                      const bytes = atob(b64);
+                      const arr = new Uint8Array(bytes.length);
+                      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+                      return new Blob([arr], { type: mime });
                     };
 
                     try {
-                      // ── BACKEND: call your updateProfile() from useAuth ───────
-                      // Uncomment and adjust field names to match your API:
-                      //
-                      // const { updateProfile } = useAuth(); // add to destructure above
-                      // await updateProfile({
-                      //
-                      //   // ── Already wired ─────────────────────────────────
-                      //   display_name:       name,          // string, max 15 chars
-                      //   city:               city,          // string, max 15 chars
-                      //   country:            country,       // string, max 15 chars
-                      //   about:              about,         // string, max 200 chars
-                      //   pfp:                profilePic,    // dataURL → convert to File before PATCH
-                      //   genres_liked:       orderedGenreIds,
-                      //   instruments_liked:  orderedInstrumentIds,
-                      //   vibes_liked:        orderedVibeIds,
-                      //
-                      //   // ── [NEW] Fields needing model additions ──────────
-                      //   headline:           headline,      // string, max 20 chars
-                      //   available_to_jam:   availableToJam, // boolean
-                      //   banner:             banner,        // dataURL → image field
-                      //   about_photo:        aboutPhoto,    // dataURL → image field
-                      //   profile_theme:      JSON.stringify(profile_theme), // JSONField
-                      // });
-
+                      // ── PATCH payload → updateProfile() in Auth.jsx ───────
+                      await updateProfile({
+                        display_name:       name,
+                        city,
+                        country,
+                        about,
+                        headline,
+                        available_to_jam:   availableToJam,
+                        pfp:                toBlob(profilePic),
+                        genres_liked:       orderedGenreIds,
+                        instruments_liked:  orderedInstrumentIds,
+                        vibes_liked:        orderedVibeIds,
+                        profile_theme:      JSON.stringify(profile_theme),
+                        // ── BACKEND NEEDED: uncomment once ImageFields exist ──
+                        // banner:          toBlob(banner),
+                        // about_photo:     toBlob(aboutPhoto),
+                      });
+                      // ─────────────────────────────────────────────────────
+                      showToast("Profile saved!");
                       setEditOpen(false);
                     } catch (err) {
                       console.error("Failed to save profile:", err);
+                      showToast("Failed to save. Please try again.");
                     }
                   }}
                   className="flex-1 rounded-full bg-[#DC2E73] px-4 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-pink-500 transition-colors"

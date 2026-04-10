@@ -108,5 +108,29 @@ export const postService = {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
-  }
+  },
+
+  async getPostsByUser(authorId, currentUserId, limit = 3) {
+    const { data, error } = await supabase
+      .from('chat_post')
+      .select(`
+        id,
+        content,
+        image,
+        created_at,
+        author:author_id (
+          id,
+          username,
+          chat_profile ( display_name, pfp )
+        ),
+        likes:chat_post_likes ( user_id ),
+        comments:chat_comment ( id )
+      `)
+      .eq('author_id', authorId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data.map((row) => toFeedPost(row, currentUserId));
+  },
 };

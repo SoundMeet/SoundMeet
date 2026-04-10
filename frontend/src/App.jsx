@@ -73,6 +73,7 @@ const App = () => {
               <Route path="/chat" element={<OnboardingGuard><Chat /></OnboardingGuard>} />
               <Route path="/feed" element={<OnboardingGuard><PrivateRoute><Feed /></PrivateRoute></OnboardingGuard>} />
               <Route path="/profile" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
+              <Route path="/profile/:username" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
               <Route path="/settings" element={<OnboardingGuard><Settings /></OnboardingGuard>} />
               <Route path="/jam/:id"  element={<EventDetailPage type="jam" />} />
               <Route path="/show/:id" element={<EventDetailPage type="show" />} />

@@ -1,4 +1,5 @@
 import { supabase } from './supaBaseClient';
+import { apiFetch } from './Auth';
 
 export const apiService = {
   async getAllJams() {
@@ -124,6 +125,17 @@ export const apiService = {
     });
 
     return flattenedData;
+  },
+
+  async getUserByUsername(username) {
+    return apiFetch(`api/profiles/${username}/`);
+  },
+
+  async sendFriendRequest(userId) {
+    return apiFetch("api/friends/request/", {
+      method: "POST",
+      body: JSON.stringify({ to_user_id: userId }),
+    });
   },
 
   async getAllFormOptions() {
