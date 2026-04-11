@@ -65,8 +65,16 @@ const MapLocationPreview = ({ selectedPlace, onLocationUpdate, onMapMove }) => {
 
   const handleMoveEnd = () => {
     if (!onMapMove || !mapRef.current) return;
-    const center = mapRef.current.getCenter();
-    onMapMove({ latitude: center.lat, longitude: center.lng });
+    const map    = mapRef.current;
+    const center = map.getCenter();
+    const b      = map.getBounds?.();
+    onMapMove({
+      latitude:  center.lat,
+      longitude: center.lng,
+      bounds: b
+        ? { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }
+        : null,
+    });
   };
 
   return (

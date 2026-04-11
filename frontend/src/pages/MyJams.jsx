@@ -1043,12 +1043,25 @@ const MyJams = () => {
       startTime:       toTime(dt),
       endTime:         toTime(edt),
       locationQuery:   editingJam.locationName ?? '',
-      selectedPlace:   editingJam.coordinates ? {
-        placeName: editingJam.locationName ?? '',
-        address:   editingJam.locationAddress ?? '',
-        latitude:  editingJam.coordinates.latitude,
-        longitude: editingJam.coordinates.longitude,
-      } : null,
+      selectedPlace:   editingJam.coordinates
+        ? {
+            placeName: editingJam.locationName ?? '',
+            address:   editingJam.locationAddress ?? '',
+            latitude:  editingJam.coordinates.latitude,
+            longitude: editingJam.coordinates.longitude,
+          }
+        : editingJam.locationName
+          ? {
+              id:           `custom-edit-${editingJam.id}`,
+              placeName:    editingJam.locationName,
+              address:      editingJam.locationAddress ?? null,
+              latitude:     null,
+              longitude:    null,
+              featureType:  'custom',
+              isCustom:     true,
+              providerName: 'manual',
+            }
+          : null,
       locationGuide:          editingJam.locationGuide ?? '',
       genres:                 { presetIds: editingJam.genreIds ?? [],        customValues: [] },
       vibes:                  { presetIds: editingJam.vibeIds ?? [],         customValues: [] },

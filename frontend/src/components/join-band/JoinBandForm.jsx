@@ -36,11 +36,13 @@ const tagGroup = () => ({ selectedIds: [], customValues: [] });
  */
 const makeInitialForm = (profile) => ({
   // § 1 — About You (listing overrides on top of profile)
-  artistName: "",                   // optional display name override; falls back to profile.name
-  photo:      null,                 // { file, previewUrl } | null — overrides profile photo
-  city:       profile?.city ?? "",  // prefilled; required for local matching
-  headline:   "",
-  bio:        "",
+  artistName:    "",    // optional display name override; falls back to profile.name
+  photo:         null,  // { file, previewUrl } | null — overrides profile photo
+  // Location — unified shape; city text extracted on submit via placeToOpportunityAreaText()
+  locationQuery: "",
+  selectedPlace: null,
+  headline:      "",
+  bio:           "",
 
   // § 2 — What You Play
   primaryRole:    null,
@@ -140,11 +142,21 @@ const JoinBandForm = ({
   const setField = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  // ── Location handlers ──────────────────────────────────────────────────────
+
+  const handlePlaceSelect = (place) =>
+    setForm((prev) => ({ ...prev, selectedPlace: place, locationQuery: place.placeName }));
+
+  const handlePlaceClear = () =>
+    setForm((prev) => ({ ...prev, selectedPlace: null, locationQuery: "" }));
+
   // ── Validation ─────────────────────────────────────────────────────────────
 
   const validateStep1 = () => {
     const newErrors = {};
-    if (!form.city.trim()) newErrors.city = "City is required for local matching";
+    if (!form.selectedPlace && !form.locationQuery.trim()) {
+      newErrors.selectedPlace = "City or area is required for local matching";
+    }
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
@@ -168,7 +180,7 @@ const JoinBandForm = ({
     setStep(n);
   };
 
-  const canAdvance = step !== 1 || !!form.city.trim();
+  const canAdvance = step !== 1 || !!(form.selectedPlace || form.locationQuery.trim());
 
   // ── Submit ─────────────────────────────────────────────────────────────────
 
@@ -261,6 +273,8 @@ const JoinBandForm = ({
                 errors={errors}
                 profile={profile}
                 onChange={setField}
+                onPlaceSelect={handlePlaceSelect}
+                onPlaceClear={handlePlaceClear}
                 accent={THEME.accent}
               />
             </motion.div>

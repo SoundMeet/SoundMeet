@@ -1,31 +1,17 @@
-import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
-import MapLocationSearchInput from "../fields/MapLocationSearchInput";
-import MapLocationPreview from "../fields/MapLocationPreview";
+import LocationSelector, { LOCATION_CONFIGS } from "../../location/LocationSelector";
 import InfoTooltip from "../../ui/InfoTooltip";
-const privacyOptions = [
+
+// ─── Visibility options ───────────────────────────────────────────────────────
+
+const PRIVACY_OPTIONS = [
   { id: "public",  label: "Public",  description: "Visible on the map. Anyone can join." },
   { id: "private", label: "Private", description: "Hidden. Invite-only session." },
 ];
 
-const SectionLabel = ({ children }) => (
-  <p
-    className="text-[11px] font-medium uppercase tracking-[0.1em] mb-2.5"
-    style={{ color: "rgba(229,226,225,0.35)" }}
-  >
-    {children}
-  </p>
-);
-
+// ─── JamLocationSection ───────────────────────────────────────────────────────
 /**
- * JamLocationSection — location search + map preview + extra directions + privacy.
- *
- * Owns `mapCenter` — the best-known geographic context for biasing searches.
- * It is initialized to null and updated from two sources:
- *   1. When the user selects a place → set to that place's coordinates.
- *   2. When the user pans the preview map → updated to the new map center.
- * This means a second search after clearing a selection stays biased to the
- * same area, even without geolocation permission.
+ * Jam-specific location section: wraps the shared LocationSelector (jam config)
+ * plus the jam-only Visibility toggle.
  *
  * Props:
  *   form             { locationQuery, selectedPlace, locationGuide, isPrivate }
@@ -42,74 +28,23 @@ const JamLocationSection = ({
   onPlaceSelect,
   onPlaceClear,
   onLocationUpdate,
-}) => {
-  // Geographic context for search biasing — persists across clear/re-search cycles
-  const [mapCenter, setMapCenter] = useState(null);
-
-  const handlePlaceSelect = (place) => {
-    setMapCenter({ latitude: place.latitude, longitude: place.longitude });
-    onPlaceSelect(place);
-  };
-
-  return (
+}) => (
   <div className="space-y-5">
-    {/* Location search */}
-    <div>
-      <label
-        className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.1em] mb-1.5"
-        style={{ color: "rgba(229,226,225,0.4)" }}
-      >
-        Location
-        <span style={{ color: "#DC2E73" }} aria-hidden>*</span>
-      </label>
 
-      <MapLocationSearchInput
-        query={form.locationQuery}
-        selectedPlace={form.selectedPlace}
-        mapCenter={mapCenter}
-        onQueryChange={(q) => onChange("locationQuery", q)}
-        onSelect={handlePlaceSelect}
-        onClear={onPlaceClear}
-        error={errors.selectedPlace}
-      />
-    </div>
+    {/* Unified location selector — jam config */}
+    <LocationSelector
+      config={LOCATION_CONFIGS.jam}
+      selectedPlace={form.selectedPlace}
+      locationQuery={form.locationQuery}
+      locationGuide={form.locationGuide}
+      error={errors.selectedPlace}
+      onChange={onChange}
+      onPlaceSelect={onPlaceSelect}
+      onPlaceClear={onPlaceClear}
+      onLocationUpdate={onLocationUpdate}
+    />
 
-    {/* Map preview — animates in after a place is selected */}
-    <AnimatePresence>
-      {form.selectedPlace && (
-        <MapLocationPreview
-          selectedPlace={form.selectedPlace}
-          onLocationUpdate={onLocationUpdate}
-          onMapMove={setMapCenter}
-        />
-      )}
-    </AnimatePresence>
-
-    {/* Extra Directions — optional wayfinding note from the creator */}
-    <div>
-      <label
-        className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.1em] mb-1.5"
-        style={{ color: "rgba(229,226,225,0.4)" }}
-      >
-        Extra Directions
-      </label>
-      <textarea
-        rows={2}
-        className="jam-input resize-none"
-        style={{ borderRadius: "0.75rem" }}
-        placeholder="e.g. Go through the red door, meet on the second floor…"
-        value={form.locationGuide}
-        onChange={(e) => onChange("locationGuide", e.target.value)}
-      />
-      <p
-        className="text-[11px] mt-1 ml-1"
-        style={{ color: "rgba(229,226,225,0.22)" }}
-      >
-        Optional — help attendees find the exact spot after arriving.
-      </p>
-    </div>
-
-    {/* Privacy toggle */}
+    {/* Visibility / privacy toggle — jam-only */}
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span
@@ -128,7 +63,7 @@ const JamLocationSection = ({
       </div>
 
       <div className="flex rounded-xl p-1" style={{ background: "#1C1B1B" }}>
-        {privacyOptions.map((opt) => {
+        {PRIVACY_OPTIONS.map((opt) => {
           const active = (opt.id === "private") === form.isPrivate;
           return (
             <button
@@ -154,12 +89,12 @@ const JamLocationSection = ({
         style={{ color: "rgba(229,226,225,0.28)" }}
       >
         {form.isPrivate
-          ? privacyOptions[1].description
-          : privacyOptions[0].description}
+          ? PRIVACY_OPTIONS[1].description
+          : PRIVACY_OPTIONS[0].description}
       </p>
     </div>
+
   </div>
-  );
-};
+);
 
 export default JamLocationSection;

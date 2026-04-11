@@ -42,7 +42,7 @@ const PromoteShowModal = ({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <div
-          id="promote-show-dropdown-portal"
+          id="location-dropdown-portal"
           style={{ position: "fixed", inset: 0, zIndex: 9999, pointerEvents: "none" }}
         />
 

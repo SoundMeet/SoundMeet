@@ -59,7 +59,7 @@ const CreateJamModal = ({
          * pointerEvents:none on the container; the dropdown sets auto.
          */}
         <div
-          id="jam-dropdown-portal"
+          id="location-dropdown-portal"
           style={{ position: "fixed", inset: 0, zIndex: 9999, pointerEvents: "none" }}
         />
 

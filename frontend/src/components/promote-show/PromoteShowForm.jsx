@@ -278,6 +278,7 @@ const PromoteShowForm = ({ options, onClose, initialValues }) => {
                 onPlaceSelect={handlePlaceSelect}
                 onPlaceClear={handlePlaceClear}
                 onLocationUpdate={handleLocationUpdate}
+                portalId="promote-show-dropdown-portal"
               />
             </motion.div>
           )}

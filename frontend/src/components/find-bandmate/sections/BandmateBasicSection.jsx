@@ -1,4 +1,5 @@
 import ImageUploadField from "../../../components/ui/ImageUploadField";
+import LocationSelector, { LOCATION_CONFIGS } from "../../../components/location/LocationSelector";
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────
 
@@ -33,12 +34,14 @@ const Field = ({ label, required, error, hint, children }) => (
  * Answers: Who is recruiting, and what project is this for?
  *
  * Props:
- *   form     { bandProjectName, postedByName, cityArea, coverImage, headline, aboutProject }
- *   errors   { bandProjectName?, cityArea? }
- *   onChange (field, value) => void
+ *   form     { bandProjectName, postedByName, locationQuery, selectedPlace, coverImage, headline, aboutProject }
+ *   errors   { bandProjectName?, selectedPlace? }
+ *   onChange       (field, value) => void
+ *   onPlaceSelect  (place) => void
+ *   onPlaceClear   () => void
  *   accent   string — hex from FORM_THEMES (find_bandmate teal)
  */
-const BandmateBasicSection = ({ form, errors = {}, onChange, accent = "#14B8A6" }) => (
+const BandmateBasicSection = ({ form, errors = {}, onChange, onPlaceSelect, onPlaceClear, accent = "#14B8A6" }) => (
   <div className="space-y-4">
     {/* Band / Project Name */}
     <Field
@@ -85,21 +88,18 @@ const BandmateBasicSection = ({ form, errors = {}, onChange, accent = "#14B8A6" 
       </div>
     )}
 
-    {/* City / Area */}
-    <Field
-      label="City / Area"
-      required
-      error={errors.cityArea}
-      hint="Used to help nearby musicians discover this opportunity."
-    >
-      <input
-        type="text"
-        className="jam-input"
-        placeholder="e.g. Miami, FL"
-        value={form.cityArea}
-        onChange={(e) => onChange("cityArea", e.target.value)}
-      />
-    </Field>
+    {/* City / Area — unified location selector */}
+    <LocationSelector
+      config={LOCATION_CONFIGS.find_bandmate}
+      selectedPlace={form.selectedPlace}
+      locationQuery={form.locationQuery}
+      locationGuide=""
+      error={errors.selectedPlace}
+      onChange={onChange}
+      onPlaceSelect={onPlaceSelect}
+      onPlaceClear={onPlaceClear}
+      onLocationUpdate={() => {}}
+    />
 
     {/* Band / Project Photo */}
     <ImageUploadField

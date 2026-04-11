@@ -34,6 +34,7 @@ import EventFooterActions from "./EventFooterActions";
 import { RateJamSheet } from "./RateJamSheet";
 import { DestructiveConfirmSheet } from "./DestructiveConfirmSheet";
 import JamInlineEditForm from "./JamInlineEditForm";
+import ShowInlineEditForm from "./ShowInlineEditForm";
 
 import JamDetailSections from "./sections/JamDetailSections";
 import ShowDetailSections from "./sections/ShowDetailSections";
@@ -214,6 +215,68 @@ function mapItemToJamForm(item, options) {
   };
 }
 
+// ─── Form initializer: item → show edit form state ───────────────────────────
+
+/**
+ * Build the edit form initial state from a normalized show item + any existing lineup IDs.
+ * Called once when the creator enters edit mode on a show.
+ */
+function mapItemToShowForm(item) {
+  const parseDt = (iso) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const startDt = parseDt(item.dateTimeRaw);
+  const endDt   = parseDt(item.endDateTimeRaw);
+
+  const date      = startDt
+    ? `${startDt.getFullYear()}-${padTwo(startDt.getMonth() + 1)}-${padTwo(startDt.getDate())}`
+    : "";
+  const startTime = startDt
+    ? `${padTwo(startDt.getHours())}:${padTwo(startDt.getMinutes())}`
+    : "";
+  const endTime   = endDt
+    ? `${padTwo(endDt.getHours())}:${padTwo(endDt.getMinutes())}`
+    : "";
+
+  const selectedPlace = item.coordinates
+    ? {
+        placeName: item.locationName  ?? "",
+        address:   item.locationAddress ?? "",
+        latitude:  item.coordinates.latitude,
+        longitude: item.coordinates.longitude,
+      }
+    : null;
+
+  // Ensure each lineup act has a stable frontend id for React keys
+  const lineup = (item.lineup ?? []).map((a) => ({
+    ...a,
+    id: a.id ?? crypto.randomUUID(),
+  }));
+
+  return {
+    title:         item.title        ?? "",
+    date,
+    startTime,
+    endTime,
+    locationQuery: item.locationName ?? item.locationAddress ?? "",
+    selectedPlace,
+    locationGuide: item.locationGuide ?? "",
+    description:   item.description  ?? "",
+    genres:        { selectedIds: item.genreIds ?? [], customValues: [] },
+    ticketPrice:   item.ticketPrice  != null ? String(item.ticketPrice)  : "",
+    ticketLink:    item.ticketLink   ?? "",
+    lineup,
+    maxCapacity:   item.capacity     != null ? String(item.capacity)     : "",
+    isPrivate:     item.isPrivate    ?? false,
+    coverImage:    item.coverImageUrl
+      ? { file: null, previewUrl: item.coverImageUrl }
+      : null,
+  };
+}
+
 // ─── EventDetailModal ─────────────────────────────────────────────────────────
 
 /**
@@ -316,8 +379,8 @@ const EventDetailModal = ({
   const isCreatorOrAdmin = relationship === "creator" || relationship === "admin";
   const isJam            = localItem?.type === "jam";
   const isShow           = localItem?.type === "promote_show";
-  // Jams owned by creator get in-place editing; everything else uses onEdit callback
-  const canEditInPlace   = isJam && isCreatorOrAdmin;
+  // Jams and shows owned by creator/admin get in-place editing; other types use onEdit callback
+  const canEditInPlace   = (isJam || isShow) && isCreatorOrAdmin;
 
   // ── Dirty check helper (ref-based so ESC handler stays stable) ────────────
   const editFormRef = useRef(null);
@@ -339,7 +402,9 @@ const EventDetailModal = ({
 
   // ── Enter edit mode ────────────────────────────────────────────────────────
   const handleEnterEdit = () => {
-    const initial = mapItemToJamForm(localItem, options);
+    const initial = isJam
+      ? mapItemToJamForm(localItem, options)
+      : mapItemToShowForm(localItem);
     editInitialFormRef.current = initial;
     setEditForm(initial);
     setEditErrors({});
@@ -364,31 +429,49 @@ const EventDetailModal = ({
   const handleSave = async () => {
     if (!editForm) return;
 
-    // Validate core details
-    const { errors: coreErrors, isValid } = validateJamCoreDetails(editForm);
-    const hasLocationError = !editForm.selectedPlace;
+    const allErrors = {};
 
-    const allErrors = { ...coreErrors };
-    if (hasLocationError) allErrors.selectedPlace = "Please search and select a location";
-
-    // Touch all required fields so errors are visible
-    setEditTouched({ title: true, date: true, startTime: true, selectedPlace: true });
-    if (!isValid || hasLocationError) {
-      setEditErrors(allErrors);
-      return;
+    if (isJam) {
+      // Validate via shared jam validator
+      const { errors: coreErrors, isValid } = validateJamCoreDetails(editForm);
+      Object.assign(allErrors, coreErrors);
+      if (!editForm.selectedPlace) allErrors.selectedPlace = "Please search and select a location";
+      setEditTouched({ title: true, date: true, startTime: true, selectedPlace: true });
+      if (!isValid || allErrors.selectedPlace) {
+        setEditErrors(allErrors);
+        return;
+      }
+    } else if (isShow) {
+      // Basic required-field validation for shows
+      if (!editForm.title?.trim())  allErrors.title      = "Show title is required";
+      if (!editForm.date)           allErrors.date       = "Date is required";
+      if (!editForm.startTime)      allErrors.startTime  = "Start time is required";
+      if (!editForm.selectedPlace)  allErrors.selectedPlace = "Please search and select a venue";
+      setEditTouched({ title: true, date: true, startTime: true, selectedPlace: true });
+      if (Object.keys(allErrors).length > 0) {
+        setEditErrors(allErrors);
+        return;
+      }
     }
 
     setIsSaving(true);
     setSaveError(null);
     try {
-      await jamService.updateJam(localItem.id, editForm);
-      const refreshed = await jamService.getJamById(localItem.id);
+      let refreshed;
+      if (isJam) {
+        await jamService.updateJam(localItem.id, editForm);
+        refreshed = await jamService.getJamById(localItem.id);
+        showToast("Jam updated!", "success");
+      } else if (isShow) {
+        await showService.updateShow(localItem.id, editForm);
+        refreshed = await showService.getShowById(localItem.id);
+        showToast("Show updated!", "success");
+      }
       setLocalItem(refreshed);
       exitEditMode();
-      showToast("Jam updated!", "success");
       onSaved?.(refreshed);
     } catch (err) {
-      console.error("Update jam failed:", err);
+      console.error("Update failed:", err);
       setSaveError("Something went wrong. Please try again.");
     } finally {
       setIsSaving(false);
@@ -508,16 +591,29 @@ const EventDetailModal = ({
       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
         <AnimatePresence mode="wait">
           {isEditing ? (
-            <JamInlineEditForm
-              key="edit-form"
-              form={editForm}
-              setForm={setEditForm}
-              errors={editErrors}
-              setErrors={setEditErrors}
-              touched={editTouched}
-              setTouched={setEditTouched}
-              options={options}
-            />
+            isJam ? (
+              <JamInlineEditForm
+                key="edit-form"
+                form={editForm}
+                setForm={setEditForm}
+                errors={editErrors}
+                setErrors={setEditErrors}
+                touched={editTouched}
+                setTouched={setEditTouched}
+                options={options}
+              />
+            ) : (
+              <ShowInlineEditForm
+                key="edit-form"
+                form={editForm}
+                setForm={setEditForm}
+                errors={editErrors}
+                setErrors={setEditErrors}
+                touched={editTouched}
+                setTouched={setEditTouched}
+                options={options}
+              />
+            )
           ) : (
             <motion.div
               key="view-body"
