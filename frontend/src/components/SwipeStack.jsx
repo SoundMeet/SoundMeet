@@ -203,9 +203,7 @@ export default function SoundMeetDiscovery() {
           apiService.getAllFormOptions(),
           socialService.getMyFriends(user.id)
         ]);
-        
         const otherProfiles = profilesData.filter(p => p.user_id !== user.id);
-        
         setProfiles(otherProfiles);
         setFriends(friendsData || []);
         
@@ -249,7 +247,7 @@ export default function SoundMeetDiscovery() {
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter((p) => {
-      const isAlreadyFriend = friends.some((f) => f.id === p.id);
+      const isAlreadyFriend = friends.some((f) => f.id === p.user_id);
       if (isAlreadyFriend) return false;
 
       const matchSearch = p.display_name
@@ -272,8 +270,9 @@ export default function SoundMeetDiscovery() {
   const handleSwipe = async (direction, id) => {
     setLastSwipeDirection(direction);
     if (direction === "right") {
+      const prof = profiles.find((p) => p.id === id)
       try {
-        await socialService.sendFriendRequest(id);
+        await socialService.sendFriendRequest(prof.user_id);
       } catch (err) {
         console.error("Failed to send friend request on swipe:", err);
       }
@@ -530,7 +529,7 @@ export default function SoundMeetDiscovery() {
                   </div>
 
                   <div className="flex flex-col gap-2 mt-auto">
-                    {friends.some(f => f.id === selectedProfile.id) ? (
+                    {friends.some(f => f.id === selectedProfile.user_id) ? (
                       <button 
                         disabled
                         className="w-full py-3 rounded-full bg-[#DC2E73]/10 text-[#DC2E73] font-bold text-[12px] border border-[#DC2E73]/30 flex items-center justify-center gap-2 opacity-80"
@@ -542,9 +541,8 @@ export default function SoundMeetDiscovery() {
                       <button 
                         onClick={async () => {
                           try {
-                            await socialService.sendFriendRequest(selectedProfile.id);
-                            setSelectedProfile(null);
                             handleSwipe("right", selectedProfile.id);
+                            setSelectedProfile(null);
                           } catch (err) {
                             console.error("Failed to send friend request:", err);
                           }
