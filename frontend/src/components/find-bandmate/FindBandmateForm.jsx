@@ -29,7 +29,9 @@ const buildInitialForm = (user) => ({
   bandProjectName: "",
   postedByUserId:  user?.id   ?? null,
   postedByName:    user?.username ?? user?.email ?? "",
-  cityArea:        "",
+  // Location — unified shape; city_area text extracted on submit via placeToOpportunityAreaText()
+  locationQuery:   "",
+  selectedPlace:   null,
   coverImage:      null,   // { file: File, previewUrl: string } | null
   headline:        "",
   aboutProject:    "",
@@ -106,12 +108,22 @@ const FindBandmateForm = ({ options, onClose }) => {
   const setField = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  // ── Location handlers ──────────────────────────────────────────────────────
+
+  const handlePlaceSelect = (place) =>
+    setForm((prev) => ({ ...prev, selectedPlace: place, locationQuery: place.placeName }));
+
+  const handlePlaceClear = () =>
+    setForm((prev) => ({ ...prev, selectedPlace: null, locationQuery: "" }));
+
   // ── Validation ─────────────────────────────────────────────────────────────
 
   const validateStep1 = () => {
     const newErrors = {};
     if (!form.bandProjectName.trim()) newErrors.bandProjectName = "Band or project name is required";
-    if (!form.cityArea.trim())        newErrors.cityArea        = "City or area is required";
+    if (!form.selectedPlace && !form.locationQuery.trim()) {
+      newErrors.selectedPlace = "City or area is required";
+    }
     setErrors((prev) => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
@@ -141,7 +153,9 @@ const FindBandmateForm = ({ options, onClose }) => {
   };
 
   const canAdvance = (() => {
-    if (step === 1) return !!form.bandProjectName.trim() && !!form.cityArea.trim();
+    if (step === 1) {
+      return !!form.bandProjectName.trim() && !!(form.selectedPlace || form.locationQuery.trim());
+    }
     return true;
   })();
 
@@ -234,6 +248,8 @@ const FindBandmateForm = ({ options, onClose }) => {
                 form={form}
                 errors={errors}
                 onChange={setField}
+                onPlaceSelect={handlePlaceSelect}
+                onPlaceClear={handlePlaceClear}
                 accent={THEME.accent}
               />
             </motion.div>

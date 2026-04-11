@@ -19,9 +19,11 @@ urlpatterns = [
     path('api/posts/<int:post_id>/comments/', views.create_comment, name='create_comment'),
     path('api/jams/create/', views.create_jam, name='create_jam'),
     path('api/jams/<int:jam_id>/update/', views.update_jam, name='update_jam'),
+    path('api/jams/<int:jam_id>/delete/', views.delete_jam, name='delete_jam'),
     path('api/jams/<int:jam_id>/invite/', views.invite_to_jam, name='invite_to_jam'),
     path('api/shows/create/', views.create_show, name='create_show'),
     path('api/shows/<int:show_id>/update/', views.update_show, name='update_show'),
+    path('api/shows/<int:show_id>/delete/', views.delete_show, name='delete_show'),
     path('api/bands/create/', views.create_band, name='create_band'),
 
     path('api/friends/request/', views.send_friend_request, name='send_friend_request'),

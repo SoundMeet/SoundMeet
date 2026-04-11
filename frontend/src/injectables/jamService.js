@@ -357,71 +357,8 @@ export const jamService = {
     return response;
   },
 
-  async updateJam(jamId, form) {
-    const dateTime =
-      form.date && form.startTime
-        ? new Date(`${form.date}T${form.startTime}`).toISOString()
-        : null;
-
-    const endDateTime =
-      form.date && form.endTime
-        ? new Date(`${form.date}T${form.endTime}`).toISOString()
-        : null;
-
-    const location =
-      form.selectedPlace?.latitude != null && form.selectedPlace?.longitude != null
-        ? `SRID=4326;POINT(${form.selectedPlace.longitude} ${form.selectedPlace.latitude})`
-        : null;
-
-    const formData = new FormData();
-
-    if (form.title)                       formData.append('name', form.title.trim());
-    if (dateTime)                         formData.append('date_time', dateTime);
-    formData.append('end_time', endDateTime ?? '');
-    if (location)                         formData.append('location', location);
-    if (form.selectedPlace?.placeName)    formData.append('location_name', form.selectedPlace.placeName);
-    if (form.selectedPlace?.address)      formData.append('location_address', form.selectedPlace.address);
-    formData.append('location_guide', form.locationGuide?.trim() || '');
-    formData.append('description', form.description?.trim() || '');
-
-    const jamType = form.jamTypes?.presetIds?.[0] ?? form.jamTypes?.customValues?.[0] ?? 'OPEN JAM';
-    formData.append('jam_type', jamType);
-    formData.append('skill_level', form.skillLevel || 'ALL LEVELS');
-    formData.append('access', !form.isPrivate);
-    formData.append('max_attendees', form.maxParticipants ? parseInt(form.maxParticipants, 10) : '');
-
-    if (form.coverImage?.file) formData.append('cover_image', form.coverImage.file);
-
-    const genreIds = form.isOpenToAllGenres ? [] : (form.genres?.presetIds || []);
-    genreIds.forEach(id => formData.append('genre_ids', id));
-
-    const vibeIds = form.isOpenToAllVibes ? [] : (form.vibes?.presetIds || []);
-    vibeIds.forEach(id => formData.append('vibe_ids', id));
-
-    const instrumentsNeeded = form.isOpenToAllInstruments ? [] : (form.instrumentsNeeded?.presetIds || []);
-    instrumentsNeeded.forEach(id => formData.append('instruments_needed_ids', id));
-
-    const rolesNeeded = form.rolesNeeded?.presetIds || [];
-    rolesNeeded.forEach(id => formData.append('roles_needed_ids', id));
-
-    const gearProvided = form.equipmentAvailable?.presetIds || [];
-    gearProvided.forEach(id => formData.append('gear_provided_ids', id));
-
-    const gearNeeded = form.equipmentNeeded?.presetIds || [];
-    gearNeeded.forEach(id => formData.append('gear_needed_ids', id));
-
-    return await apiFetch(`api/jams/${jamId}/update/`, {
-      method: 'PATCH',
-      body: formData,
-    });
-  },
-
   async deleteJam(jamId) {
-    const { error } = await supabase
-      .from('chat_jam')
-      .delete()
-      .eq('id', jamId);
-    if (error) throw error;
+    await apiFetch(`api/jams/${jamId}/delete/`, { method: 'DELETE' });
   },
 
   async getJamNames(jamIds) {
@@ -655,12 +592,13 @@ export const jamService = {
 
     if (form.title)     formData.append('name', form.title.trim());
     if (dateTime)       formData.append('date_time', dateTime);
-    if (endDateTime)    formData.append('end_time', endDateTime);
+    formData.append('end_time', endDateTime ?? '');
     if (location)       formData.append('location', location);
 
-    if (form.selectedPlace?.placeName) formData.append('location_name', form.selectedPlace.placeName);
-    if (form.selectedPlace?.address)   formData.append('location_address', form.selectedPlace.address);
-    if (form.locationGuide)            formData.append('location_guide', form.locationGuide.trim());
+    // Always send location text fields so edits/clears persist to the backend
+    formData.append('location_name', form.selectedPlace?.placeName ?? '');
+    formData.append('location_address', form.selectedPlace?.address ?? '');
+    formData.append('location_guide', form.locationGuide?.trim() || '');
 
     formData.append('description', form.description?.trim() || '');
 

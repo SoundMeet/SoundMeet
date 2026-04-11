@@ -393,6 +393,14 @@ def update_jam(request, jam_id):
     return Response({'status': 'Jam updated successfully'})
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_jam(request, jam_id):
+    jam = get_object_or_404(Jam, id=jam_id, admin=request.user)
+    jam.delete()
+    return Response({'status': 'Jam deleted'}, status=204)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
@@ -498,6 +506,14 @@ def update_show(request, show_id):
     show.genres.set(valid_genre_ids)
 
     return Response({'status': 'Show updated successfully'})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_show(request, show_id):
+    show = get_object_or_404(Show, id=show_id, admin=request.user)
+    show.delete()
+    return Response({'status': 'Show deleted'}, status=204)
 
 
 @api_view(['POST'])

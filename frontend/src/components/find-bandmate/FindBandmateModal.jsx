@@ -40,6 +40,12 @@ const FindBandmateModal = ({
         onFocusOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
+        {/* Dropdown portal for LocationSelector search results */}
+        <div
+          id="location-dropdown-portal"
+          style={{ position: "fixed", inset: 0, zIndex: 9999, pointerEvents: "none" }}
+        />
+
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

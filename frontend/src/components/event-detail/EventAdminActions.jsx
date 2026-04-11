@@ -88,20 +88,18 @@ const EventAdminActions = ({ item, onEdit, onEnterEdit, onDelete, onClose, onOpe
             </p>
           </div>
 
-          {item?.type !== "promote_show" && (
-            <AdminButton
-              icon={<EditIcon />}
-              label="Edit Event"
-              onClick={() => {
-                if (onEnterEdit) {
-                  onEnterEdit();
-                } else {
-                  onEdit?.(item);
-                  onClose?.();
-                }
-              }}
-            />
-          )}
+          <AdminButton
+            icon={<EditIcon />}
+            label="Edit Event"
+            onClick={() => {
+              if (onEnterEdit) {
+                onEnterEdit();
+              } else {
+                onEdit?.(item);
+                onClose?.();
+              }
+            }}
+          />
 
           {(item?.type === "jam" || item?.type === "promote_show") && (
             <AdminButton

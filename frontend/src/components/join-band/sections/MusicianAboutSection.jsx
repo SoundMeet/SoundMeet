@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import LocationSelector, { LOCATION_CONFIGS } from "../../../components/location/LocationSelector";
 
 // ─── Field ────────────────────────────────────────────────────────────────────
 
@@ -275,10 +276,12 @@ const ProfilePhotoField = ({ profilePhotoUrl, listingPhoto, onChange, accent = "
  * Fields here are listing-level customizations on top of that profile.
  *
  * Props:
- *   form     { artistName, photo, city, headline, bio }
- *   errors   { city? }
+ *   form     { artistName, photo, locationQuery, selectedPlace, headline, bio }
+ *   errors   { selectedPlace? }
  *   profile  { name, city, photoUrl }
  *   onChange (field, value) => void
+ *   onPlaceSelect  (place) => void
+ *   onPlaceClear   () => void
  *   accent   string
  */
 const MusicianAboutSection = ({
@@ -286,6 +289,8 @@ const MusicianAboutSection = ({
   errors  = {},
   profile = {},
   onChange,
+  onPlaceSelect,
+  onPlaceClear,
   accent  = "#8B5CF6",
 }) => (
   <div className="space-y-4">
@@ -326,21 +331,18 @@ const MusicianAboutSection = ({
       />
     </Field>
 
-    {/* ── City / Area ─────────────────────────────────────────────────────── */}
-    <Field
-      label="City / Area"
-      required
-      error={errors.city}
-      hint="Prefilled from your profile — used for local matching."
-    >
-      <input
-        type="text"
-        className="jam-input"
-        placeholder="e.g. Miami, FL"
-        value={form.city}
-        onChange={(e) => onChange("city", e.target.value)}
-      />
-    </Field>
+    {/* ── City / Area — unified location selector ─────────────────────── */}
+    <LocationSelector
+      config={LOCATION_CONFIGS.join_band}
+      selectedPlace={form.selectedPlace}
+      locationQuery={form.locationQuery}
+      locationGuide=""
+      error={errors.selectedPlace}
+      onChange={onChange}
+      onPlaceSelect={onPlaceSelect}
+      onPlaceClear={onPlaceClear}
+      onLocationUpdate={() => {}}
+    />
 
     {/* ── Headline ─────────────────────────────────────────────────────────── */}
     <Field

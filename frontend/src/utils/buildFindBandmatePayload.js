@@ -7,6 +7,8 @@
  * the rest of the form code stays unchanged.
  */
 
+import { placeToOpportunityAreaText } from "./location/adapters";
+
 /**
  * Flattens a TagGroupState { selectedIds, customValues } into a plain string array.
  */
@@ -27,7 +29,8 @@ export function buildFindBandmatePayload(formValues) {
     bandProjectName,
     postedByUserId,
     postedByName,
-    cityArea,
+    selectedPlace,
+    locationQuery  = "",
     coverImage = null,
     headline,
     aboutProject,
@@ -54,7 +57,8 @@ export function buildFindBandmatePayload(formValues) {
     band_project_name: bandProjectName.trim(),
     posted_by_user_id: postedByUserId ?? null,
     posted_by_name:    trimOrNull(postedByName),
-    city_area:         cityArea.trim(),
+    // city_area extracted from the unified Place or falls back to raw query text
+    city_area:         placeToOpportunityAreaText(selectedPlace, locationQuery),
     headline:          trimOrNull(headline),
     about_project:     trimOrNull(aboutProject),
 

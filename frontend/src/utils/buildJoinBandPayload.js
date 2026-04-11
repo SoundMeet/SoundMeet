@@ -10,6 +10,8 @@
  * the rest of the form code stays unchanged.
  */
 
+import { placeToOpportunityAreaText } from "./location/adapters";
+
 const flattenTagGroup = (group) => [
   ...(group?.selectedIds  ?? []),
   ...(group?.customValues ?? []),
@@ -26,8 +28,9 @@ export function buildJoinBandPayload(formValues, profile = {}) {
   const {
     // § 1 — About You (listing overrides)
     artistName,
-    photo        = null,
-    city,
+    photo          = null,
+    selectedPlace,
+    locationQuery  = "",
     headline,
     bio,
 
@@ -76,7 +79,8 @@ export function buildJoinBandPayload(formValues, profile = {}) {
     // display_name falls back to profile name when no artist name override is set
     display_name: trimOrNull(artistName) ?? profile.name ?? null,
     artist_name:  trimOrNull(artistName),
-    city:         city.trim() || profile.city || null,
+    // city is extracted from the unified Place or falls back to raw query text / profile city
+    city:         placeToOpportunityAreaText(selectedPlace, locationQuery) || profile.city || null,
     headline:     trimOrNull(headline),
     bio:          trimOrNull(bio),
 

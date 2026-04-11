@@ -295,11 +295,7 @@ export const showService = {
   },
 
   async deleteShow(showId) {
-    const { error } = await supabase
-      .from('chat_show')
-      .delete()
-      .eq('id', showId);
-    if (error) throw error;
+    await apiFetch(`api/shows/${showId}/delete/`, { method: 'DELETE' });
   },
 
   async cancelShowRsvp(showId, userId) {
