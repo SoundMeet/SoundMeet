@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   motion,
@@ -25,6 +26,7 @@ import {
 import { apiService } from "../injectables/apiCalls";
 import { socialService } from "../injectables/socialService";
 import { useAuth } from "../injectables/Auth";
+import { ProfilesRUS } from "../services/ProfilesRUS";
 
 const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
 const BUCKET_URL = `${SUPABASE_URL}/storage/v1/object/public/media/`;
@@ -172,6 +174,7 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
 
 export default function SoundMeetDiscovery() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -575,7 +578,10 @@ export default function SoundMeetDiscovery() {
                         Add Friend
                       </button>
                     )}
-                    <button className="w-full py-3 rounded-full bg-[#2A2A2A] text-white/80 font-bold text-[12px] hover:bg-[#393939] hover:text-white hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => ProfilesRUS(navigate, selectedProfile.id)}
+                      className="w-full py-3 rounded-full bg-[#2A2A2A] text-white/80 font-bold text-[12px] hover:bg-[#393939] hover:text-white hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
                       <ExternalLink size={14} />
                       View Profile
                     </button>

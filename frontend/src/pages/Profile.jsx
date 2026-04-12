@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { jamService } from "../injectables/jamService";
 import { apiService } from "../injectables/apiCalls";
 import { postService } from "../injectables/postService";
+import { musicSnipService } from "../injectables/musicSnipService";
 import CropperThings from "../components/CropperThings";
 import { useAuth } from "../injectables/Auth";
 import { useAuthModal } from "../context/AuthModalContext";
@@ -170,10 +171,10 @@ function InterestsSidebar({ pills, jams, user, city, country, availableToJam, on
 
   const grouped = CATEGORIES.map(cat => ({
     ...cat,
-    pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_")),
+    pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_") && p.text),
   })).filter(cat => cat.pills.length > 0);
 
-  const ungrouped = pills.filter(p => !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
+  const ungrouped = pills.filter(p => p.text && !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
 
   const dark          = needsDarkText(cardColor.bg, textOverride);
   const textPrimary   = dark ? "#111"             : "#fff";
@@ -447,6 +448,12 @@ const Profile = () => {
   const [activeSection, setActiveSection] = useState("Name & Location");
   const [nameHover, setNameHover] = useState(false);
 
+  // ── Interests card drag state (lifted from IIFE to satisfy Rules of Hooks) ─
+  const [intDragState, setIntDragState] = useState(null);
+  const intDragStartY    = useRef(0);
+  const intMovedRef      = useRef(false);
+  const intContainerRefs = useRef({});
+
   // ── Route param — /profile/:username ─────────────────────────────────────
   // If a username is present in the URL we're viewing someone else's profile.
   // If not, we're viewing our own. isOwnProfile gates all edit affordances.
@@ -460,7 +467,7 @@ const Profile = () => {
   const [viewedUserLoading, setViewedUserLoading] = useState(!!routeUsername);
 
   // Derive isOwnProfile once we know both sides
-  const isOwnProfile = !routeUsername || (loggedInUser?.username === routeUsername);
+  const isOwnProfile = !routeUsername || (loggedInUser?.id?.toString() === routeUsername);
 
   // The user object we actually seed the profile from
   const user = isOwnProfile ? loggedInUser : viewedUser;
@@ -472,10 +479,7 @@ const Profile = () => {
       return;
     }
     setViewedUserLoading(true);
-    // ── BACKEND: replace this stub with your real user-by-username endpoint ──
-    // Expected shape: same as the logged-in `user` object from useAuth.
-    // e.g. apiService.getUserByUsername(routeUsername)
-    apiService.getUserByUsername(routeUsername)
+    apiService.getProfileById(routeUsername)
       .then(data => setViewedUser(data))
       .catch(err => {
         console.error("Failed to load profile:", err);
@@ -505,24 +509,62 @@ const Profile = () => {
 
   // ── Add Friend state — only relevant when viewing someone else's profile ──
   const [friendStatus, setFriendStatus] = useState("none"); // "none" | "pending" | "friends"
-  const [friendLoading, setFriendLoading] = useState(false);
 
-  const handleAddFriend = async () => {
+  const handleAddFriend = () => {
     if (!isLoggedIn) { openModal("login"); return; }
-    if (friendLoading || friendStatus !== "none") return;
-    setFriendLoading(true);
-    try {
-      await apiService.sendFriendRequest(user?.id);
-      setFriendStatus("pending");
-    } catch (err) {
-      console.error("Failed to send friend request:", err);
-    } finally {
-      setFriendLoading(false);
-    }
+    if (friendStatus !== "none") return;
+    setFriendStatus("pending");
+    apiService.sendFriendRequest(user?.user_id)
+      .catch(err => console.error("Failed to send friend request:", err));
   };
 
   // pills – seeded from user.genres_liked, instruments_liked, vibes_liked
   const [pills, setPills] = useState([]);
+
+  // ── Interests card drag effect (depends on pills + intDragState) ──────────
+  useEffect(() => {
+    if (!intDragState) return;
+    const onMove = (e) => {
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      if (Math.abs(clientY - intDragStartY.current) > 5) intMovedRef.current = true;
+      const container = intContainerRefs.current[intDragState.catKey];
+      if (!container) return;
+      const items = container.querySelectorAll("[data-pill-item]");
+      let closest = intDragState.overIdx, closestDist = Infinity;
+      items.forEach((el, i) => {
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(clientY - (rect.top + rect.height / 2));
+        if (dist < closestDist) { closestDist = dist; closest = i; }
+      });
+      setIntDragState(prev => prev ? { ...prev, overIdx: closest } : null);
+    };
+    const onUp = () => {
+      if (intMovedRef.current && intDragState && intDragState.fromIdx !== intDragState.overIdx) {
+        const catPills  = pills.filter(p => typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_"));
+        const reordered = [...catPills];
+        const [moved]   = reordered.splice(intDragState.fromIdx, 1);
+        reordered.splice(intDragState.overIdx, 0, moved);
+        let copy = [...reordered];
+        const newPills = pills.map(p => {
+          if (typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_")) return copy.shift();
+          return p;
+        });
+        setPills(newPills);
+      }
+      setIntDragState(null);
+      intMovedRef.current = false;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup",   onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend",  onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup",   onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend",  onUp);
+    };
+  }, [intDragState, pills]);
 
   // ── Pill picker state ─────────────────────────────────────────────────────
   const [allTags, setAllTags] = useState([]);
@@ -569,13 +611,14 @@ const Profile = () => {
     setHeadline(user.headline || "");
     setAvailableToJam(user.available_to_jam ?? false);
     if (user.pfp) setProfilePic(user.pfp);
+    if (user.profile_banner) setBanner(user.profile_banner);
 
     // Seed pills from genres, instruments, and vibes — color stable per tag.id
     const colors = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
     const userTags = [
-      ...(user.genres_liked ?? []).map(t => ({ ...t, uid: `g_${t.id}` })),
-      ...(user.instruments_liked ?? []).map(t => ({ ...t, uid: `i_${t.id}` })),
-      ...(user.vibes_liked ?? []).map(t => ({ ...t, uid: `v_${t.id}` })),
+      ...(user.genres_liked ?? []).filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `g_${t.id}` })),
+      ...(user.instruments_liked ?? []).filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `i_${t.id}` })),
+      ...(user.vibes_liked ?? []).filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `v_${t.id}` })),
     ];
     if (userTags.length > 0) {
       setPills(userTags.map((tag) => ({
@@ -659,9 +702,8 @@ const Profile = () => {
   const [snippetModalOpen, setSnippetModalOpen] = useState(false);
   const [newSnippet, setNewSnippet] = useState({
     title: "",
-    audioFile: null,  // raw File object — blob URL created at play time
+    audioFile: null,
     audioName: null,
-    background: null,
   });
 
   const [playingIndex, setPlayingIndex] = useState(null);
@@ -764,17 +806,13 @@ const Profile = () => {
     setPlayingIndex(null);
   };
 
-  // ── BACKEND NEEDED: fetch snippets on mount ───────────────────────────────
-  // Uncomment and replace stub once GET /api/snippets/ (or /api/profiles/<username>/snippets/) exists.
-  // Shape expected per snippet: { id, title, audio: <served URL>, background: <served URL or null> }
-  //
-  // useEffect(() => {
-  //   if (!user?.id) return;
-  //   const endpoint = isOwnProfile ? "api/snippets/" : `api/profiles/${routeUsername}/snippets/`;
-  //   apiFetch(endpoint)
-  //     .then((data) => setSnippets(data.map(s => ({ ...s, audioFile: null, audioName: s.title }))))
-  //     .catch(console.error);
-  // }, [user?.id, isOwnProfile, routeUsername]);
+  useEffect(() => {
+    const profileUserId = isOwnProfile ? loggedInUser?.id : viewedUser?.user_id;
+    if (!profileUserId) return;
+    musicSnipService.getProfileSnips(profileUserId)
+      .then((snips) => setSnippets(snips.map(s => ({ ...s, audioName: s.name }))))
+      .catch(console.error);
+  }, [loggedInUser?.id, viewedUser?.user_id, isOwnProfile]);
 
   const saveSnippet = async () => {
     if (!newSnippet.title.trim() && !newSnippet.audioFile) {
@@ -794,53 +832,31 @@ const Profile = () => {
       return;
     }
 
-    // ── BACKEND NEEDED: POST /api/snippets/ ─────────────────────────────────
-    // Uncomment once the endpoint exists. Remove the local blob fallback below.
-    //
-    // try {
-    //   const form = new FormData();
-    //   form.append("title", newSnippet.title);
-    //   form.append("audio", newSnippet.audioFile);
-    //   if (newSnippet.background) {
-    //     const bgBlob = await fetch(newSnippet.background).then(r => r.blob());
-    //     form.append("background", bgBlob, "bg.jpg");
-    //   }
-    //   const saved = await apiFetch("api/snippets/", { method: "POST", body: form });
-    //   setSnippets((prev) => [...prev, { ...saved, audioFile: null, audioName: saved.title }]);
-    // } catch (err) {
-    //   showToast("Failed to save snippet.");
-    //   return;
-    // }
+    try {
+      const saved = await musicSnipService.createSnip({ name: newSnippet.title, musicFile: newSnippet.audioFile });
+      setSnippets((prev) => [...prev, { ...saved, audioName: saved.name }]);
+    } catch (err) {
+      showToast("Failed to save snippet.");
+      return;
+    }
 
-    // ── LOCAL FALLBACK (remove once backend is wired) ────────────────────────
-    const audioUrl = URL.createObjectURL(newSnippet.audioFile);
-    setSnippets((prev) => [...prev, { ...newSnippet, audio: audioUrl }]);
-    // ─────────────────────────────────────────────────────────────────────────
-
-    setNewSnippet({ title: "", audioFile: null, audioName: null, background: null });
+    setNewSnippet({ title: "", audioFile: null, audioName: null });
     setSnippetModalOpen(false);
   };
 
   const deleteSnippet = async (indexToDelete) => {
     const target = snippets[indexToDelete];
 
-    // ── BACKEND NEEDED: DELETE /api/snippets/<id>/ ───────────────────────────
-    // Uncomment once the endpoint exists.
-    //
-    // if (target?.id) {
-    //   try {
-    //     await apiFetch(`api/snippets/${target.id}/`, { method: "DELETE" });
-    //   } catch (err) {
-    //     showToast("Failed to delete snippet.");
-    //     return;
-    //   }
-    // }
-
-    // ── LOCAL CLEANUP ────────────────────────────────────────────────────────
-    if (target) {
-      revokeObjectUrl(target.audio);
-      revokeObjectUrl(target.background);
+    if (target?.id) {
+      try {
+        await musicSnipService.deleteSnip(target.id);
+      } catch (err) {
+        showToast("Failed to delete snippet.");
+        return;
+      }
     }
+
+    if (target) revokeObjectUrl(target.audio);
     setSnippets((prev) => prev.filter((_, i) => i !== indexToDelete));
 
     if (playingIndex === indexToDelete) {
@@ -1057,7 +1073,7 @@ const Profile = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-neutral-900/50 text-white">
         <p className="text-2xl font-semibold">Profile not found</p>
-        <p className="text-sm text-white/40">No user with username @{routeUsername}</p>
+        <p className="text-sm text-white/40">No user found with username @{routeUsername}</p>
       </div>
     );
   }
@@ -1067,15 +1083,15 @@ const Profile = () => {
       <main className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-6">
 
         {/* ── Top-level layout: [content area] + [jams sidebar] ── */}
-        <div className="flex gap-4 items-start">
+        <div className="flex flex-col lg:flex-row gap-4 lg:items-start">
 
           {/* ── LEFT+CENTER CONTENT AREA ── */}
           <div className="flex flex-col gap-4 flex-1 min-w-0">
 
             {/* Banner — scoped to left+center only, sidebar breaks through above it */}
             <div
-              className="relative flex h-[260px] w-full items-center overflow-visible rounded-2xl bg-neutral-200 px-6 md:px-10"
-              onMouseEnter={() => setNameHover(true)}
+              className="relative flex h-[260px] w-full items-center overflow-hidden lg:overflow-visible rounded-2xl bg-neutral-200 px-6 md:px-10"
+              onMouseEnter={() => isOwnProfile && editOpen && setNameHover(true)}
               onMouseLeave={() => setNameHover(false)}
               style={{
                 backgroundImage: banner ? `url(${banner})` : undefined,
@@ -1113,7 +1129,7 @@ const Profile = () => {
               {!isOwnProfile && !editOpen && (
                 <button
                   onClick={handleAddFriend}
-                  disabled={friendLoading || friendStatus !== "none"}
+                  disabled={friendStatus !== "none"}
                   className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200"
                   style={{
                     background: friendStatus === "friends"
@@ -1132,13 +1148,10 @@ const Profile = () => {
                         ? "rgba(255,255,255,0.5)"
                         : "#fff",
                     boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.35)" : "none",
-                    opacity: friendLoading ? 0.6 : 1,
                     cursor: friendStatus !== "none" ? "default" : "pointer",
                   }}
                 >
-                  {friendLoading ? (
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                  ) : friendStatus === "friends" ? (
+                  {friendStatus === "friends" ? (
                     <>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                         <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1148,10 +1161,9 @@ const Profile = () => {
                   ) : friendStatus === "pending" ? (
                     <>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
-                        <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      Request Sent
+                      Sent
                     </>
                   ) : (
                     <>
@@ -1199,7 +1211,7 @@ const Profile = () => {
             </div>
 
             {/* ── Two-column content grid below banner ── */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
 
           {/* ── LEFT COLUMN ── */}
           <div className="flex flex-col gap-4">
@@ -1247,7 +1259,7 @@ const Profile = () => {
                         className="text-sm italic"
                         style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", transition: "color 0.4s ease" }}
                       >
-                        Add your headline!
+                        {isOwnProfile ? "Add your headline!" : "empty... :("}
                       </p>
                     )}
                   </div>
@@ -1267,7 +1279,7 @@ const Profile = () => {
                       className="text-sm leading-relaxed italic"
                       style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", transition: "color 0.4s ease" }}
                     >
-                      (bio goes here)
+                      {isOwnProfile ? "(bio goes here)" : "empty too... :("}
                     </p>
                   )}
                 </div>
@@ -1431,15 +1443,9 @@ const Profile = () => {
               ];
               const grouped = CATEGORIES.map(cat => ({
                 ...cat,
-                pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_")),
+                pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_") && p.text),
               })).filter(cat => cat.pills.length > 0);
-              const ungrouped = pills.filter(p => !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
-
-              // Per-category drag state — inline mirror of InterestsSidebar logic
-              const [intDragState, setIntDragState] = useState(null);
-              const intDragStartY    = useRef(0);
-              const intMovedRef      = useRef(false);
-              const intContainerRefs = useRef({});
+              const ungrouped = pills.filter(p => p.text && !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
 
               const handleIntPillDown = (e, catKey, localIdx) => {
                 if (!isOwnProfile) return;
@@ -1448,50 +1454,6 @@ const Profile = () => {
                 intMovedRef.current   = false;
                 setIntDragState({ catKey, fromIdx: localIdx, overIdx: localIdx });
               };
-
-              useEffect(() => {
-                if (!intDragState) return;
-                const onMove = (e) => {
-                  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                  if (Math.abs(clientY - intDragStartY.current) > 5) intMovedRef.current = true;
-                  const container = intContainerRefs.current[intDragState.catKey];
-                  if (!container) return;
-                  const items = container.querySelectorAll("[data-pill-item]");
-                  let closest = intDragState.overIdx, closestDist = Infinity;
-                  items.forEach((el, i) => {
-                    const rect = el.getBoundingClientRect();
-                    const dist = Math.abs(clientY - (rect.top + rect.height / 2));
-                    if (dist < closestDist) { closestDist = dist; closest = i; }
-                  });
-                  setIntDragState(prev => prev ? { ...prev, overIdx: closest } : null);
-                };
-                const onUp = () => {
-                  if (intMovedRef.current && intDragState && intDragState.fromIdx !== intDragState.overIdx) {
-                    const catPills  = pills.filter(p => typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_"));
-                    const reordered = [...catPills];
-                    const [moved]   = reordered.splice(intDragState.fromIdx, 1);
-                    reordered.splice(intDragState.overIdx, 0, moved);
-                    let copy = [...reordered];
-                    const newPills = pills.map(p => {
-                      if (typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_")) return copy.shift();
-                      return p;
-                    });
-                    setPills(newPills);
-                  }
-                  setIntDragState(null);
-                  intMovedRef.current = false;
-                };
-                window.addEventListener("mousemove", onMove);
-                window.addEventListener("mouseup",   onUp);
-                window.addEventListener("touchmove", onMove, { passive: false });
-                window.addEventListener("touchend",  onUp);
-                return () => {
-                  window.removeEventListener("mousemove", onMove);
-                  window.removeEventListener("mouseup",   onUp);
-                  window.removeEventListener("touchmove", onMove);
-                  window.removeEventListener("touchend",  onUp);
-                };
-              }, [intDragState, pills]);
 
               return (
                 <div
@@ -1694,7 +1656,7 @@ const Profile = () => {
                     </div>
 
                     {/* post stubs */}
-                    <div className="flex flex-row gap-2 flex-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                    <div className="flex flex-row gap-2 flex-1 overflow-x-auto white-scrollbar pb-1">
                       {profilePostsLoading ? (
                         <div className="flex flex-1 items-center justify-center">
                           <div
@@ -1714,12 +1676,12 @@ const Profile = () => {
                           No posts yet
                         </div>
                       ) : (
-                        profilePosts.map((post) => (
+                        profilePosts.map((post, i) => (
                           <div
                             key={post.id}
-                            className="rounded-xl overflow-hidden flex flex-col flex-1 cursor-pointer transition-all duration-150 hover:brightness-110"
-                            style={{ minWidth: "130px", maxWidth: "180px" }}
+                            className={`rounded-xl overflow-hidden flex flex-col shrink-0 cursor-pointer transition-all duration-150 hover:brightness-110 ${i >= 3 ? "hidden lg:flex" : ""}`}
                             style={{
+                              width: "155px",
                               background: postsCardBg,
                               border: `1px solid ${postsCardBorder}`,
                             }}
@@ -1833,7 +1795,7 @@ const Profile = () => {
             );
 
             return (
-              <div className="w-[210px] shrink-0 flex flex-col self-stretch">
+              <div className="w-full lg:w-[210px] lg:shrink-0 flex flex-col lg:self-stretch">
                 <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col h-full"
                   style={{
                     background: cardColors.jams.bg,
@@ -1994,7 +1956,7 @@ const Profile = () => {
                     <div className="p-5 mt-auto">
                       <button
                         onClick={handleAddFriend}
-                        disabled={friendLoading || friendStatus !== "none"}
+                        disabled={friendStatus !== "none"}
                         className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 group relative overflow-hidden"
                         style={{
                           background: friendStatus === "friends"
@@ -2013,7 +1975,6 @@ const Profile = () => {
                             ? "#ca8a04"
                             : "#DC2E73",
                           boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.15)" : "none",
-                          opacity: friendLoading ? 0.6 : 1,
                           cursor: friendStatus !== "none" ? "default" : "pointer",
                         }}
                         onMouseEnter={(e) => {
@@ -2029,7 +1990,7 @@ const Profile = () => {
                           e.currentTarget.style.transform = "translateY(0)";
                         }}
                       >
-                        {friendLoading ? "…" : friendStatus === "friends" ? "✓ Friends" : friendStatus === "pending" ? "Request Sent" : "+ Add Friend"}
+                        {friendStatus === "friends" ? "✓ Friends" : friendStatus === "pending" ? "✓ Sent" : "+ Add Friend"}
                       </button>
                     </div>
                   )}
@@ -2978,8 +2939,7 @@ const Profile = () => {
                         instruments_liked:  orderedInstrumentIds,
                         vibes_liked:        orderedVibeIds,
                         profile_theme:      JSON.stringify(profile_theme),
-                        // ── BACKEND NEEDED: uncomment once ImageFields exist ──
-                        // banner:          toBlob(banner),
+                        profile_banner:     toBlob(banner),
                         // about_photo:     toBlob(aboutPhoto),
                       });
                       // ─────────────────────────────────────────────────────
@@ -3054,39 +3014,6 @@ const Profile = () => {
                 <i className="fa-solid fa-music text-sm" />
                 <span className="text-sm font-medium truncate max-w-[240px]">
                   {newSnippet.audioName ? newSnippet.audioName : "Choose Audio"}
-                </span>
-              </label>
-            </div>
-
-            <div className="mb-6">
-              <p className="mb-1.5 text-sm text-neutral-400">
-                Background Image <span className="text-neutral-600">(optional)</span>
-              </p>
-              <input
-                type="file"
-                accept="image/*"
-                id="snippetBg"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  openCrop("snippet", file);
-                  e.target.value = "";
-                }}
-              />
-              <label
-                htmlFor="snippetBg"
-                className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3 text-neutral-300 transition-all duration-200 hover:border-transparent hover:bg-[#DC2E73] hover:text-white"
-                style={newSnippet.background ? {
-                  backgroundImage: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url(${newSnippet.background})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  borderColor: "transparent",
-                } : {}}
-              >
-                <i className="fa-solid fa-image text-sm" />
-                <span className="text-sm font-medium">
-                  {newSnippet.background ? "Change Background" : "Choose Background"}
                 </span>
               </label>
             </div>

@@ -127,8 +127,35 @@ export const apiService = {
     return flattenedData;
   },
 
-  async getUserByUsername(username) {
-    return apiFetch(`api/profiles/${username}/`);
+  async getProfileById(id) {
+    const { data, error } = await supabase
+      .from('chat_profile')
+      .select(`
+        *,
+        instruments_liked:chat_profile_instruments_liked (
+          instrument:chat_instrument (id, name, family)
+        ),
+        genres_liked:chat_profile_genres_liked (
+          genre:chat_genre (id, name)
+        ),
+        vibes_liked:chat_profile_vibes_liked (
+          vibe:chat_vibe (id, name)
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching profile by id:', error);
+      return null;
+    }
+
+    return {
+      ...data,
+      instruments: data.instruments_liked.map(l => l.instrument),
+      genres: data.genres_liked.map(l => l.genre),
+      vibes: data.vibes_liked.map(l => l.vibe),
+    };
   },
 
   async sendFriendRequest(userId) {

@@ -104,9 +104,7 @@ export function AuthProvider({ children }) {
     if (data.instagram !== undefined)           form.append("instagram", data.instagram);
     if (data.tiktok !== undefined)              form.append("tiktok", data.tiktok);
 
-    // ── BACKEND NEEDED: ImageField "banner" on the profile model ──────────────
-    // Uncomment once the backend field exists.
-    // if (data.banner instanceof Blob) form.append("banner", data.banner, "banner.jpg");
+    if (data.profile_banner instanceof Blob) form.append("profile_banner", data.profile_banner, "banner.jpg");
 
     // ── BACKEND NEEDED: ImageField "about_photo" on the profile model ─────────
     // Uncomment once the backend field exists.

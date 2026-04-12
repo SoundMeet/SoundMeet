@@ -221,6 +221,27 @@
   display: none;
 }
  
+/* ── Thin white scrollbar — posts strip ──────────────────────────────────────
+ * Slim, white/translucent scrollbar for horizontal scroll areas.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.white-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
+}
+.white-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+.white-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.white-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.25);
+  border-radius: 99px;
+}
+.white-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.45);
+}
+
 /* ── Pill strip on the banner ─────────────────────────────────────────────────
  * .pill-track animates left by 50% (half the doubled pill array) then back.
  * Pausing on hover lets users read the pills without them running away.
