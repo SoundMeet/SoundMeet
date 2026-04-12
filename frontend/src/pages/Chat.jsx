@@ -12,6 +12,7 @@ import { DestructiveConfirmSheet } from '../components/event-detail/DestructiveC
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
+import { supabase } from '../injectables/supaBaseClient'
 import { jamService } from '../injectables/jamService'
 import { useToast } from '../context/ToastContext'
 
@@ -279,9 +280,6 @@ const Chat = () => {
 
     const allConvIds = [...dmThreads, ...jamThreads].map(t => t._convId).filter(Boolean)
     if (allConvIds.length === 0) return
-
-    const { createClient } = supabase.constructor ? { createClient: null } : {}
-    void createClient // supabase is already the singleton client
 
     // ── Subscription A ────────────────────────────────────────────────────────
     const subA = supabase
