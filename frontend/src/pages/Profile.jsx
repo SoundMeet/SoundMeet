@@ -8,6 +8,7 @@ import { musicSnipService } from "../injectables/musicSnipService";
 import CropperThings from "../components/CropperThings";
 import { useAuth } from "../injectables/Auth";
 import { useAuthModal } from "../context/AuthModalContext";
+import { formatAvatarUrl } from "../utils/formatAvatarUrl";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_SNIPPETS = 5;
@@ -610,8 +611,8 @@ const Profile = () => {
     setAbout(user.about || "");
     setHeadline(user.headline || "");
     setAvailableToJam(user.available_to_jam ?? false);
-    if (user.pfp) setProfilePic(user.pfp);
-    if (user.profile_banner) setBanner(user.profile_banner);
+    if (user.pfp) setProfilePic(formatAvatarUrl(user.pfp));
+    if (user.profile_banner) setBanner(formatAvatarUrl(user.profile_banner));
 
     // Seed pills from genres, instruments, and vibes — color stable per tag.id
     const colors = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
@@ -806,11 +807,18 @@ const Profile = () => {
     setPlayingIndex(null);
   };
 
+  const normalizeSnip = (s) => ({
+    ...s,
+    title:     s.name      ?? s.title ?? "",
+    audio:     formatAvatarUrl(s.musicFile) ?? s.audio ?? null,
+    audioName: s.name      ?? s.title ?? "",
+  });
+
   useEffect(() => {
     const profileUserId = isOwnProfile ? loggedInUser?.id : viewedUser?.user_id;
     if (!profileUserId) return;
     musicSnipService.getProfileSnips(profileUserId)
-      .then((snips) => setSnippets(snips.map(s => ({ ...s, audioName: s.name }))))
+      .then((snips) => setSnippets(snips.map(normalizeSnip)))
       .catch(console.error);
   }, [loggedInUser?.id, viewedUser?.user_id, isOwnProfile]);
 
@@ -834,7 +842,7 @@ const Profile = () => {
 
     try {
       const saved = await musicSnipService.createSnip({ name: newSnippet.title, musicFile: newSnippet.audioFile });
-      setSnippets((prev) => [...prev, { ...saved, audioName: saved.name }]);
+      setSnippets((prev) => [...prev, normalizeSnip(saved)]);
     } catch (err) {
       showToast("Failed to save snippet.");
       return;
@@ -1126,39 +1134,29 @@ const Profile = () => {
               )}
 
               {/* ── Add Friend button — only visible on other people's profiles, hidden when edit modal is open ── */}
-              {!isOwnProfile && !editOpen && (
+              {!isOwnProfile && !editOpen && friendStatus === "friends" && (
+                <div className="absolute bottom-4 right-4 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ background: "rgba(22,163,74,0.18)", border: "1px solid rgba(74,222,128,0.35)", color: "#4ade80" }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Friends
+                </div>
+              )}
+              {!isOwnProfile && !editOpen && friendStatus !== "friends" && (
                 <button
                   onClick={handleAddFriend}
-                  disabled={friendStatus !== "none"}
+                  disabled={friendStatus === "pending"}
                   className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200"
                   style={{
-                    background: friendStatus === "friends"
-                      ? "rgba(22,163,74,0.15)"
-                      : friendStatus === "pending"
-                        ? "rgba(255,255,255,0.10)"
-                        : "#DC2E73",
-                    border: friendStatus === "friends"
-                      ? "1px solid rgba(22,163,74,0.4)"
-                      : friendStatus === "pending"
-                        ? "1px solid rgba(255,255,255,0.2)"
-                        : "1px solid rgba(220,46,115,0.6)",
-                    color: friendStatus === "friends"
-                      ? "#4ade80"
-                      : friendStatus === "pending"
-                        ? "rgba(255,255,255,0.5)"
-                        : "#fff",
+                    background: friendStatus === "pending" ? "rgba(255,255,255,0.10)" : "#DC2E73",
+                    border: friendStatus === "pending" ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(220,46,115,0.6)",
+                    color: friendStatus === "pending" ? "rgba(255,255,255,0.5)" : "#fff",
                     boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.35)" : "none",
-                    cursor: friendStatus !== "none" ? "default" : "pointer",
+                    cursor: friendStatus === "pending" ? "default" : "pointer",
                   }}
                 >
-                  {friendStatus === "friends" ? (
-                    <>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Friends
-                    </>
-                  ) : friendStatus === "pending" ? (
+                  {friendStatus === "pending" ? (
                     <>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                         <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1954,44 +1952,42 @@ const Profile = () => {
                   {/* ── ADD FRIEND — only visible on other people's profiles ── */}
                   {!isOwnProfile && (
                     <div className="p-5 mt-auto">
-                      <button
-                        onClick={handleAddFriend}
-                        disabled={friendStatus !== "none"}
-                        className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 group relative overflow-hidden"
-                        style={{
-                          background: friendStatus === "friends"
-                            ? "rgba(22,163,74,0.15)"
-                            : friendStatus === "pending"
-                            ? "rgba(202,138,4,0.12)"
-                            : "rgba(220,46,115,0.12)",
-                          border: friendStatus === "friends"
-                            ? "1px solid rgba(22,163,74,0.35)"
-                            : friendStatus === "pending"
-                            ? "1px solid rgba(202,138,4,0.30)"
-                            : "1px solid rgba(220,46,115,0.30)",
-                          color: friendStatus === "friends"
-                            ? "#16a34a"
-                            : friendStatus === "pending"
-                            ? "#ca8a04"
-                            : "#DC2E73",
-                          boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.15)" : "none",
-                          cursor: friendStatus !== "none" ? "default" : "pointer",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (friendStatus !== "none") return;
-                          e.currentTarget.style.background = "rgba(220,46,115,0.22)";
-                          e.currentTarget.style.boxShadow = "0 0 28px rgba(220,46,115,0.35)";
-                          e.currentTarget.style.transform = "translateY(-1px)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (friendStatus !== "none") return;
-                          e.currentTarget.style.background = "rgba(220,46,115,0.12)";
-                          e.currentTarget.style.boxShadow = "0 0 20px rgba(220,46,115,0.15)";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                      >
-                        {friendStatus === "friends" ? "✓ Friends" : friendStatus === "pending" ? "✓ Sent" : "+ Add Friend"}
-                      </button>
+                      {friendStatus === "friends" ? (
+                        <div className="w-full rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2"
+                          style={{ background: "rgba(22,163,74,0.15)", border: "1px solid rgba(22,163,74,0.35)", color: "#4ade80" }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Friends
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleAddFriend}
+                          disabled={friendStatus === "pending"}
+                          className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 group relative overflow-hidden"
+                          style={{
+                            background: friendStatus === "pending" ? "rgba(202,138,4,0.12)" : "rgba(220,46,115,0.12)",
+                            border: friendStatus === "pending" ? "1px solid rgba(202,138,4,0.30)" : "1px solid rgba(220,46,115,0.30)",
+                            color: friendStatus === "pending" ? "#ca8a04" : "#DC2E73",
+                            boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.15)" : "none",
+                            cursor: friendStatus === "pending" ? "default" : "pointer",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (friendStatus !== "none") return;
+                            e.currentTarget.style.background = "rgba(220,46,115,0.22)";
+                            e.currentTarget.style.boxShadow = "0 0 28px rgba(220,46,115,0.35)";
+                            e.currentTarget.style.transform = "translateY(-1px)";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (friendStatus !== "none") return;
+                            e.currentTarget.style.background = "rgba(220,46,115,0.12)";
+                            e.currentTarget.style.boxShadow = "0 0 20px rgba(220,46,115,0.15)";
+                            e.currentTarget.style.transform = "translateY(0)";
+                          }}
+                        >
+                          {friendStatus === "pending" ? "✓ Sent" : "+ Add Friend"}
+                        </button>
+                      )}
                     </div>
                   )}
 

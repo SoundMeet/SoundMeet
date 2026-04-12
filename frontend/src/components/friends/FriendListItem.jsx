@@ -4,6 +4,7 @@ import { MdPerson, MdChat, MdMoreVert, MdPersonRemove } from 'react-icons/md'
 import { useFriends } from '../../context/FriendsContext'
 import { useToast } from '../../context/ToastContext'
 import { DestructiveConfirmSheet } from '../event-detail/DestructiveConfirmSheet'
+import { ProfilesRUS } from '../../services/ProfilesRUS'
 
 function FriendAvatar({ displayName, avatarUrl }) {
   const [imgError, setImgError] = useState(false)
@@ -74,7 +75,7 @@ export function FriendListItem({ friend }) {
 
   const handleViewProfile = () => {
     setMenuOpen(false)
-    navigate('/profile')
+    ProfilesRUS(navigate, friend.profileId)
   }
 
   const handleConfirmRemove = async () => {

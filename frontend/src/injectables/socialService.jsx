@@ -49,7 +49,7 @@ export const socialService = {
           user:user_id (
             id,
             username,
-            chat_profile ( display_name, pfp )
+            chat_profile ( id, display_name, pfp )
           )
         )
       `)
