@@ -171,37 +171,55 @@ export const chatService = {
   },
 
   async getUserConversations(currentUserId) {
-      const M2M_TABLE = 'chat_conversation_participants';
+    const M2M_TABLE = 'chat_conversation_participants';
 
-      const { data: participations, error: fetchError } = await supabase
-        .from(M2M_TABLE)
-        .select('conversation_id')
-        .eq('user_id', currentUserId)
-        .is('left_at', null);
+    // Fetch active participant rows including unread state for this user.
+    const { data: participations, error: fetchError } = await supabase
+      .from(M2M_TABLE)
+      .select('conversation_id, unread_count, last_read_message_id')
+      .eq('user_id', currentUserId)
+      .is('left_at', null);
 
-      if (fetchError) throw fetchError;
+    if (fetchError) throw fetchError;
 
-      if (!participations || participations.length === 0) {
-        return [];
+    if (!participations || participations.length === 0) {
+      return [];
+    }
+
+    const conversationIds = participations.map(p => p.conversation_id);
+
+    // Build a fast lookup: convId → { unread_count, last_read_message_id }
+    const unreadByConvId = {}
+    for (const p of participations) {
+      unreadByConvId[String(p.conversation_id)] = {
+        unreadCount:       p.unread_count ?? 0,
+        lastReadMessageId: p.last_read_message_id ?? null,
       }
+    }
 
-      const conversationIds = participations.map(p => p.conversation_id);
+    // Fetch conversations ordered by most recent message, null-last.
+    const { data: conversations, error: convError } = await supabase
+      .from('chat_conversation')
+      .select(`
+        id,
+        jam_id,
+        last_message_at,
+        last_message_id,
+        chat_conversation_participants (
+          user_id
+        )
+      `)
+      .in('id', conversationIds)
+      .order('last_message_at', { ascending: false, nullsFirst: false });
 
-      const { data: conversations, error: convError } = await supabase
-        .from('chat_conversation')
-        .select(`
-          id,
-          jam_id,
-          chat_conversation_participants (
-            user_id
-          )
-        `)
-        .in('id', conversationIds);
+    if (convError) throw convError;
 
-      if (convError) throw convError;
-
-      return conversations;
-    },
+    // Attach unread state to each conversation row so callers have it in one place.
+    return (conversations ?? []).map(c => ({
+      ...c,
+      ...unreadByConvId[String(c.id)],
+    }));
+  },
 
   // ─── Conversation listing ─────────────────────────────────────────────────
 
@@ -355,6 +373,7 @@ export const chatService = {
   /**
    * Rejoin a jam chat the user previously left.
    * Clears left_at — only valid while jam is upcoming or live (enforced by caller).
+   * Recomputes unread_count for messages that arrived while left_at was set.
    */
   async rejoinJamChat(conversationId, userId) {
     const { error } = await supabase
@@ -363,6 +382,13 @@ export const chatService = {
       .eq('conversation_id', conversationId)
       .eq('user_id', userId);
     if (error) throw error;
+
+    await supabase.rpc('recompute_unread', {
+      p_conversation_id: conversationId,
+      p_user_id: userId,
+    }).then(({ error: rpcErr }) => {
+      if (rpcErr) console.error('[chatService] recompute_unread after rejoin failed:', rpcErr);
+    });
   },
 
   /**
@@ -382,11 +408,40 @@ export const chatService = {
   /**
    * Resurface a previously hidden DM (e.g. on incoming message).
    * Clears left_at for that user only.
+   * Recomputes unread_count for messages that arrived while left_at was set.
    */
   async unhideDMConversation(conversationId, userId) {
     const { error } = await supabase
       .from('chat_conversation_participants')
       .update({ left_at: null })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    if (error) throw error;
+
+    await supabase.rpc('recompute_unread', {
+      p_conversation_id: conversationId,
+      p_user_id: userId,
+    }).then(({ error: rpcErr }) => {
+      if (rpcErr) console.error('[chatService] recompute_unread after DM restore failed:', rpcErr);
+    });
+  },
+
+  // ─── Read state ──────────────────────────────────────────────────────────
+
+  /**
+   * Mark a conversation as read for the current user.
+   * Sets unread_count = 0, advances last_read_message_id (primary pointer)
+   * and last_read_at (secondary metadata).
+   */
+  async markConversationRead(conversationId, userId, latestMessageId) {
+    if (!latestMessageId) return;
+    const { error } = await supabase
+      .from('chat_conversation_participants')
+      .update({
+        unread_count:        0,
+        last_read_message_id: latestMessageId,
+        last_read_at:        new Date().toISOString(),
+      })
       .eq('conversation_id', conversationId)
       .eq('user_id', userId);
     if (error) throw error;

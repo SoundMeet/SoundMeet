@@ -163,13 +163,26 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
           <div className="flex-1 min-w-0">
             <div
               className="truncate leading-tight"
-              style={{ fontSize: '0.84rem', fontWeight: 600, color: isActive ? '#E5E2E1' : 'rgba(229,226,225,0.88)' }}
+              style={{
+                fontSize:   '0.84rem',
+                fontWeight: item.unread > 0 ? 700 : 600,
+                color:      isActive ? '#E5E2E1' : item.unread > 0 ? '#E5E2E1' : 'rgba(229,226,225,0.88)',
+              }}
             >
               {participant.name}
             </div>
             <div
               className="truncate leading-tight mt-0.5"
-              style={{ fontSize: '0.69rem', color: previewIsInvite ? 'rgba(220,46,115,0.75)' : previewLabel ? 'rgba(229,226,225,0.4)' : statusColor }}
+              style={{
+                fontSize: '0.69rem',
+                color: previewIsInvite
+                  ? 'rgba(220,46,115,0.75)'
+                  : item.unread > 0
+                    ? 'rgba(229,226,225,0.75)'
+                    : previewLabel
+                      ? 'rgba(229,226,225,0.4)'
+                      : statusColor,
+              }}
             >
               {previewLabel ?? statusLabel}
             </div>
@@ -185,10 +198,16 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
               )}
               {item.unread > 0 && (
                 <div
-                  className="w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
-                  style={{ fontSize: '9px', fontWeight: 700 }}
+                  className="rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
+                  style={{
+                    minWidth:   '1rem',
+                    height:     '1rem',
+                    padding:    '0 4px',
+                    fontSize:   '9px',
+                    fontWeight: 700,
+                  }}
                 >
-                  {item.unread}
+                  {item.unread > 99 ? '99+' : item.unread}
                 </div>
               )}
             </div>
@@ -271,14 +290,25 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
       <div className="flex-1 min-w-0">
         <div
           className="truncate leading-tight"
-          style={{ fontSize: '0.84rem', fontWeight: 600, color: isActive ? '#E5E2E1' : 'rgba(229,226,225,0.88)' }}
+          style={{
+            fontSize:   '0.84rem',
+            fontWeight: item.unread > 0 ? 700 : 600,
+            color:      isActive ? '#E5E2E1' : item.unread > 0 ? '#E5E2E1' : 'rgba(229,226,225,0.88)',
+          }}
         >
           {item.name}
         </div>
         {secondaryText && (
           <div
             className="truncate leading-tight mt-0.5"
-            style={{ fontSize: '0.69rem', color: secondaryColor }}
+            style={{
+              fontSize: '0.69rem',
+              color: previewIsInvite
+                ? 'rgba(220,46,115,0.75)'
+                : item.unread > 0 && previewLabel
+                  ? 'rgba(229,226,225,0.75)'
+                  : secondaryColor,
+            }}
           >
             {secondaryText}
           </div>
@@ -295,10 +325,16 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
           )}
           {item.unread > 0 && (
             <div
-              className="w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
-              style={{ fontSize: '9px', fontWeight: 700 }}
+              className="rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
+              style={{
+                minWidth:   '1rem',
+                height:     '1rem',
+                padding:    '0 4px',
+                fontSize:   '9px',
+                fontWeight: 700,
+              }}
             >
-              {item.unread}
+              {item.unread > 99 ? '99+' : item.unread}
             </div>
           )}
         </div>

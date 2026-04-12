@@ -158,6 +158,7 @@ const Chat = () => {
               memberCount: participants.length,
               onlineCount: 0,
               jamId: String(conv.jam_id),
+              unread: conv.unreadCount ?? 0,
               lastMessage,
             })
           } else {
@@ -183,7 +184,7 @@ const Chat = () => {
               _convId: conv.id,
               type: 'dm',
               participantId: otherUserId,
-              unread: 0,
+              unread: conv.unreadCount ?? 0,
               lastMessage,
             })
           }
@@ -226,9 +227,16 @@ const Chat = () => {
           }, {})
         )
 
+        // Sort helper: newest lastMessage.isoTimestamp first, no-message threads last.
+        const byLastMsg = (a, b) => {
+          const ta = a.lastMessage?.isoTimestamp ?? ''
+          const tb = b.lastMessage?.isoTimestamp ?? ''
+          return tb < ta ? -1 : tb > ta ? 1 : 0
+        }
+
         if (!cancelled) {
-          setDmThreads(dedupedDms)
-          setJamThreads(jams)
+          setDmThreads([...dedupedDms].sort(byLastMsg))
+          setJamThreads([...jams].sort(byLastMsg))
           // Merge rather than replace: freshly fetched DB profiles take precedence,
           // but preserve any user already in state that is not in this batch —
           // e.g. a DM target whose conversation was hidden and therefore excluded
@@ -253,7 +261,97 @@ const Chat = () => {
       })
 
     return () => { cancelled = true }
-  }, [isLoggedIn, user?.id]) 
+  }, [isLoggedIn, user?.id])
+  // ---------------------------------------------------------
+
+
+  // ─── Subscription A: participant row updates → unread badge ───────────────
+  // Fires when the trigger increments unread_count for this user (message
+  // arrived in a conversation they are not currently viewing) or when
+  // mark-as-read zeroes it on another device/tab.
+  //
+  // Subscription B: conversation row updates → preview + list reorder
+  // Fires when last_message_at changes (trigger ran after a new message).
+  // The backend value is authoritative — we patch lastMessage.isoTimestamp
+  // and re-sort both thread arrays so the list order matches the DB.
+  useEffect(() => {
+    if (!isLoggedIn || !user?.id) return
+
+    const allConvIds = [...dmThreads, ...jamThreads].map(t => t._convId).filter(Boolean)
+    if (allConvIds.length === 0) return
+
+    const { createClient } = supabase.constructor ? { createClient: null } : {}
+    void createClient // supabase is already the singleton client
+
+    // ── Subscription A ────────────────────────────────────────────────────────
+    const subA = supabase
+      .channel(`unread_badges_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',
+          schema: 'public',
+          table:  'chat_conversation_participants',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const { conversation_id, unread_count } = payload.new
+          const convId = String(conversation_id)
+          setDmThreads(prev => prev.map(t =>
+            String(t._convId) === convId ? { ...t, unread: unread_count ?? 0 } : t
+          ))
+          setJamThreads(prev => prev.map(t =>
+            String(t._convId) === convId ? { ...t, unread: unread_count ?? 0 } : t
+          ))
+        }
+      )
+      .subscribe()
+
+    // ── Subscription B ────────────────────────────────────────────────────────
+    const subB = supabase
+      .channel(`conv_summary_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',
+          schema: 'public',
+          table:  'chat_conversation',
+          filter: `id=in.(${allConvIds.join(',')})`,
+        },
+        (payload) => {
+          const { id, last_message_at } = payload.new
+          if (!last_message_at) return
+          const convId = String(id)
+          const patchThread = t => String(t._convId) === convId
+            ? { ...t, lastMessage: { ...(t.lastMessage ?? {}), isoTimestamp: last_message_at } }
+            : t
+          setDmThreads(prev => {
+            const patched = prev.map(patchThread)
+            return [...patched].sort((a, b) => {
+              const ta = a.lastMessage?.isoTimestamp ?? ''
+              const tb = b.lastMessage?.isoTimestamp ?? ''
+              return tb < ta ? -1 : tb > ta ? 1 : 0
+            })
+          })
+          setJamThreads(prev => {
+            const patched = prev.map(patchThread)
+            return [...patched].sort((a, b) => {
+              const ta = a.lastMessage?.isoTimestamp ?? ''
+              const tb = b.lastMessage?.isoTimestamp ?? ''
+              return tb < ta ? -1 : tb > ta ? 1 : 0
+            })
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subA)
+      supabase.removeChannel(subB)
+    }
+  // Re-subscribe when the conversation list changes (new conv added / removed).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, user?.id, dmThreads.length, jamThreads.length])
   // ---------------------------------------------------------
 
 
@@ -383,6 +481,20 @@ const Chat = () => {
     let cancelled = false
     setIsLoadingMsgs(true)
 
+    // Debounce timer for mark-as-read while thread stays active.
+    // We do NOT call markConversationRead on every incoming message —
+    // instead we debounce so multi-tab/device churn is minimal.
+    let markReadTimer = null
+    const scheduleMarkRead = (latestId) => {
+      clearTimeout(markReadTimer)
+      markReadTimer = setTimeout(() => {
+        if (!cancelled && user?.id && latestId) {
+          chatService.markConversationRead(thread._convId, user.id, latestId)
+            .catch(err => console.error('[Chat] markConversationRead failed:', err))
+        }
+      }, 1500)
+    }
+
     chatService.getMessages(thread._convId)
       .then((rows) => {
         if (cancelled) return
@@ -390,6 +502,18 @@ const Chat = () => {
           ...prev,
           [activeThreadId]: rows.map(normalizeMessage),
         }))
+        // Zero out the badge immediately in local state for instant feedback,
+        // then commit to DB via debounced write.
+        if (rows.length > 0) {
+          const latestId = rows[rows.length - 1].id
+          setDmThreads(prev => prev.map(t =>
+            t.id === activeThreadId ? { ...t, unread: 0 } : t
+          ))
+          setJamThreads(prev => prev.map(t =>
+            t.id === activeThreadId ? { ...t, unread: 0 } : t
+          ))
+          scheduleMarkRead(latestId)
+        }
       })
       .catch((err) => {
         console.error('[Chat] Failed to load messages:', err)
@@ -417,14 +541,17 @@ const Chat = () => {
       setJamThreads(prev => prev.map(t =>
         t.id === activeThreadId ? { ...t, lastMessage } : t
       ))
+      // Debounce mark-as-read for messages arriving while thread is active.
+      scheduleMarkRead(newRow.id)
     })
 
     return () => {
       cancelled = true
+      clearTimeout(markReadTimer)
       unsubRef.current?.()
       unsubRef.current = null
     }
-  }, [activeThreadId, isLoggedIn]) 
+  }, [activeThreadId, isLoggedIn])
 
   useEffect(() => () => unsubRef.current?.(), [])
 
@@ -495,6 +622,26 @@ const Chat = () => {
     if (!thread?._convId) return
 
     setSendError(null)
+
+    // Optimistic bump: move this conversation to the top immediately so the
+    // sender sees instant feedback. Subscription B will confirm with the
+    // authoritative last_message_at from the DB — if they differ, the
+    // realtime event wins and corrects the order.
+    const optimisticTs = new Date().toISOString()
+    const optimisticLast = { senderId: String(user.id), content: text, isoTimestamp: optimisticTs }
+    const bumpToTop = (threads) => {
+      const updated = threads.map(t =>
+        t.id === activeThreadId ? { ...t, lastMessage: optimisticLast } : t
+      )
+      return [...updated].sort((a, b) => {
+        const ta = a.lastMessage?.isoTimestamp ?? ''
+        const tb = b.lastMessage?.isoTimestamp ?? ''
+        return tb < ta ? -1 : tb > ta ? 1 : 0
+      })
+    }
+    setDmThreads(bumpToTop)
+    setJamThreads(bumpToTop)
+
     try {
       await chatService.sendMessage(thread._convId, user.id, text)
     } catch (err) {
