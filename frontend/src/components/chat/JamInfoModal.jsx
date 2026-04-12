@@ -113,7 +113,7 @@ const JamInfoModal = ({ jam, isOpen, onClose, users }) => {
 
         {/* Join Jam button */}
         <button
-          onClick={() => { console.log('Join Jam stub'); onClose() }}
+          onClick={onClose}
           className="w-full text-white font-semibold cursor-pointer hover:opacity-90 transition-opacity py-3"
           style={{
             background: 'linear-gradient(135deg, #DC2E73, #FB4040)',

@@ -101,6 +101,62 @@ export const socialService = {
     });
   },
 
+  async getSentFriendRequests(userId) {
+    const { data, error } = await supabase
+      .from('chat_friendrequest')
+      .select(`
+        id,
+        status,
+        created_at,
+        to_user:to_user_id (
+          id,
+          username,
+          chat_profile ( display_name, pfp )
+        )
+      `)
+      .eq('from_user_id', userId)
+      .eq('status', 'PENDING')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async removeFriend(currentUserId, targetUserId) {
+    // Fetch both profiles' int PKs in parallel (chat_profile.id ≠ user_id)
+    const [{ data: myProfile, error: e1 }, { data: theirProfile, error: e2 }] =
+      await Promise.all([
+        supabase.from('chat_profile').select('id').eq('user_id', currentUserId).single(),
+        supabase.from('chat_profile').select('id').eq('user_id', targetUserId).single(),
+      ]);
+
+    if (e1) throw e1;
+    if (e2) throw e2;
+
+    // Django adds friendship bidirectionally; delete both rows
+    const [{ error: d1 }, { error: d2 }] = await Promise.all([
+      supabase
+        .from('chat_profile_friends')
+        .delete()
+        .eq('profile_id', myProfile.id)
+        .eq('user_id', targetUserId),
+      supabase
+        .from('chat_profile_friends')
+        .delete()
+        .eq('profile_id', theirProfile.id)
+        .eq('user_id', currentUserId),
+    ]);
+
+    if (d1) throw d1;
+    if (d2) throw d2;
+  },
+
+  async cancelFriendRequest(requestId) {
+    return await apiFetch(`api/friends/request/${requestId}/cancel/`, {
+      method: 'POST',
+    });
+  },
+
   async getPeopleProfiles(currentUserId) {
     const { data, error } = await supabase
       .from('chat_profile')
@@ -112,6 +168,7 @@ export const socialService = {
         about,
         city,
         country,
+        user_account:user_id ( username ),
         instruments_liked:chat_profile_instruments_liked (
           instrument:chat_instrument (id, name)
         ),
@@ -132,7 +189,7 @@ export const socialService = {
       id: p.user_id,
       profileId: p.id,
       displayName: p.display_name || '',
-      username: '',
+      username: p.user_account?.username || '',
       avatarUrl: formatAvatarUrl(p.pfp),
       about: p.about || '',
       location: [p.city, p.country].filter(Boolean).join(', '),

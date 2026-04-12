@@ -15,6 +15,8 @@ import { useAuth } from '../injectables/Auth'
 import { socialService } from '../injectables/socialService'
 import { supabase } from '../injectables/supaBaseClient'
 import { useToast } from './ToastContext'
+import { useFriends } from './FriendsContext'
+import { formatAvatarUrl } from '../utils/formatAvatarUrl'
 import {
   registerServiceWorker,
   getPushPermission,
@@ -79,7 +81,7 @@ function buildFromUser(rawUser) {
     id: rawUser.id,
     username: rawUser.username || '',
     displayName: profile?.display_name || rawUser.username || 'Someone',
-    avatarUrl: profile?.pfp || null,
+    avatarUrl: formatAvatarUrl(profile?.pfp) || null,
     instruments: [],
   }
 }
@@ -119,7 +121,7 @@ function normalizeNotif(n, requestsById = {}, profilesById = {}) {
         id: accepterId,
         username: '',
         displayName: profile?.display_name || 'Someone',
-        avatarUrl: profile?.pfp || null,
+        avatarUrl: formatAvatarUrl(profile?.pfp) || null,
       },
     }
   }
@@ -131,7 +133,7 @@ function normalizeNotif(n, requestsById = {}, profilesById = {}) {
       ...base,
       type: 'post_like',
       fromUser: profile
-        ? { id: userId, username: '', displayName: profile.display_name || 'Someone', avatarUrl: profile.pfp || null }
+        ? { id: userId, username: '', displayName: profile.display_name || 'Someone', avatarUrl: formatAvatarUrl(profile.pfp) || null }
         : null,
     }
   }
@@ -143,7 +145,7 @@ function normalizeNotif(n, requestsById = {}, profilesById = {}) {
       ...base,
       type: 'post_comment',
       fromUser: profile
-        ? { id: userId, username: '', displayName: profile.display_name || 'Someone', avatarUrl: profile.pfp || null }
+        ? { id: userId, username: '', displayName: profile.display_name || 'Someone', avatarUrl: formatAvatarUrl(profile.pfp) || null }
         : null,
     }
   }
@@ -155,7 +157,7 @@ function normalizeNotif(n, requestsById = {}, profilesById = {}) {
       ...base,
       type: 'jam_invite',
       fromUser: profile
-        ? { id: userId, username: '', displayName: profile.display_name || 'Someone', avatarUrl: profile.pfp || null }
+        ? { id: userId, username: '', displayName: profile.display_name || 'Someone', avatarUrl: formatAvatarUrl(profile.pfp) || null }
         : null,
     }
   }
@@ -230,6 +232,7 @@ async function enrichNotifications(rawNotifs) {
 export function NotificationsProvider({ children }) {
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { fetchFriends } = useFriends()
 
   const [notifications, setNotifications] = useState([])
   const [loadingIds, setLoadingIds] = useState(new Set())
@@ -315,7 +318,7 @@ export function NotificationsProvider({ children }) {
   ).length
 
   const friendRequests = notifications.filter(
-    (n) => n.type === 'friend_request' && !n.accepted && !n.declined
+    (n) => n.type === 'friend_request' && !n.accepted && !n.declined && n.fromUser != null
   )
 
   // ── Initial fetch ──
@@ -533,6 +536,7 @@ export function NotificationsProvider({ children }) {
           )
         )
         showToast('Friend request accepted', 'success')
+        if (user?.id) fetchFriends(user.id)
       } catch (err) {
         const detail = err?.detail || err?.error || ''
         if (detail.toLowerCase().includes('already') || detail.toLowerCase().includes('not found')) {
@@ -569,11 +573,8 @@ export function NotificationsProvider({ children }) {
       setLoadingIds((prev) => new Set(prev).add(notificationId))
       try {
         await socialService.handleFriendRequest(requestId, 'DENY')
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, declined: true, isRead: true } : n
-          )
-        )
+        setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+        socialService.deleteNotification(notificationId).catch(() => {})
       } catch (err) {
         const detail = err?.detail || err?.error || ''
         showToast(detail || 'Could not decline friend request', 'error')

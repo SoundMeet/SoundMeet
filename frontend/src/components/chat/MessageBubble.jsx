@@ -127,7 +127,7 @@ const SenderInfo = ({ sender, jamMeta }) => {
         <span
           style={{
             fontSize:      '0.62rem',
-            color:         'rgba(229,226,225,0.28)',
+            color:         'rgba(220,46,115,0.8)',
             letterSpacing: '0.02em',
             lineHeight:    1.2,
           }}

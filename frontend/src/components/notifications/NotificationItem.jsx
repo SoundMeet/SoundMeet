@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { X, UserPlus, UserCheck, Heart, MessageCircle, Music, Bell, UserRound } from 'lucide-react'
+import { X, UserPlus, UserCheck, Heart, MessageCircle, Music, Bell } from 'lucide-react'
 import { useNotifications } from '../../context/NotificationsContext'
 import { useLiveTick } from '../../hooks/useLiveTick'
 
@@ -33,7 +33,6 @@ function buildSentence(type, fromUser, accepted, declined) {
     case 'post_like':    return `${name} liked your post`
     case 'post_comment': return `${name} commented on your post`
     case 'jam_invite':   return `${name} invited you to a jam`
-    case 'new_follower': return `${name} started following you`
     default:             return 'New notification'
   }
 }
@@ -48,12 +47,10 @@ function buildGroupSentence(group) {
   if (_count === 2) {
     const secondName = _members[1]?.fromUser?.displayName || 'Someone'
     if (type === 'post_like')    return `${firstName} and ${secondName} liked your post`
-    if (type === 'new_follower') return `${firstName} and ${secondName} started following you`
   }
   const others = _count - 1
   const plural = others > 1 ? 'others' : 'other'
   if (type === 'post_like')    return `${firstName} and ${others} ${plural} liked your post`
-  if (type === 'new_follower') return `${firstName} and ${others} ${plural} started following you`
   return group.message || 'New notification'
 }
 
@@ -78,7 +75,6 @@ function renderSentence(type, fromUser, accepted, declined) {
     case 'post_like':               return <><N>{name}</N> liked your post</>
     case 'post_comment':            return <><N>{name}</N> commented on your post</>
     case 'jam_invite':              return <><N>{name}</N> invited you to a jam</>
-    case 'new_follower':            return <><N>{name}</N> started following you</>
     default:                        return <>New notification</>
   }
 }
@@ -94,15 +90,11 @@ function renderGroupSentence(group) {
     const secondName = _members[1]?.fromUser?.displayName || 'Someone'
     if (type === 'post_like')
       return <><N>{firstName}</N> and <N>{secondName}</N> liked your post</>
-    if (type === 'new_follower')
-      return <><N>{firstName}</N> and <N>{secondName}</N> started following you</>
   }
   const others = _count - 1
   const plural  = others > 1 ? 'others' : 'other'
   if (type === 'post_like')
     return <><N>{firstName}</N> and {others} {plural} liked your post</>
-  if (type === 'new_follower')
-    return <><N>{firstName}</N> and {others} {plural} started following you</>
   return <>{group.message || 'New notification'}</>
 }
 
@@ -116,7 +108,6 @@ function getDeepLink(type, referenceId, accepted, declined) {
   if (type === 'friend_request_accepted') return { path: '/chat' }
   if (type === 'post_like' || type === 'post_comment') return { path: '/feed' }
   if (type === 'jam_invite') return { path: '/', state: { openJamId: referenceId } }
-  if (type === 'new_follower') return { path: '/meet' }
   return null
 }
 
@@ -128,7 +119,6 @@ const TYPE_META = {
   post_like:               { label: 'Like'           },
   post_comment:            { label: 'Comment'        },
   jam_invite:              { label: 'Jam invite'     },
-  new_follower:            { label: 'Follower'       },
 }
 
 // ── Type badge ────────────────────────────────────────────────────────────────
@@ -139,7 +129,6 @@ const TYPE_BADGE_CFG = {
   post_like:               { Icon: Heart,          color: '#e05080' },
   post_comment:            { Icon: MessageCircle,  color: '#5b9cf6' },
   jam_invite:              { Icon: Music,           color: '#b06eff' },
-  new_follower:            { Icon: UserRound,       color: '#38bdf8' },
 }
 
 function TypeBadge({ type }) {

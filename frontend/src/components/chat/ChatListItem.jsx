@@ -1,3 +1,5 @@
+import { extractEventLink } from '../../utils/eventLinkParser'
+
 const AVATAR_PALETTE = ['#C2185B', '#7B1FA2', '#1565C0', '#00695C', '#E65100', '#4527A0']
 
 function FallbackAvatar({ name, size }) {
@@ -40,7 +42,39 @@ function PresencePip({ status }) {
   )
 }
 
-const ChatListItem = ({ item, isActive, onClick, users }) => {
+// ─── Format timestamp for sidebar (WhatsApp-style) ───────────────────────────
+function formatListTime(isoTimestamp) {
+  if (!isoTimestamp) return null
+  const d = new Date(isoTimestamp)
+  if (isNaN(d.getTime())) return null
+  const now = new Date()
+  const diffDays = Math.floor((now - d) / 86400000)
+  if (diffDays === 0) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+  if (diffDays < 7) {
+    return d.toLocaleDateString([], { weekday: 'short' })
+  }
+  return d.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' })
+}
+
+// ─── Build a short preview string for a last-message object ─────────────────
+// Returns { text, isInvite } so callers can style invite previews distinctly.
+function getMessagePreview(lastMessage) {
+  if (!lastMessage) return null
+  const { type, content } = lastMessage
+  if (type === 'image')   return { text: '📷 Photo',      isInvite: false }
+  if (type === 'sticker') return { text: 'Sticker',        isInvite: false }
+  if (type === 'link')    return { text: '🔗 Link',        isInvite: false }
+  if (type === 'invite')  return { text: 'Jam invite',  isInvite: true  }
+  // Detect SoundMeet event links embedded in text messages
+  if (content && extractEventLink(content)) {
+    return { text: 'Jam invite', isInvite: true }
+  }
+  return content ? { text: content, isInvite: false } : null
+}
+
+const ChatListItem = ({ item, isActive, onClick, users, currentUserId }) => {
   const base = [
     'flex items-center gap-3 mx-1 px-3 py-2.5 cursor-pointer',
     'rounded-xl transition-all duration-150',
@@ -49,22 +83,30 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
       : 'hover:bg-white/[0.05]',
   ].join(' ')
 
+  // ─── DM variant ────────────────────────────────────────────────────────────
   if (item.type === 'dm') {
     const participant = (users || []).find((u) => u.id === item.participantId)
     if (!participant) return null
 
-    const statusLabel =
-      participant.status === 'online' ? 'Online' :
-      participant.status === 'away'   ? 'Away'   : 'Offline'
+    const previewResult = getMessagePreview(item.lastMessage)
+    const timeStr       = formatListTime(item.lastMessage?.isoTimestamp)
+    const isOwn         = item.lastMessage && String(item.lastMessage.senderId) === String(currentUserId)
+    const previewLabel  = previewResult
+      ? (isOwn ? `You: ${previewResult.text}` : previewResult.text)
+      : null
+    const previewIsInvite = !isOwn && previewResult?.isInvite
 
     const statusColor =
       participant.status === 'online' ? 'rgba(34,197,94,0.75)' :
       participant.status === 'away'   ? 'rgba(247,193,13,0.75)' :
       'rgba(229,226,225,0.3)'
+    const statusLabel =
+      participant.status === 'online' ? 'Online' :
+      participant.status === 'away'   ? 'Away'   : 'Offline'
 
     return (
       <div className={base} onClick={onClick}>
-        {/* Avatar with presence pip + unread badge */}
+        {/* Avatar with presence pip */}
         <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
           {participant.avatar ? (
             <img
@@ -77,17 +119,9 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
             <FallbackAvatar name={participant.name} size={36} />
           )}
           <PresencePip status={participant.status} />
-          {item.unread > 0 && (
-            <div
-              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
-              style={{ fontSize: '9px', fontWeight: 700 }}
-            >
-              {item.unread}
-            </div>
-          )}
         </div>
 
-        {/* Name + status */}
+        {/* Name + preview (or status fallback) */}
         <div className="flex-1 min-w-0">
           <div
             className="truncate leading-tight"
@@ -97,17 +131,54 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
           </div>
           <div
             className="truncate leading-tight mt-0.5"
-            style={{ fontSize: '0.69rem', color: statusColor }}
+            style={{ fontSize: '0.69rem', color: previewIsInvite ? 'rgba(220,46,115,0.75)' : previewLabel ? 'rgba(229,226,225,0.4)' : statusColor }}
           >
-            {statusLabel}
+            {previewLabel ?? statusLabel}
           </div>
         </div>
+
+        {/* Right column: time + unread badge */}
+        {(timeStr || item.unread > 0) && (
+          <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
+            {timeStr && (
+              <span style={{ fontSize: '0.6rem', color: 'rgba(229,226,225,0.3)', whiteSpace: 'nowrap' }}>
+                {timeStr}
+              </span>
+            )}
+            {item.unread > 0 && (
+              <div
+                className="w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
+                style={{ fontSize: '9px', fontWeight: 700 }}
+              >
+                {item.unread}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }
 
-  // Jam variant
-  const memberText = item.memberCount > 0 ? `${item.memberCount} members` : null
+  // ─── Jam variant ───────────────────────────────────────────────────────────
+  const previewResult  = getMessagePreview(item.lastMessage)
+  const timeStr        = formatListTime(item.lastMessage?.isoTimestamp)
+  const isOwn          = item.lastMessage && String(item.lastMessage.senderId) === String(currentUserId)
+
+  // For group chats show sender prefix so it's clear who said it
+  let previewLabel = null
+  if (previewResult) {
+    previewLabel = isOwn ? `You: ${previewResult.text}` : previewResult.text
+  }
+  const previewIsInvite = !isOwn && previewResult?.isInvite
+
+  const secondaryText = previewLabel ?? (item.memberCount > 0 ? `${item.memberCount} members` : null)
+  const secondaryColor = previewIsInvite
+    ? 'rgba(220,46,115,0.75)'
+    : previewLabel
+      ? 'rgba(229,226,225,0.4)'
+      : item.active
+        ? 'rgba(220,46,115,0.75)'
+        : 'rgba(229,226,225,0.32)'
 
   return (
     <div className={base} onClick={onClick}>
@@ -134,18 +205,34 @@ const ChatListItem = ({ item, isActive, onClick, users }) => {
         >
           {item.name}
         </div>
-        {(memberText || item.active) && (
+        {secondaryText && (
           <div
             className="truncate leading-tight mt-0.5"
-            style={{
-              fontSize: '0.69rem',
-              color: item.active ? 'rgba(220,46,115,0.75)' : 'rgba(229,226,225,0.32)',
-            }}
+            style={{ fontSize: '0.69rem', color: secondaryColor }}
           >
-            {item.active ? 'Active' : memberText}
+            {secondaryText}
           </div>
         )}
       </div>
+
+      {/* Right column: time + unread badge */}
+      {(timeStr || item.unread > 0) && (
+        <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
+          {timeStr && (
+            <span style={{ fontSize: '0.6rem', color: 'rgba(229,226,225,0.3)', whiteSpace: 'nowrap' }}>
+              {timeStr}
+            </span>
+          )}
+          {item.unread > 0 && (
+            <div
+              className="w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
+              style={{ fontSize: '9px', fontWeight: 700 }}
+            >
+              {item.unread}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
