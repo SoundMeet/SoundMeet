@@ -267,17 +267,19 @@ export const jamService = {
   async getMyPastJams(userId, userLocation = null) {
     const now = new Date().toISOString();
 
-    const { data: attending } = await supabase
+    const { data: attending, error: attErr } = await supabase
       .from('chat_jam_users_attending')
       .select('jam_id')
       .eq('user_id', userId);
+    if (attErr) throw attErr;
     const attendingIds = attending?.map((r) => r.jam_id) ?? [];
 
-    const { data: created } = await supabase
+    const { data: created, error: createdErr } = await supabase
       .from('chat_jam')
       .select('id')
       .eq('admin_id', userId)
       .lt('date_time', now);
+    if (createdErr) throw createdErr;
     const createdIds = created?.map((r) => r.id) ?? [];
 
     const allIds = [...new Set([...attendingIds, ...createdIds])];
@@ -410,10 +412,11 @@ export const jamService = {
         .is('left_at', null);
 
       // System event — non-fatal if it fails
-      await supabase
-        .from('chat_message')
-        .insert([{ conversation_id: conv.id, sender_id: userId, content: '__system:left_chat__' }])
-        .catch(() => {});
+      try {
+        await supabase
+          .from('chat_message')
+          .insert([{ conversation_id: conv.id, sender_id: userId, content: '__system:left_chat__' }]);
+      } catch (_) {}
     }
   },
 
@@ -498,7 +501,16 @@ export const jamService = {
         { onConflict: 'jam_id,user_id' }
       );
 
-    const conversationId = await chatService.getOrCreateJamChat(Number(jamId), userId);
+    // Chat enrollment is non-fatal: attendance is already committed above.
+    // If getOrCreateJamChat throws (e.g. RLS, schema, network), we log and
+    // continue so the join shows success instead of rolling back in the UI.
+    let conversationId = null;
+    try {
+      conversationId = await chatService.getOrCreateJamChat(Number(jamId), userId);
+      console.log('[jamService.joinJam] Chat enrolled, conversationId:', conversationId);
+    } catch (chatErr) {
+      console.error('[jamService.joinJam] Chat enrollment failed (attendance already saved):', chatErr);
+    }
     return conversationId;
   },
 

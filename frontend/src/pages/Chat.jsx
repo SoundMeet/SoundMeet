@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom'
 import ChatSidebar from '../components/chat/ChatSidebar'
 import ChatHeader from '../components/chat/ChatHeader'
 import MessageList from '../components/chat/MessageList'
-import TypingIndicator from '../components/chat/TypingIndicator'
 import ChatComposer from '../components/chat/ChatComposer'
 import EventDetailModal from '../components/event-detail/EventDetailModal'
 import { JamChatMembersModal } from '../components/chat/JamChatMembersModal'
@@ -70,7 +69,6 @@ const Chat = () => {
   const [hideDMTarget,   setHideDMTarget]     = useState(null)
   const [hidingDM,       setHidingDM]         = useState(false)
   const [isSidebarOpen, setIsSidebarOpen]     = useState(false)
-  const [isTyping, setIsTyping]             = useState(false)
   // { [jamId]: { adminId: string|null, attendees: JamAttendee[] } }
   const [jamAttendeeCache, setJamAttendeeCache] = useState({})
   // Conversation ID we intend to open — set as soon as getOrCreateDMChat resolves,
@@ -132,7 +130,7 @@ const Chat = () => {
             ? jamService.getJamNames(jamConvIds).catch(() => ({}))
             : Promise.resolve({}),
           convIds.length
-            ? chatService.getLastMessagesForConversations(convIds).catch(() => ({}))
+            ? chatService.getLastMessagesForConversations(conversations).catch(() => ({}))
             : Promise.resolve({}),
         ])
 
@@ -608,7 +606,6 @@ const Chat = () => {
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleSelectThread = (id) => {
     setActiveThreadId(id)
-    setIsTyping(false)
     setSendError(null)
     setIsSidebarOpen(false)
   }
@@ -621,21 +618,25 @@ const Chat = () => {
 
     setSendError(null)
 
+    // Capture previous preview so we can roll back on failure.
+    const previousLastMessage = thread.lastMessage
+
     // Optimistic bump: move this conversation to the top immediately so the
     // sender sees instant feedback. Subscription B will confirm with the
     // authoritative last_message_at from the DB — if they differ, the
     // realtime event wins and corrects the order.
     const optimisticTs = new Date().toISOString()
     const optimisticLast = { senderId: String(user.id), content: text, isoTimestamp: optimisticTs }
+    const sortByLastMsg = (a, b) => {
+      const ta = a.lastMessage?.isoTimestamp ?? ''
+      const tb = b.lastMessage?.isoTimestamp ?? ''
+      return tb < ta ? -1 : tb > ta ? 1 : 0
+    }
     const bumpToTop = (threads) => {
       const updated = threads.map(t =>
         t.id === activeThreadId ? { ...t, lastMessage: optimisticLast } : t
       )
-      return [...updated].sort((a, b) => {
-        const ta = a.lastMessage?.isoTimestamp ?? ''
-        const tb = b.lastMessage?.isoTimestamp ?? ''
-        return tb < ta ? -1 : tb > ta ? 1 : 0
-      })
+      return [...updated].sort(sortByLastMsg)
     }
     setDmThreads(bumpToTop)
     setJamThreads(bumpToTop)
@@ -645,6 +646,16 @@ const Chat = () => {
     } catch (err) {
       console.error('[Chat] Failed to send message:', err)
       setSendError('Message failed to send. Please try again.')
+      // Roll back the optimistic preview so the sidebar doesn't show a
+      // message that never sent.
+      const rollback = (threads) => {
+        const restored = threads.map(t =>
+          t.id === activeThreadId ? { ...t, lastMessage: previousLastMessage } : t
+        )
+        return [...restored].sort(sortByLastMsg)
+      }
+      setDmThreads(rollback)
+      setJamThreads(rollback)
     }
   }
 
@@ -878,9 +889,7 @@ const Chat = () => {
               />
             )}
 
-            <TypingIndicator isTyping={isTyping} user={chatUsers[1] ?? null} />
-
-            {sendError && (
+{sendError && (
               <p
                 className="text-xs px-8 pb-1 text-center flex-shrink-0"
                 style={{ color: '#fb4040', fontFamily: 'Sora, sans-serif' }}

@@ -224,29 +224,30 @@ export const chatService = {
   // ─── Conversation listing ─────────────────────────────────────────────────
 
   /**
-   * Fetch the latest message for each conversation in one query.
-   * Returns a map of { [convId: string]: { sender_id, content, timestamp } }.
+   * Fetch the latest message for each conversation using the last_message_id
+   * pointer already maintained by the DB trigger on chat_conversation.
+   * One PK lookup per conversation — no cap, always correct.
+   *
+   * @param {Array<{ id, last_message_id }>} conversations
+   *   The array returned by getUserConversations (includes last_message_id).
+   * @returns {Object} Map of { [convId: string]: message row }
    */
-  async getLastMessagesForConversations(convIds) {
-    if (!convIds.length) return {};
+  async getLastMessagesForConversations(conversations) {
+    if (!conversations.length) return {};
 
-    // Fetch recent messages ordered newest-first, then pick first per conv in JS.
-    // Limit is generous but bounded: 10 candidates per conversation.
+    const messageIds = conversations.map(c => c.last_message_id).filter(Boolean);
+    if (!messageIds.length) return {};
+
     const { data, error } = await supabase
       .from('chat_message')
       .select('id, conversation_id, sender_id, content, timestamp')
-      .in('conversation_id', convIds)
-      .order('timestamp', { ascending: false })
-      .limit(Math.min(convIds.length * 10, 500));
+      .in('id', messageIds);
 
     if (error) throw error;
 
-    const latest = {};
-    for (const row of (data ?? [])) {
-      const cid = String(row.conversation_id);
-      if (!latest[cid]) latest[cid] = row;
-    }
-    return latest;
+    return Object.fromEntries(
+      (data ?? []).map(row => [String(row.conversation_id), row])
+    );
   },
 
   async getParticipantsForConversations(convIds) {
@@ -364,10 +365,11 @@ export const chatService = {
     if (error) throw error;
 
     // System event — non-fatal if it fails
-    await supabase
-      .from('chat_message')
-      .insert([{ conversation_id: conversationId, sender_id: userId, content: '__system:left_chat__' }])
-      .catch(() => {});
+    try {
+      await supabase
+        .from('chat_message')
+        .insert([{ conversation_id: conversationId, sender_id: userId, content: '__system:left_chat__' }]);
+    } catch (_) {}
   },
 
   /**
