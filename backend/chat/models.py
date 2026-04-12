@@ -256,6 +256,11 @@ class Conversation(models.Model):
     participants = models.ManyToManyField(User, through='ConversationParticipant', related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    last_message = models.ForeignKey(
+        'Message', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+'
+    )
 
     def __str__(self):
         if self.jam: return f"Jam Chat: {self.jam.name}"
@@ -265,9 +270,16 @@ class Conversation(models.Model):
 
 
 class ConversationParticipant(models.Model):
+    id = models.AutoField(primary_key=True)
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='conversation_participants')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversation_memberships')
     left_at = models.DateTimeField(null=True, blank=True)
+    unread_count = models.IntegerField(default=0)
+    last_read_message = models.ForeignKey(
+        'Message', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+'
+    )
+    last_read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'chat_conversation_participants'
