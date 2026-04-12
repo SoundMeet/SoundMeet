@@ -36,7 +36,7 @@ export const chatService = {
     if (currentUserId) {
       const { data: existingPart, error: partCheckError } = await supabase
         .from(M2M_TABLE)
-        .select('conversation_id')
+        .select('conversation_id, left_at')
         .eq('conversation_id', conversationId)
         .eq('user_id', currentUserId)
         .maybeSingle();
@@ -50,9 +50,15 @@ export const chatService = {
           .insert([{ conversation_id: conversationId, user_id: currentUserId }]);
 
         if (partInsertError) throw partInsertError;
+      } else if (existingPart.left_at) {
+        // User previously left this chat (e.g. via leaveJamChat) — clear left_at to rejoin
+        const { error: rejoinErr } = await supabase
+          .from(M2M_TABLE)
+          .update({ left_at: null })
+          .eq('conversation_id', conversationId)
+          .eq('user_id', currentUserId);
+        if (rejoinErr) throw rejoinErr;
       }
-      // If row exists — do NOT auto-rejoin.
-      // Once migration is deployed: check left_at here before re-inserting.
     }
 
     return conversationId;
@@ -136,12 +142,11 @@ export const chatService = {
   async getUserConversations(currentUserId) {
       const M2M_TABLE = 'chat_conversation_participants';
 
-      // NOTE: .is('left_at', null) filter will be added here once migration
-      // 0011_conversationparticipant_left_at is deployed to the live DB.
       const { data: participations, error: fetchError } = await supabase
         .from(M2M_TABLE)
         .select('conversation_id')
-        .eq('user_id', currentUserId);
+        .eq('user_id', currentUserId)
+        .is('left_at', null);
 
       if (fetchError) throw fetchError;
 
@@ -201,7 +206,8 @@ export const chatService = {
     const { data, error } = await supabase
       .from('chat_conversation_participants')
       .select('conversation_id, user_id')
-      .in('conversation_id', convIds);
+      .in('conversation_id', convIds)
+      .is('left_at', null);
 
     if (error) throw error;
     return data ?? [];
