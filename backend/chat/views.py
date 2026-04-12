@@ -617,6 +617,21 @@ def handle_friend_request(request, request_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
+def cancel_friend_request(request, request_id):
+    fr = get_object_or_404(FriendRequest, id=request_id, from_user=request.user, status='PENDING')
+    # Remove the FRIEND_REQUEST notification from the recipient's feed
+    Notification.objects.filter(
+        notification_type='FRIEND_REQUEST',
+        reference_id=fr.id,
+        user=fr.to_user,
+    ).delete()
+    fr.delete()
+    return Response({'status': 'Cancelled'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
 def apply_for_bandmate(request, listing_id):
     listing = get_object_or_404(BandmateListing, id=listing_id)
     message = request.data.get('message', '')

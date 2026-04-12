@@ -28,6 +28,7 @@ urlpatterns = [
 
     path('api/friends/request/', views.send_friend_request, name='send_friend_request'),
     path('api/friends/request/<int:request_id>/handle/', views.handle_friend_request, name='handle_friend_request'),
+    path('api/friends/request/<int:request_id>/cancel/', views.cancel_friend_request, name='cancel_friend_request'),
 
     path('api/bandmates/<int:listing_id>/apply/', views.apply_for_bandmate, name='apply_for_bandmate'),
 ]

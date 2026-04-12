@@ -10,7 +10,7 @@ const SearchIcon = () => (
   </svg>
 )
 
-const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose }) => {
+const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, currentUserId, onClose }) => {
   const [query, setQuery] = useState('')
   const [newChatOpen, setNewChatOpen] = useState(false)
 
@@ -106,6 +106,7 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
             activeId={activeId}
             onSelect={handleSelect}
             users={users}
+            currentUserId={currentUserId}
           />
 
           <div className="mx-3 my-2 h-px bg-white/[0.06]" />
@@ -116,6 +117,7 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, onClose
             activeId={activeId}
             onSelect={handleSelect}
             users={users}
+            currentUserId={currentUserId}
             showEmptyState
           />
         </div>

@@ -47,6 +47,15 @@ const AlertIcon = () => (
   </svg>
 );
 
+const AddFriendIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="19" y1="8" x2="19" y2="14" />
+    <line x1="22" y1="11" x2="16" y2="11" />
+  </svg>
+);
+
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
 const Badge = ({ children, color, bg, border }) => (
@@ -333,7 +342,9 @@ const AttendeeRow = ({
   attendee, adminId, accent,
   isFriend, isYou, isAdminMode, isShow,
   onRemove, isRemoving, confirmingRemove, onConfirmRemove, onCancelRemove,
+  requestSent, onAddFriend, onCancelRequest,
 }) => {
+  const [hoveringRequest, setHoveringRequest] = useState(false);
   const isHost    = String(attendee.userId) === String(adminId);
   const canRemove = !isHost && !isYou && isAdminMode;
 
@@ -414,17 +425,50 @@ const AttendeeRow = ({
           )}
         </div>
 
-        {/* Zone 3 — action rail (always occupies space for alignment) */}
-        <div className="shrink-0 w-7 flex items-start justify-center pt-0.5">
+        {/* Zone 3 — action rail */}
+        <div className="shrink-0 flex items-center gap-1.5 self-center">
+          {!isYou && !isFriend && (
+            requestSent ? (
+              <button
+                onClick={onCancelRequest}
+                aria-label="Cancel friend request"
+                className="h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
+                style={{
+                  background: hoveringRequest ? "rgba(251,64,64,0.12)" : "rgba(255,255,255,0.05)",
+                  color: hoveringRequest ? "rgba(251,64,64,0.7)" : "rgba(229,226,225,0.22)",
+                  border: hoveringRequest ? "1px solid rgba(251,64,64,0.18)" : "1px solid rgba(255,255,255,0.07)",
+                }}
+                onMouseEnter={() => setHoveringRequest(true)}
+                onMouseLeave={() => setHoveringRequest(false)}
+              >
+                {hoveringRequest ? <RemoveIcon /> : <AddFriendIcon />}
+              </button>
+            ) : (
+              <button
+                onClick={onAddFriend}
+                aria-label={`Add ${attendee.displayName} as friend`}
+                className="h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
+                style={{
+                  background: hexToRgba(accent, 0.1),
+                  color: accent,
+                  border: `1px solid ${hexToRgba(accent, 0.2)}`,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = hexToRgba(accent, 0.2); }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = hexToRgba(accent, 0.1); }}
+              >
+                <AddFriendIcon />
+              </button>
+            )
+          )}
           {canRemove && !confirmingRemove && (
             <button
               onClick={onRemove}
               disabled={isRemoving}
               aria-label={`Remove ${attendee.displayName}`}
-              className="h-6 w-6 flex items-center justify-center rounded-full transition-all duration-150 disabled:opacity-40"
-              style={{ background: "rgba(251,64,64,0.08)", color: "rgba(251,64,64,0.45)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(251,64,64,0.16)"; e.currentTarget.style.color = "#fb4040"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(251,64,64,0.08)"; e.currentTarget.style.color = "rgba(251,64,64,0.45)"; }}
+              className="h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 disabled:opacity-40"
+              style={{ background: "rgba(251,64,64,0.08)", color: "rgba(251,64,64,0.45)", border: "1px solid rgba(251,64,64,0.1)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(251,64,64,0.16)"; e.currentTarget.style.color = "#fb4040"; e.currentTarget.style.border = "1px solid rgba(251,64,64,0.25)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(251,64,64,0.08)"; e.currentTarget.style.color = "rgba(251,64,64,0.45)"; e.currentTarget.style.border = "1px solid rgba(251,64,64,0.1)"; }}
             >
               <RemoveIcon />
             </button>
@@ -480,6 +524,8 @@ export function ManageAttendeesModal({ open, onClose, item, accent, currentUserI
   const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   const [removingId,      setRemovingId]      = useState(null);
   const [togglingItem,    setTogglingItem]    = useState(null);
+  // Map<userId, requestId> — stores sent request IDs so we can cancel them
+  const [sentRequests,    setSentRequests]    = useState(new Map());
 
   // Fetch attendees + friends in parallel
   useEffect(() => {
@@ -525,8 +571,32 @@ export function ManageAttendeesModal({ open, onClose, item, accent, currentUserI
 
   // Reset on close
   useEffect(() => {
-    if (!open) { setActiveTab("all"); setConfirmRemoveId(null); setRemovingId(null); }
+    if (!open) { setActiveTab("all"); setConfirmRemoveId(null); setRemovingId(null); setSentRequests(new Map()); }
   }, [open]);
+
+  const handleAddFriend = async (userId) => {
+    // Optimistically mark as sent (no requestId yet)
+    setSentRequests((prev) => new Map(prev).set(String(userId), null));
+    try {
+      const res = await socialService.sendFriendRequest(userId);
+      const requestId = res?.id ?? null;
+      setSentRequests((prev) => new Map(prev).set(String(userId), requestId));
+    } catch (err) {
+      console.error("[ManageAttendeesModal] add friend failed:", err);
+      setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m; });
+    }
+  };
+
+  const handleCancelRequest = async (userId) => {
+    const requestId = sentRequests.get(String(userId));
+    setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m; });
+    try {
+      if (requestId) await socialService.cancelFriendRequest(requestId);
+    } catch (err) {
+      console.error("[ManageAttendeesModal] cancel request failed:", err);
+      setSentRequests((prev) => new Map(prev).set(String(userId), requestId));
+    }
+  };
 
   // ESC
   useEffect(() => {
@@ -777,6 +847,9 @@ export function ManageAttendeesModal({ open, onClose, item, accent, currentUserI
                             confirmingRemove={confirmRemoveId === attendee.userId}
                             onConfirmRemove={() => handleConfirmRemove(attendee.userId)}
                             onCancelRemove={() => setConfirmRemoveId(null)}
+                            requestSent={sentRequests.has(String(attendee.userId))}
+                            onAddFriend={() => handleAddFriend(attendee.userId)}
+                            onCancelRequest={() => handleCancelRequest(attendee.userId)}
                           />
                         </div>
                       );

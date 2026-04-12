@@ -381,7 +381,7 @@ function ArchiveCard({ item, onOpen }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1.5">
-            <h3 className="text-sm font-semibold text-white leading-tight">{item.title}</h3>
+            <h3 className="text-sm font-semibold text-white leading-tight min-w-0 truncate">{item.title}</h3>
             <span className="text-[10px] text-neutral-600 shrink-0">{item.date}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

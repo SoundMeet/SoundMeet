@@ -77,7 +77,7 @@ function Tag({ label, highlighted }) {
 // ─── Relationship controls ────────────────────────────────────────────────────
 
 function RelationshipButton({ status, userId }) {
-  const { updateRelationship } = useFriends()
+  const { sendFriendRequest, updateRelationship } = useFriends()
 
   if (status === 'friends') {
     return (
@@ -123,7 +123,7 @@ function RelationshipButton({ status, userId }) {
     <ActionBtn
       label="Add Friend"
       accent
-      onClick={() => updateRelationship(userId, 'request_sent')}
+      onClick={() => sendFriendRequest(userId)}
     />
   )
 }

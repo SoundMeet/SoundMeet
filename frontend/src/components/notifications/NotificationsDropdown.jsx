@@ -3,14 +3,14 @@ import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bell, Settings, ChevronLeft, Volume2, VolumeX, BellOff,
-  UserPlus, UserCheck, Heart, MessageCircle, Music, UserRound, Smartphone,
+  UserPlus, UserCheck, Heart, MessageCircle, Music, Smartphone,
 } from 'lucide-react'
 import { useNotifications } from '../../context/NotificationsContext'
 import { NotificationItem } from './NotificationItem'
 
 // ─── Grouping ─────────────────────────────────────────────────────────────────
 
-const GROUPABLE = new Set(['post_like', 'new_follower'])
+const GROUPABLE = new Set(['post_like'])
 
 function groupNotifications(notifications) {
   const buckets = new Map()
@@ -44,7 +44,6 @@ const PREF_TYPES = [
   { type: 'post_like',               label: 'Post likes',          Icon: Heart        },
   { type: 'post_comment',            label: 'Post comments',       Icon: MessageCircle },
   { type: 'jam_invite',              label: 'Jam invites',         Icon: Music        },
-  { type: 'new_follower',            label: 'New followers',       Icon: UserRound    },
 ]
 
 // ─── Toggle switch ────────────────────────────────────────────────────────────

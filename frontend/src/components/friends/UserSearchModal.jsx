@@ -260,7 +260,7 @@ export function UserSearchModal({ open, onOpenChange }) {
                 style={{ caretColor: '#DC2E73', minWidth: 0 }}
               />
 
-              {displayQuery ? (
+              {displayQuery && (
                 <button
                   onClick={clearSearch}
                   aria-label="Clear"
@@ -269,18 +269,6 @@ export function UserSearchModal({ open, onOpenChange }) {
                 >
                   <CloseIcon size={11} />
                 </button>
-              ) : (
-                <kbd
-                  className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-[5px]"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.25)',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  ESC
-                </kbd>
               )}
 
               <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />

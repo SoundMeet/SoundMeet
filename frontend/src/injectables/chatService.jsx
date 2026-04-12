@@ -164,6 +164,32 @@ export const chatService = {
 
   // ─── Conversation listing ─────────────────────────────────────────────────
 
+  /**
+   * Fetch the latest message for each conversation in one query.
+   * Returns a map of { [convId: string]: { sender_id, content, timestamp } }.
+   */
+  async getLastMessagesForConversations(convIds) {
+    if (!convIds.length) return {};
+
+    // Fetch recent messages ordered newest-first, then pick first per conv in JS.
+    // Limit is generous but bounded: 10 candidates per conversation.
+    const { data, error } = await supabase
+      .from('chat_message')
+      .select('id, conversation_id, sender_id, content, timestamp')
+      .in('conversation_id', convIds)
+      .order('timestamp', { ascending: false })
+      .limit(Math.min(convIds.length * 10, 500));
+
+    if (error) throw error;
+
+    const latest = {};
+    for (const row of (data ?? [])) {
+      const cid = String(row.conversation_id);
+      if (!latest[cid]) latest[cid] = row;
+    }
+    return latest;
+  },
+
   async getParticipantsForConversations(convIds) {
     if (!convIds.length) return [];
 

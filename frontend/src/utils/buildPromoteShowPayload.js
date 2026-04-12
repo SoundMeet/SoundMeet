@@ -89,7 +89,5 @@ export function buildPromoteShowPayload(formValues) {
 
   // TODO: await api.promoteShow(payload);
   // Update field names in this file only when the endpoint is ready.
-  console.log("payload:", payload);
-
   return payload;
 }

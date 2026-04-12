@@ -18,7 +18,7 @@ function EmptyJamState() {
   )
 }
 
-const ChatSectionList = ({ title, items, activeId, onSelect, users, showEmptyState = false }) => {
+const ChatSectionList = ({ title, items, activeId, onSelect, users, currentUserId, showEmptyState = false }) => {
   return (
     <div className="mb-1">
       <div
@@ -43,6 +43,7 @@ const ChatSectionList = ({ title, items, activeId, onSelect, users, showEmptySta
               isActive={item.id === activeId}
               onClick={() => onSelect(item.id)}
               users={users}
+              currentUserId={currentUserId}
             />
           ))
       }

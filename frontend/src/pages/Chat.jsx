@@ -114,15 +114,27 @@ const Chat = () => {
         if (chatCurrentUser) usersMap[chatCurrentUser.id] = chatCurrentUser
 
         const jamConvIds = conversations.filter(c => c.jam_id).map(c => c.jam_id)
-        const jamNames = jamConvIds.length
-          ? await jamService.getJamNames(jamConvIds).catch(() => ({}))
-          : {}
+        const [jamNames, lastMsgMap] = await Promise.all([
+          jamConvIds.length
+            ? jamService.getJamNames(jamConvIds).catch(() => ({}))
+            : Promise.resolve({}),
+          convIds.length
+            ? chatService.getLastMessagesForConversations(convIds).catch(() => ({}))
+            : Promise.resolve({}),
+        ])
 
         conversations.forEach((conv) => {
           const threadId = `c_${conv.id}`
           const participants = allParticipants.filter(
             p => p.conversation_id === conv.id
           )
+
+          const rawLast = lastMsgMap[String(conv.id)] ?? null
+          const lastMessage = rawLast ? {
+            senderId:     String(rawLast.sender_id),
+            content:      rawLast.content ?? '',
+            isoTimestamp: rawLast.timestamp,
+          } : null
 
           if (conv.jam_id) {
             jams.push({
@@ -134,6 +146,7 @@ const Chat = () => {
               memberCount: participants.length,
               onlineCount: 0,
               jamId: String(conv.jam_id),
+              lastMessage,
             })
           } else {
             const otherParticipant = participants.find(
@@ -144,10 +157,10 @@ const Chat = () => {
               : null
 
             if (otherUserId && !usersMap[otherUserId]) {
-              missingUserIds.add(otherUserId) // Mark this user for fetching
+              missingUserIds.add(otherUserId)
               usersMap[otherUserId] = {
                 id: otherUserId,
-                name: `Loading...`, 
+                name: `Loading...`,
                 avatar: null,
                 status: 'offline',
               }
@@ -159,6 +172,7 @@ const Chat = () => {
               type: 'dm',
               participantId: otherUserId,
               unread: 0,
+              lastMessage,
             })
           }
         })
@@ -295,6 +309,18 @@ const Chat = () => {
         if (existing.some(m => m.id === msg.id)) return prev
         return { ...prev, [activeThreadId]: [...existing, msg] }
       })
+      // Keep sidebar preview in sync for the active thread
+      const lastMessage = {
+        senderId:     String(newRow.sender_id),
+        content:      newRow.content ?? '',
+        isoTimestamp: newRow.timestamp,
+      }
+      setDmThreads(prev => prev.map(t =>
+        t.id === activeThreadId ? { ...t, lastMessage } : t
+      ))
+      setJamThreads(prev => prev.map(t =>
+        t.id === activeThreadId ? { ...t, lastMessage } : t
+      ))
     })
 
     return () => {
@@ -493,6 +519,7 @@ const Chat = () => {
           activeId={activeThreadId}
           onSelect={handleSelectThread}
           users={chatUsers}
+          currentUserId={chatCurrentUser?.id}
           onClose={() => setIsSidebarOpen(false)}
         />
       </div>

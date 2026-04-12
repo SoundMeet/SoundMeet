@@ -58,8 +58,8 @@ const App = () => {
   }
   return (
     <ToastProvider>
-    <NotificationsProvider>
-      <FriendsProvider>
+    <FriendsProvider>
+      <NotificationsProvider>
         <AuthModalProvider>
           <div className='bg-linear-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
             <div className="sticky top-0 z-50">
@@ -82,8 +82,8 @@ const App = () => {
             <AuthModal />
           </div>
         </AuthModalProvider>
-      </FriendsProvider>
-    </NotificationsProvider>
+      </NotificationsProvider>
+    </FriendsProvider>
     </ToastProvider>
   )
 }
