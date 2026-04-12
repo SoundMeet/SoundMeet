@@ -52,6 +52,21 @@ const MyJamsIcon = () => (
   </svg>
 );
 
+const ChatIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
 // ─── JoinJamSuccessState ──────────────────────────────────────────────────────
 
 /**
@@ -64,6 +79,7 @@ const MyJamsIcon = () => (
  *   isPrivate           boolean
  *   onGoToMyJams        () => void
  *   onDownloadCalendar  (() => void) | null  — null hides the calendar button
+ *   onGoToGroupChat     (() => void) | null  — null hides the group chat button
  *   onClose             () => void
  */
 const JoinJamSuccessState = ({
@@ -71,6 +87,7 @@ const JoinJamSuccessState = ({
   isPrivate,
   onGoToMyJams,
   onDownloadCalendar,
+  onGoToGroupChat,
   onClose,
 }) => {
   const isConfirmed = !isPrivate;
@@ -134,6 +151,20 @@ const JoinJamSuccessState = ({
           <MyJamsIcon />
           Go to My Jams
         </button>
+
+        {isConfirmed && onGoToGroupChat && (
+          <button
+            onClick={onGoToGroupChat}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-full text-sm font-semibold transition-all duration-200 hover:bg-white/10"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              color: "rgba(229,226,225,0.55)",
+            }}
+          >
+            <ChatIcon />
+            Go to Group Chat
+          </button>
+        )}
 
         {isConfirmed && onDownloadCalendar && (
           <button

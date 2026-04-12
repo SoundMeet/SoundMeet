@@ -93,12 +93,14 @@ const JoinJamModal = ({
   currentUser,
   onSubmit,
   onSuccessNavigateToMyJams,
+  onSuccessNavigateToGroupChat,
 }) => {
   const { options } = useFormOptions()
   const [form, setForm] = useState(INITIAL_FORM);
   // "form" | "submitting" | "success" | "error"
   const [phase, setPhase] = useState("form");
   const [errorMessage, setErrorMessage] = useState(null);
+  const [conversationId, setConversationId] = useState(null);
 
   const isPrivate = jam?.isPrivate ?? false;
   const isPlay = form.attendanceType === "play";
@@ -129,6 +131,7 @@ const JoinJamModal = ({
         setForm(INITIAL_FORM);
         setPhase("form");
         setErrorMessage(null);
+        setConversationId(null);
       }, 300);
       return () => clearTimeout(t);
     }
@@ -144,7 +147,8 @@ const JoinJamModal = ({
     const payload = buildJoinJamPayload(jam.id, isPrivate, form);
 
     try {
-      await onSubmit?.(payload);
+      const convId = await onSubmit?.(payload);
+      setConversationId(convId ?? null);
       setPhase("success");
     } catch (err) {
       setErrorMessage(
@@ -158,6 +162,10 @@ const JoinJamModal = ({
     onSuccessNavigateToMyJams?.();
     onClose();
   };
+
+  const handleGoToGroupChat = (onSuccessNavigateToGroupChat && conversationId)
+    ? () => { onSuccessNavigateToGroupChat(conversationId); onClose(); }
+    : null;
 
   const handleDownloadCalendar = () => {
     if (jam) downloadJamCalendarEvent(jam);
@@ -277,6 +285,7 @@ const JoinJamModal = ({
                     isPrivate={isPrivate}
                     onGoToMyJams={handleGoToMyJams}
                     onDownloadCalendar={calendarHandler}
+                    onGoToGroupChat={handleGoToGroupChat}
                     onClose={onClose}
                   />
                 </motion.div>

@@ -898,19 +898,28 @@ const Home = () => {
         isOpen={joinJamModal.open}
         onClose={() => { setJoinJamModal({ open: false, jam: null }); refreshMyJoinedIds(); }}
         jam={joinJamModal.jam}
-        onSubmit={(payload) => jamService.joinJam(
-          joinJamModal.jam.id,
-          user?.id,
-          {
-            instrumentIds:        payload?.instrumentIds ?? [],
-            customInstruments:    payload?.customInstruments ?? [],
-            roleIds:              payload?.roleIds ?? [],
-            customRoles:          payload?.customRoles ?? [],
-            gearIds:              payload?.equipmentOfferingIds ?? [],
-            customGear:           payload?.customEquipmentOfferings ?? [],
-          }
-        )}
+        onSubmit={async (payload) => {
+          console.log('[Home] joinJam start — jamId:', joinJamModal.jam.id, 'userId:', user?.id);
+          const conversationId = await jamService.joinJam(
+            joinJamModal.jam.id,
+            user?.id,
+            {
+              instrumentIds:        payload?.instrumentIds ?? [],
+              customInstruments:    payload?.customInstruments ?? [],
+              roleIds:              payload?.roleIds ?? [],
+              customRoles:          payload?.customRoles ?? [],
+              gearIds:              payload?.equipmentOfferingIds ?? [],
+              customGear:           payload?.customEquipmentOfferings ?? [],
+            }
+          );
+          console.log('[Home] joinJam success — conversationId:', conversationId);
+          // Refresh immediately so EventDetailModal reflects joined state
+          // without waiting for the JoinJamModal close animation.
+          refreshMyJoinedIds();
+          return conversationId;
+        }}
         onSuccessNavigateToMyJams={() => navigate("/jams")}
+        onSuccessNavigateToGroupChat={() => navigate("/chat", { state: { openJamId: joinJamModal.jam?.id } })}
       />
 
       <RSVPShowModal
