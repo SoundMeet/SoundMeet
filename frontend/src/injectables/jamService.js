@@ -383,7 +383,8 @@ export const jamService = {
   },
 
   /**
-   * Remove the current user from a jam's attendee list.
+   * Remove the current user from a jam's attendee list and deactivate their chat membership.
+   * Only call for upcoming/ongoing jams — past jam leave is blocked at the UI level.
    */
   async leaveJam(jamId, userId) {
     const { error } = await supabase
@@ -392,6 +393,28 @@ export const jamService = {
       .eq('jam_id', Number(jamId))
       .eq('user_id', userId);
     if (error) throw error;
+
+    // Also deactivate chat membership so the chat disappears from their inbox.
+    const { data: conv } = await supabase
+      .from('chat_conversation')
+      .select('id')
+      .eq('jam_id', Number(jamId))
+      .maybeSingle();
+
+    if (conv?.id) {
+      await supabase
+        .from('chat_conversation_participants')
+        .update({ left_at: new Date().toISOString() })
+        .eq('conversation_id', conv.id)
+        .eq('user_id', userId)
+        .is('left_at', null);
+
+      // System event — non-fatal if it fails
+      await supabase
+        .from('chat_message')
+        .insert([{ conversation_id: conv.id, sender_id: userId, content: '__system:left_chat__' }])
+        .catch(() => {});
+    }
   },
 
   /**

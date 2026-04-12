@@ -36,6 +36,24 @@ function DateSeparator({ rawDate }) {
   )
 }
 
+// ─── System event row ─────────────────────────────────────────────────────────
+function SystemEventRow({ text }) {
+  return (
+    <div className="flex items-center justify-center my-3">
+      <span
+        style={{
+          fontSize:      '0.66rem',
+          color:         'rgba(229,226,225,0.28)',
+          fontStyle:     'italic',
+          letterSpacing: '0.01em',
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  )
+}
+
 // jamMeta: { [userId]: { role: string|null, isHost: boolean, bringing: string[] } }
 const MessageList = ({ messages, currentUserId, users, jamMeta }) => {
   const bottomRef = useRef(null)
@@ -79,6 +97,14 @@ const MessageList = ({ messages, currentUserId, users, jamMeta }) => {
               <DateSeparator rawDate={group.rawDate} />
             )}
             {group.messages.map((msg, mi) => {
+              // System events render as centred text, not as bubbles
+              if (msg.content === '__system:left_chat__') {
+                const name = sender?.name ?? 'Someone'
+                return (
+                  <SystemEventRow key={msg.id} text={`${name} left the chat`} />
+                )
+              }
+
               const props = {
                 message:        msg,
                 isOutgoing,

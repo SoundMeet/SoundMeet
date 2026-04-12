@@ -253,7 +253,7 @@ class Conversation(models.Model):
     jam = models.ForeignKey(Jam, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_rooms")
     band = models.ForeignKey(Band, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_rooms")
     show = models.ForeignKey(Show, on_delete=models.CASCADE, null=True, blank=True, related_name="chat_rooms")
-    participants = models.ManyToManyField(User, related_name='conversations')
+    participants = models.ManyToManyField(User, through='ConversationParticipant', related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -262,6 +262,19 @@ class Conversation(models.Model):
         if self.band: return f"Band Chat: {self.band.name}"
         if self.show: return f"Show Chat: {self.show.name}"
         return f"DM: {self.id}"
+
+
+class ConversationParticipant(models.Model):
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='conversation_participants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversation_memberships')
+    left_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'chat_conversation_participants'
+        unique_together = ('conversation', 'user')
+
+    def __str__(self):
+        return f"{self.user.username} in {self.conversation_id}"
 
 
 class Message(models.Model):

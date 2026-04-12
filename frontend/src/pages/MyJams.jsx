@@ -20,6 +20,7 @@ import {
   DISCOVERY_VARIANTS,
 } from '../utils/discovery'
 import { jamService } from '../injectables/jamService'
+import { getEventLifecycleState } from '../utils/eventComputed'
 import { showService } from '../injectables/showService'
 import { chatService } from '../injectables/chatService'
 import { useAuth } from '../injectables/Auth'
@@ -999,6 +1000,8 @@ const MyJams = () => {
 
   const handleLeave = async (item) => {
     if (!user?.id) return
+    // Past jams are historical — attendance is locked and cannot be removed.
+    if (item?.type === 'jam' && getEventLifecycleState(item) === 'ended') return
     try {
       if (item?.type === 'jam') {
         await jamService.leaveJam(item.id, user.id)
