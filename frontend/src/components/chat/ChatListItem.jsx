@@ -220,7 +220,7 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
                   <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
                   <line x1="1" y1="1" x2="23" y2="23" />
                 </svg>
-                Hide Conversation
+                Delete Conversation
               </button>
             </div>
           </>
