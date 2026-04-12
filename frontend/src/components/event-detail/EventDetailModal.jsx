@@ -16,6 +16,7 @@ import {
 import { useFormOptions } from "../../hooks/useFormOptions";
 import { jamService } from "../../injectables/jamService";
 import { showService } from "../../injectables/showService";
+import { chatService } from "../../injectables/chatService";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../injectables/Auth";
 
@@ -71,7 +72,7 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-const ParticipationConfirmation = ({ item, accent }) => {
+const ParticipationConfirmation = ({ item, accent, chatLeftAt, onRejoinChat, rejoinLoading, canRejoin }) => {
   const isShow = item.type === "promote_show";
   const headline = isShow
     ? "You're registered for this show"
@@ -96,7 +97,7 @@ const ParticipationConfirmation = ({ item, accent }) => {
         <span className="shrink-0 mt-[1px]" style={{ color: accent }}>
           <CheckCircleIcon />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p
             className="text-[13px] font-semibold leading-snug"
             style={{ color: accent }}
@@ -106,6 +107,29 @@ const ParticipationConfirmation = ({ item, accent }) => {
           <p className="text-[11.5px] text-neutral-500 mt-[3px] leading-snug">
             {note}
           </p>
+
+          {/* Chat left indicator + Rejoin — jams only */}
+          {chatLeftAt && (
+            <div className="flex items-center justify-between mt-2.5 pt-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <span className="text-[11px]" style={{ color: 'rgba(229,226,225,0.35)' }}>
+                Chat left
+              </span>
+              {canRejoin ? (
+                <button
+                  onClick={onRejoinChat}
+                  disabled={rejoinLoading}
+                  className="text-[11px] font-semibold px-3 py-1 rounded-full transition-all duration-150 disabled:opacity-40"
+                  style={{ background: hexToRgba(accent, 0.13), color: accent, border: `1px solid ${hexToRgba(accent, 0.2)}` }}
+                >
+                  {rejoinLoading ? 'Rejoining…' : 'Rejoin Chat'}
+                </button>
+              ) : (
+                <span className="text-[11px]" style={{ color: 'rgba(229,226,225,0.25)' }}>
+                  Jam ended
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -342,6 +366,11 @@ const EventDetailModal = ({
   const [deleteConfirmOpen,setDeleteConfirmOpen]= useState(false);
   const [actionLoading,    setActionLoading]    = useState(false);
 
+  // ── Chat membership state (jams only, approved attendees) ─────────────────
+  const [jamConvId,     setJamConvId]     = useState(null);
+  const [chatLeftAt,    setChatLeftAt]    = useState(null);
+  const [rejoinLoading, setRejoinLoading] = useState(false);
+
   // ── In-place edit state (jams only) ───────────────────────────────────────
   const [isEditing,         setIsEditing]         = useState(false);
   const [editForm,          setEditForm]           = useState(null);
@@ -369,6 +398,33 @@ const EventDetailModal = ({
       document.body.removeChild(el);
     }
     showToast("Link copied!", "success");
+  };
+
+  // ── Chat membership fetch (jam + approved attendee only) ─────────────────
+  useEffect(() => {
+    const isAttending = ctx.isAttendee || ctx.joinState === "approved";
+    if (!open || localItem?.type !== "jam" || !isAttending || !user?.id || !localItem?.id) return;
+    chatService.getJamChatStatus(localItem.id, user.id)
+      .then((status) => {
+        setJamConvId(status?.conversationId ?? null);
+        setChatLeftAt(status?.leftAt ?? null);
+      })
+      .catch(() => {}); // non-critical — silently fail
+  }, [open, localItem?.id, ctx.isAttendee, ctx.joinState, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Rejoin chat ────────────────────────────────────────────────────────────
+  const handleRejoinChat = async () => {
+    if (!jamConvId || !user?.id) return;
+    setRejoinLoading(true);
+    try {
+      await chatService.rejoinJamChat(jamConvId, user.id);
+      setChatLeftAt(null);
+      showToast("Rejoined chat!", "success");
+    } catch {
+      showToast("Could not rejoin chat.", "error");
+    } finally {
+      setRejoinLoading(false);
+    }
   };
 
   // ── Computed state ──────────────────────────────────────────────────────────
@@ -510,6 +566,9 @@ const EventDetailModal = ({
       exitEditMode();
       setDiscardConfirmOpen(false);
       setAttendeesOpen(false);
+      setJamConvId(null);
+      setChatLeftAt(null);
+      setRejoinLoading(false);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -627,7 +686,14 @@ const EventDetailModal = ({
               <EventPermissionsNotice item={localItem} viewerContext={ctx} />
 
               {relationship === "approved" && (
-                <ParticipationConfirmation item={localItem} accent={accent} />
+                <ParticipationConfirmation
+                  item={localItem}
+                  accent={accent}
+                  chatLeftAt={chatLeftAt}
+                  onRejoinChat={handleRejoinChat}
+                  rejoinLoading={rejoinLoading}
+                  canRejoin={lifecycle === "upcoming" || lifecycle === "live"}
+                />
               )}
 
               {!isShortDesc && (

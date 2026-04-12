@@ -10,7 +10,7 @@ const SearchIcon = () => (
   </svg>
 )
 
-const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, currentUserId, onClose }) => {
+const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, onDMHide, users, currentUserId, onClose }) => {
   const [query, setQuery] = useState('')
   const [newChatOpen, setNewChatOpen] = useState(false)
 
@@ -105,6 +105,7 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, users, current
             items={filteredDms}
             activeId={activeId}
             onSelect={handleSelect}
+            onHide={onDMHide}
             users={users}
             currentUserId={currentUserId}
           />

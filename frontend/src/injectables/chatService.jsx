@@ -44,12 +44,15 @@ export const chatService = {
       if (partCheckError) throw partCheckError;
 
       if (!existingPart) {
+        // First time joining — insert row
         const { error: partInsertError } = await supabase
           .from(M2M_TABLE)
           .insert([{ conversation_id: conversationId, user_id: currentUserId }]);
 
         if (partInsertError) throw partInsertError;
       }
+      // If row exists — do NOT auto-rejoin.
+      // Once migration is deployed: check left_at here before re-inserting.
     }
 
     return conversationId;
@@ -133,6 +136,8 @@ export const chatService = {
   async getUserConversations(currentUserId) {
       const M2M_TABLE = 'chat_conversation_participants';
 
+      // NOTE: .is('left_at', null) filter will be added here once migration
+      // 0011_conversationparticipant_left_at is deployed to the live DB.
       const { data: participations, error: fetchError } = await supabase
         .from(M2M_TABLE)
         .select('conversation_id')
@@ -246,5 +251,107 @@ export const chatService = {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
+  },
+
+  // ─── Chat membership ──────────────────────────────────────────────────────
+
+  /**
+   * Returns { conversationId, leftAt } for a jam + user without auto-joining.
+   * Returns null if no conversation exists for the jam yet.
+   */
+  async getJamChatStatus(jamId, userId) {
+    const { data: conv, error: convErr } = await supabase
+      .from('chat_conversation')
+      .select('id')
+      .eq('jam_id', Number(jamId))
+      .maybeSingle();
+    if (convErr) throw convErr;
+    if (!conv?.id) return null;
+
+    const { data: part, error: partErr } = await supabase
+      .from('chat_conversation_participants')
+      .select('left_at')
+      .eq('conversation_id', conv.id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (partErr) throw partErr;
+
+    return { conversationId: conv.id, leftAt: part?.left_at ?? null };
+  },
+
+  /**
+   * Returns the current user's participant row for a conversation.
+   * { left_at } — null means active, non-null means they left.
+   */
+  async getJamChatMembership(conversationId, userId) {
+    const { data, error } = await supabase
+      .from('chat_conversation_participants')
+      .select('left_at')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ?? null;
+  },
+
+  /**
+   * Leave a jam chat without leaving the jam.
+   * Sets left_at — does not remove attendance.
+   * Inserts a system event message so the chat shows "[Name] left the chat".
+   */
+  async leaveJamChat(conversationId, userId) {
+    const { error } = await supabase
+      .from('chat_conversation_participants')
+      .update({ left_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .is('left_at', null);
+    if (error) throw error;
+
+    // System event — non-fatal if it fails
+    await supabase
+      .from('chat_message')
+      .insert([{ conversation_id: conversationId, sender_id: userId, content: '__system:left_chat__' }])
+      .catch(() => {});
+  },
+
+  /**
+   * Rejoin a jam chat the user previously left.
+   * Clears left_at — only valid while jam is upcoming or live (enforced by caller).
+   */
+  async rejoinJamChat(conversationId, userId) {
+    const { error } = await supabase
+      .from('chat_conversation_participants')
+      .update({ left_at: null })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    if (error) throw error;
+  },
+
+  /**
+   * Hide a DM conversation for the current user only.
+   * Sets left_at on their participant row — the other person is unaffected.
+   */
+  async hideDMConversation(conversationId, userId) {
+    const { error } = await supabase
+      .from('chat_conversation_participants')
+      .update({ left_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .is('left_at', null);
+    if (error) throw error;
+  },
+
+  /**
+   * Resurface a previously hidden DM (e.g. on incoming message).
+   * Clears left_at for that user only.
+   */
+  async unhideDMConversation(conversationId, userId) {
+    const { error } = await supabase
+      .from('chat_conversation_participants')
+      .update({ left_at: null })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    if (error) throw error;
   },
 };

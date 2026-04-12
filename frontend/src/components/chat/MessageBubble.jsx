@@ -180,7 +180,7 @@ const MessageBubble = ({ message, isOutgoing, showSenderInfo, sender, isFirst, i
           <SenderInfo sender={sender} jamMeta={jamMeta} />
         )}
 
-        <div className="group w-full">
+        <div className="group">
           {/* Text bubble */}
           {hasText && (
             <div

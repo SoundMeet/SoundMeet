@@ -97,7 +97,7 @@ function ParticipantChips({ participants }) {
 
 // ─── ChatHeader ───────────────────────────────────────────────────────────────
 // participants: derived from jam attendee data; empty array = still loading or DM
-const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick }) => {
+const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick, onMembersClick, onHideDM }) => {
   const isJam = thread?.type === 'jam'
 
   let threadName  = ''
@@ -228,22 +228,62 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
         </div>
       </div>
 
-      {/* ── Right: View Jam CTA ──────────────────────────────────────────────── */}
-      {isJam && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onJamLinkClick?.() }}
-          className="flex items-center gap-1.5 text-white font-semibold cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0 ml-3"
-          style={{
-            background:   'linear-gradient(135deg, #DC2E73, #FB4040)',
-            borderRadius: '3rem',
-            padding:      '0.4rem 0.85rem',
-            fontSize:     '0.8rem',
-          }}
-        >
-          <Music2 size={14} />
-          <span className="hidden sm:inline">View Jam</span>
-        </button>
-      )}
+      {/* ── Right: actions ───────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+        {/* Jam: members pill + View Jam */}
+        {isJam && (
+          <>
+            {onMembersClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onMembersClick() }}
+                className="flex items-center gap-1 transition-opacity hover:opacity-80 flex-shrink-0"
+                style={{
+                  background:   'rgba(255,255,255,0.07)',
+                  border:       '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '3rem',
+                  padding:      '0.35rem 0.7rem',
+                  fontSize:     '0.72rem',
+                  color:        'rgba(229,226,225,0.55)',
+                }}
+                aria-label="View members"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>{thread?.memberCount ?? ''}</span>
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onJamLinkClick?.() }}
+              className="flex items-center gap-1.5 text-white font-semibold cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+              style={{
+                background:   'linear-gradient(135deg, #DC2E73, #FB4040)',
+                borderRadius: '3rem',
+                padding:      '0.4rem 0.85rem',
+                fontSize:     '0.8rem',
+              }}
+            >
+              <Music2 size={14} />
+              <span className="hidden sm:inline">View Jam</span>
+            </button>
+          </>
+        )}
+
+        {/* DM: kebab menu → Hide Conversation */}
+        {!isJam && onHideDM && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onHideDM() }}
+            className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150 hover:bg-white/[0.07] flex-shrink-0"
+            style={{ color: 'rgba(229,226,225,0.38)' }}
+            aria-label="More options"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="5" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="19" r="1" fill="currentColor" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   )
 }

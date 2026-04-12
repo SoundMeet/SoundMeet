@@ -1,4 +1,7 @@
+import { useRef, useState } from 'react'
 import { extractEventLink } from '../../utils/eventLinkParser'
+
+const LONG_PRESS_MS = 500
 
 const AVATAR_PALETTE = ['#C2185B', '#7B1FA2', '#1565C0', '#00695C', '#E65100', '#4527A0']
 
@@ -67,6 +70,8 @@ function getMessagePreview(lastMessage) {
   if (type === 'sticker') return { text: 'Sticker',        isInvite: false }
   if (type === 'link')    return { text: '🔗 Link',        isInvite: false }
   if (type === 'invite')  return { text: 'Jam invite',  isInvite: true  }
+  // System events — don't expose raw sentinel strings
+  if (content === '__system:left_chat__') return { text: 'Left the chat', isInvite: false }
   // Detect SoundMeet event links embedded in text messages
   if (content && extractEventLink(content)) {
     return { text: 'Jam invite', isInvite: true }
@@ -74,7 +79,7 @@ function getMessagePreview(lastMessage) {
   return content ? { text: content, isInvite: false } : null
 }
 
-const ChatListItem = ({ item, isActive, onClick, users, currentUserId }) => {
+const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId }) => {
   const base = [
     'flex items-center gap-3 mx-1 px-3 py-2.5 cursor-pointer',
     'rounded-xl transition-all duration-150',
@@ -82,6 +87,28 @@ const ChatListItem = ({ item, isActive, onClick, users, currentUserId }) => {
       ? 'bg-white/[0.09]'
       : 'hover:bg-white/[0.05]',
   ].join(' ')
+
+  // ─── Long-press state (DM only) ────────────────────────────────────────────
+  const pressTimer  = useRef(null)
+  const didLongPress = useRef(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const startPress = () => {
+    didLongPress.current = false
+    pressTimer.current = setTimeout(() => {
+      didLongPress.current = true
+      setMenuOpen(true)
+    }, LONG_PRESS_MS)
+  }
+
+  const cancelPress = () => {
+    clearTimeout(pressTimer.current)
+  }
+
+  const handleClick = (e) => {
+    if (didLongPress.current) { e.preventDefault(); return }
+    onClick?.()
+  }
 
   // ─── DM variant ────────────────────────────────────────────────────────────
   if (item.type === 'dm') {
@@ -105,55 +132,98 @@ const ChatListItem = ({ item, isActive, onClick, users, currentUserId }) => {
       participant.status === 'away'   ? 'Away'   : 'Offline'
 
     return (
-      <div className={base} onClick={onClick}>
-        {/* Avatar with presence pip */}
-        <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
-          {participant.avatar ? (
-            <img
-              src={participant.avatar}
-              alt={participant.name}
-              className="rounded-full object-cover"
-              style={{ width: 36, height: 36 }}
-            />
-          ) : (
-            <FallbackAvatar name={participant.name} size={36} />
+      <div className="relative">
+        <div
+          className={base}
+          onClick={handleClick}
+          onMouseDown={startPress}
+          onMouseUp={cancelPress}
+          onMouseLeave={cancelPress}
+          onTouchStart={startPress}
+          onTouchEnd={cancelPress}
+          onTouchMove={cancelPress}
+          onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true) }}
+        >
+          {/* Avatar with presence pip */}
+          <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
+            {participant.avatar ? (
+              <img
+                src={participant.avatar}
+                alt={participant.name}
+                className="rounded-full object-cover"
+                style={{ width: 36, height: 36 }}
+              />
+            ) : (
+              <FallbackAvatar name={participant.name} size={36} />
+            )}
+            <PresencePip status={participant.status} />
+          </div>
+
+          {/* Name + preview (or status fallback) */}
+          <div className="flex-1 min-w-0">
+            <div
+              className="truncate leading-tight"
+              style={{ fontSize: '0.84rem', fontWeight: 600, color: isActive ? '#E5E2E1' : 'rgba(229,226,225,0.88)' }}
+            >
+              {participant.name}
+            </div>
+            <div
+              className="truncate leading-tight mt-0.5"
+              style={{ fontSize: '0.69rem', color: previewIsInvite ? 'rgba(220,46,115,0.75)' : previewLabel ? 'rgba(229,226,225,0.4)' : statusColor }}
+            >
+              {previewLabel ?? statusLabel}
+            </div>
+          </div>
+
+          {/* Right column: time + unread badge */}
+          {(timeStr || item.unread > 0) && (
+            <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
+              {timeStr && (
+                <span style={{ fontSize: '0.6rem', color: 'rgba(229,226,225,0.3)', whiteSpace: 'nowrap' }}>
+                  {timeStr}
+                </span>
+              )}
+              {item.unread > 0 && (
+                <div
+                  className="w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
+                  style={{ fontSize: '9px', fontWeight: 700 }}
+                >
+                  {item.unread}
+                </div>
+              )}
+            </div>
           )}
-          <PresencePip status={participant.status} />
         </div>
 
-        {/* Name + preview (or status fallback) */}
-        <div className="flex-1 min-w-0">
-          <div
-            className="truncate leading-tight"
-            style={{ fontSize: '0.84rem', fontWeight: 600, color: isActive ? '#E5E2E1' : 'rgba(229,226,225,0.88)' }}
-          >
-            {participant.name}
-          </div>
-          <div
-            className="truncate leading-tight mt-0.5"
-            style={{ fontSize: '0.69rem', color: previewIsInvite ? 'rgba(220,46,115,0.75)' : previewLabel ? 'rgba(229,226,225,0.4)' : statusColor }}
-          >
-            {previewLabel ?? statusLabel}
-          </div>
-        </div>
-
-        {/* Right column: time + unread badge */}
-        {(timeStr || item.unread > 0) && (
-          <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
-            {timeStr && (
-              <span style={{ fontSize: '0.6rem', color: 'rgba(229,226,225,0.3)', whiteSpace: 'nowrap' }}>
-                {timeStr}
-              </span>
-            )}
-            {item.unread > 0 && (
-              <div
-                className="w-4 h-4 rounded-full bg-[#DC2E73] text-white flex items-center justify-center"
-                style={{ fontSize: '9px', fontWeight: 700 }}
+        {/* Long-press context menu */}
+        {menuOpen && (
+          <>
+            {/* Dismiss overlay */}
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+            <div
+              className="absolute left-2 right-2 z-50 rounded-xl overflow-hidden"
+              style={{
+                top:       '100%',
+                marginTop: 4,
+                background: 'rgba(28,28,30,0.98)',
+                border:     '1px solid rgba(255,255,255,0.1)',
+                boxShadow:  '0 8px 32px rgba(0,0,0,0.6)',
+              }}
+            >
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-100 hover:bg-white/[0.06]"
+                style={{ fontSize: '0.84rem', color: 'rgba(251,64,64,0.85)' }}
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onHide?.() }}
               >
-                {item.unread}
-              </div>
-            )}
-          </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+                Hide Conversation
+              </button>
+            </div>
+          </>
         )}
       </div>
     )

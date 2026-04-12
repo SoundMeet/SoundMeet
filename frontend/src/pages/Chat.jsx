@@ -7,7 +7,8 @@ import MessageList from '../components/chat/MessageList'
 import TypingIndicator from '../components/chat/TypingIndicator'
 import ChatComposer from '../components/chat/ChatComposer'
 import EventDetailModal from '../components/event-detail/EventDetailModal'
-import { ManageAttendeesModal } from '../components/event-detail/ManageAttendeesModal'
+import { JamChatMembersModal } from '../components/chat/JamChatMembersModal'
+import { DestructiveConfirmSheet } from '../components/event-detail/DestructiveConfirmSheet'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
@@ -62,9 +63,12 @@ const Chat = () => {
   const [isLoadingMsgs, setIsLoadingMsgs]   = useState(false)
   const [convError, setConvError]           = useState(null)
   const [sendError, setSendError]           = useState(null)
-  const [jamDetailModal, setJamDetailModal] = useState({ open: false, item: null })
-  const [attendeesModal, setAttendeesModal] = useState({ open: false, item: null })
-  const [isSidebarOpen, setIsSidebarOpen]   = useState(false)
+  const [jamDetailModal, setJamDetailModal]   = useState({ open: false, item: null })
+  const [attendeesModal, setAttendeesModal]   = useState({ open: false, item: null })
+  const [hideDMConfirm,  setHideDMConfirm]    = useState(false)
+  const [hideDMTarget,   setHideDMTarget]     = useState(null)
+  const [hidingDM,       setHidingDM]         = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen]     = useState(false)
   const [isTyping, setIsTyping]             = useState(false)
   // { [jamId]: { adminId: string|null, attendees: JamAttendee[] } }
   const [jamAttendeeCache, setJamAttendeeCache] = useState({})
@@ -197,11 +201,27 @@ const Chat = () => {
           }
         }
 
+        // Deduplicate DMs: one thread per participant, keep the most recent.
+        // Duplicate conversations can exist from earlier data — don't show them all.
+        const dedupedDms = Object.values(
+          dms.reduce((acc, dm) => {
+            const key = dm.participantId ?? dm._convId
+            const existing = acc[key]
+            if (!existing) {
+              acc[key] = dm
+            } else {
+              const existingTs = existing.lastMessage?.isoTimestamp ?? ''
+              const newTs      = dm.lastMessage?.isoTimestamp ?? ''
+              if (newTs > existingTs) acc[key] = dm
+            }
+            return acc
+          }, {})
+        )
+
         if (!cancelled) {
-          setDmThreads(dms)
+          setDmThreads(dedupedDms)
           setJamThreads(jams)
           setChatUsers(Object.values(usersMap))
-
         }
       })
       .catch((err) => {
@@ -344,7 +364,7 @@ const Chat = () => {
     }
   }
 
-  // ─── Header click → attendees modal ───────────────────────────────────────
+  // ─── Header click / members pill → JamChatMembersModal ──────────────────
   const handleHeaderClick = async () => {
     if (!activeThread?.jamId) return
     try {
@@ -354,6 +374,33 @@ const Chat = () => {
     } catch (err) {
       console.error('[Chat] Failed to load jam for attendees:', err)
       showToast('Could not load attendees.', 'error')
+    }
+  }
+
+  // ─── DM hide ──────────────────────────────────────────────────────────────
+  // Called from header ⋮ button (no item arg — uses activeThread)
+  // or from long-press on sidebar item (item arg provided)
+  const handleHideDM = (item) => {
+    const target = item ?? activeThread
+    if (!target || target.type !== 'dm') return
+    setHideDMTarget(target)
+    setHideDMConfirm(true)
+  }
+
+  const handleConfirmHideDM = async () => {
+    if (!hideDMTarget?._convId || !user?.id) return
+    setHidingDM(true)
+    try {
+      await chatService.hideDMConversation(hideDMTarget._convId, user.id)
+      setDmThreads(prev => prev.filter(t => t.id !== hideDMTarget.id))
+      if (activeThreadId === hideDMTarget.id) setActiveThreadId(null)
+      setHideDMConfirm(false)
+      setHideDMTarget(null)
+    } catch (err) {
+      console.error('[Chat] Hide DM failed:', err)
+      showToast('Could not hide conversation.', 'error')
+    } finally {
+      setHidingDM(false)
     }
   }
 
@@ -518,6 +565,7 @@ const Chat = () => {
           jamThreads={jamThreads}
           activeId={activeThreadId}
           onSelect={handleSelectThread}
+          onDMHide={handleHideDM}
           users={chatUsers}
           currentUserId={chatCurrentUser?.id}
           onClose={() => setIsSidebarOpen(false)}
@@ -583,6 +631,8 @@ const Chat = () => {
               participants={headerParticipants}
               onJamLinkClick={handleViewJam}
               onHeaderClick={handleHeaderClick}
+              onMembersClick={activeThread.type === 'jam' ? handleHeaderClick : undefined}
+              onHideDM={activeThread.type === 'dm' ? handleHideDM : undefined}
             />
 
             {isLoadingMsgs ? (
@@ -623,26 +673,48 @@ const Chat = () => {
         onClose={() => setJamDetailModal({ open: false, item: null })}
         viewerContext={
           jamDetailModal.item && user
-            ? { isCreator: String(jamDetailModal.item.admin_id) === String(user.id) }
+            ? {
+                isCreator: String(jamDetailModal.item.admin_id) === String(user.id),
+                isAttendee: String(jamDetailModal.item.admin_id) !== String(user.id),
+              }
             : {}
         }
         openedFrom="chat"
       />
 
       {attendeesModal.item && (
-        <ManageAttendeesModal
+        <JamChatMembersModal
           open={attendeesModal.open}
           onClose={() => setAttendeesModal({ open: false, item: null })}
           item={attendeesModal.item}
+          conversationId={activeThread?._convId}
+          currentUserId={user?.id}
           accent="#DC2E73"
-          currentUserId={user ? String(user.id) : null}
           isAdminMode={
             attendeesModal.item && user
               ? String(attendeesModal.item.admin_id) === String(user.id)
               : false
           }
+          onLeaveChat={() => {
+            setJamThreads(prev => prev.filter(t => t.id !== activeThreadId))
+            setActiveThreadId(null)
+          }}
+          onLeaveJam={() => {
+            setJamThreads(prev => prev.filter(t => t.id !== activeThreadId))
+            setActiveThreadId(null)
+          }}
         />
       )}
+
+      <DestructiveConfirmSheet
+        open={hideDMConfirm}
+        onClose={() => setHideDMConfirm(false)}
+        onConfirm={handleConfirmHideDM}
+        loading={hidingDM}
+        title="Hide Conversation?"
+        body="This will remove the conversation from your list. The other person won't be affected."
+        confirmLabel="Hide"
+      />
     </div>
   )
 }
