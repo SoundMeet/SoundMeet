@@ -187,6 +187,9 @@ def get_profile(request):
 
         if 'pfp' in request.FILES:
             profile.pfp = request.FILES['pfp']
+        
+        if 'profile_banner' in request.FILES:
+            profile.profile_banner = request.FILES['profile_banner']
 
         profile.save()
 
