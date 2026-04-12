@@ -215,6 +215,7 @@ def get_profile(request):
         'onboarding_complete': profile.onboarding_complete,
         'skill_level': profile.skill_level,
         'pfp': profile.pfp.url if profile.pfp else None,
+        'profile_banner': profile.profile_banner.url if profile.profile_banner else None,
         'country': profile.country,
         'city': profile.city,
         'state': profile.state,
