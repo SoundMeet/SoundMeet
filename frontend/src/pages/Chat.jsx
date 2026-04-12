@@ -12,6 +12,7 @@ import { DestructiveConfirmSheet } from '../components/event-detail/DestructiveC
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { chatService } from '../injectables/chatService'
+import { supabase } from '../injectables/supaBaseClient'
 import { jamService } from '../injectables/jamService'
 import { useToast } from '../context/ToastContext'
 
@@ -72,8 +73,16 @@ const Chat = () => {
   const [isTyping, setIsTyping]             = useState(false)
   // { [jamId]: { adminId: string|null, attendees: JamAttendee[] } }
   const [jamAttendeeCache, setJamAttendeeCache] = useState({})
+  // Conversation ID we intend to open — set as soon as getOrCreateDMChat resolves,
+  // cleared once the thread is visible and selected in the sidebar.
+  const [pendingConvId, setPendingConvId] = useState(null)
 
   const unsubRef = useRef(null)
+  // Prevents Stage A (resolve) from re-running for the same navigation entry.
+  const openDmWithHandledRef = useRef(null)
+  // Holds minimal target info so Stage B can synthesise the thread even if the
+  // initial conversation load query ran before the DB restore completed.
+  const pendingDmTargetRef = useRef(null)
 
   // ─── Current user normalised for chat components ──────────────────────────
   const chatCurrentUser = isLoggedIn && user
@@ -150,6 +159,7 @@ const Chat = () => {
               memberCount: participants.length,
               onlineCount: 0,
               jamId: String(conv.jam_id),
+              unread: conv.unreadCount ?? 0,
               lastMessage,
             })
           } else {
@@ -175,7 +185,7 @@ const Chat = () => {
               _convId: conv.id,
               type: 'dm',
               participantId: otherUserId,
-              unread: 0,
+              unread: conv.unreadCount ?? 0,
               lastMessage,
             })
           }
@@ -218,10 +228,27 @@ const Chat = () => {
           }, {})
         )
 
+        // Sort helper: newest lastMessage.isoTimestamp first, no-message threads last.
+        const byLastMsg = (a, b) => {
+          const ta = a.lastMessage?.isoTimestamp ?? ''
+          const tb = b.lastMessage?.isoTimestamp ?? ''
+          return tb < ta ? -1 : tb > ta ? 1 : 0
+        }
+
         if (!cancelled) {
-          setDmThreads(dedupedDms)
-          setJamThreads(jams)
-          setChatUsers(Object.values(usersMap))
+          setDmThreads([...dedupedDms].sort(byLastMsg))
+          setJamThreads([...jams].sort(byLastMsg))
+          // Merge rather than replace: freshly fetched DB profiles take precedence,
+          // but preserve any user already in state that is not in this batch —
+          // e.g. a DM target whose conversation was hidden and therefore excluded
+          // from getUserConversations. Without this, Stage A's profile injection
+          // is wiped and the chat header falls back to "?".
+          setChatUsers((prev) => {
+            const merged = {}
+            for (const u of prev) merged[u.id] = u
+            for (const [id, u] of Object.entries(usersMap)) merged[id] = u
+            return Object.values(merged)
+          })
         }
       })
       .catch((err) => {
@@ -235,54 +262,199 @@ const Chat = () => {
       })
 
     return () => { cancelled = true }
-  }, [isLoggedIn, user?.id]) 
+  }, [isLoggedIn, user?.id])
   // ---------------------------------------------------------
 
 
-  // ─── Auto-open or create DM when navigated from Friends page ─────────────
+  // ─── Subscription A: participant row updates → unread badge ───────────────
+  // Fires when the trigger increments unread_count for this user (message
+  // arrived in a conversation they are not currently viewing) or when
+  // mark-as-read zeroes it on another device/tab.
+  //
+  // Subscription B: conversation row updates → preview + list reorder
+  // Fires when last_message_at changes (trigger ran after a new message).
+  // The backend value is authoritative — we patch lastMessage.isoTimestamp
+  // and re-sort both thread arrays so the list order matches the DB.
+  useEffect(() => {
+    if (!isLoggedIn || !user?.id) return
+
+    const allConvIds = [...dmThreads, ...jamThreads].map(t => t._convId).filter(Boolean)
+    if (allConvIds.length === 0) return
+
+    // ── Subscription A ────────────────────────────────────────────────────────
+    const subA = supabase
+      .channel(`unread_badges_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',
+          schema: 'public',
+          table:  'chat_conversation_participants',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const { conversation_id, unread_count } = payload.new
+          const convId = String(conversation_id)
+          setDmThreads(prev => prev.map(t =>
+            String(t._convId) === convId ? { ...t, unread: unread_count ?? 0 } : t
+          ))
+          setJamThreads(prev => prev.map(t =>
+            String(t._convId) === convId ? { ...t, unread: unread_count ?? 0 } : t
+          ))
+        }
+      )
+      .subscribe()
+
+    // ── Subscription B ────────────────────────────────────────────────────────
+    const subB = supabase
+      .channel(`conv_summary_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',
+          schema: 'public',
+          table:  'chat_conversation',
+          filter: `id=in.(${allConvIds.join(',')})`,
+        },
+        (payload) => {
+          const { id, last_message_at } = payload.new
+          if (!last_message_at) return
+          const convId = String(id)
+          const patchThread = t => String(t._convId) === convId
+            ? { ...t, lastMessage: { ...(t.lastMessage ?? {}), isoTimestamp: last_message_at } }
+            : t
+          setDmThreads(prev => {
+            const patched = prev.map(patchThread)
+            return [...patched].sort((a, b) => {
+              const ta = a.lastMessage?.isoTimestamp ?? ''
+              const tb = b.lastMessage?.isoTimestamp ?? ''
+              return tb < ta ? -1 : tb > ta ? 1 : 0
+            })
+          })
+          setJamThreads(prev => {
+            const patched = prev.map(patchThread)
+            return [...patched].sort((a, b) => {
+              const ta = a.lastMessage?.isoTimestamp ?? ''
+              const tb = b.lastMessage?.isoTimestamp ?? ''
+              return tb < ta ? -1 : tb > ta ? 1 : 0
+            })
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subA)
+      supabase.removeChannel(subB)
+    }
+  // Re-subscribe when the conversation list changes (new conv added / removed).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, user?.id, dmThreads.length, jamThreads.length])
+  // ---------------------------------------------------------
+
+
+  // ─── Stage A: Resolve the canonical DM conversation id ───────────────────
+  // Starts immediately on navigation — does NOT wait for isLoadingConvs.
+  // Calling getOrCreateDMChat early means the DB restore can race ahead of (or
+  // overlap with) the getUserConversations query that populates dmThreads.
+  // Stage B (below) handles activation once threads are fully hydrated.
   useEffect(() => {
     const target = location.state?.openDmWith
-    if (!target?.id || !isLoggedIn || !user?.id || isLoadingConvs) return
+    if (!target?.id || !isLoggedIn || !user?.id) return
 
-    const existing = dmThreads.find(
-      (t) => String(t.participantId) === String(target.id)
+    // One resolve per navigation entry — location.key is unique per push/replace.
+    const handledKey = `${location.key}:${user.id}:${target.id}`
+    if (openDmWithHandledRef.current === handledKey) return
+    openDmWithHandledRef.current = handledKey
+
+    // Clear any stale pending intent from a previous navigation.
+    setPendingConvId(null)
+    pendingDmTargetRef.current = null
+
+    // Store target profile so Stage B can synthesise the thread without relying
+    // on location.state being available later.
+    // FriendListItem sends camelCase keys (displayName, avatarUrl).
+    // Support both spellings so the profile resolves on every navigation path.
+    const targetProfile = {
+      id: String(target.id),
+      name: target.displayName || target.display_name || target.username || `User #${target.id}`,
+      avatar: formatAvatarUrl(target.avatarUrl ?? target.pfp ?? null),
+    }
+    pendingDmTargetRef.current = targetProfile
+
+    // Ensure the friend's profile is available for name/avatar rendering.
+    setChatUsers((prev) =>
+      prev.some((u) => u.id === targetProfile.id)
+        ? prev
+        : [...prev, { ...targetProfile, status: 'offline' }]
     )
 
-    if (existing) {
-      setActiveThreadId(existing.id)
+    // Quick path: if the DM is already visible in the loaded thread list we can
+    // skip the round-trip and signal Stage B directly.
+    const existingThread = dmThreads.find(
+      (t) => String(t.participantId) === String(target.id)
+    )
+    if (existingThread) {
+      setPendingConvId(existingThread._convId)
       return
     }
 
+    // Slow path: resolve (find / restore / create) against the database.
     chatService.getOrCreateDMChat(user.id, target.id)
       .then((convId) => {
-        const threadId = `c_${convId}`
-        const newThread = {
-          id: threadId,
-          _convId: convId,
-          type: 'dm',
-          participantId: String(target.id),
-          unread: 0,
-        }
-        const newUser = {
-          id: String(target.id),
-          name: target.display_name || target.username || `User #${target.id}`,
-          avatar: formatAvatarUrl(target.pfp),
-          status: 'offline',
-        }
-        setDmThreads((prev) => {
-          if (prev.some((t) => t.id === threadId)) return prev
-          return [...prev, newThread]
-        })
-        setChatUsers((prev) => {
-          if (prev.some((u) => u.id === newUser.id)) return prev
-          return [...prev, newUser]
-        })
-        setActiveThreadId(threadId)
+        setPendingConvId(convId)
       })
       .catch((err) => {
-        console.error('[Chat] Failed to open DM with friend:', err)
+        console.error('[Chat] Failed to resolve DM with friend:', err)
+        pendingDmTargetRef.current = null
       })
-  }, [location.state, isLoggedIn, user?.id, isLoadingConvs, dmThreads])
+  // dmThreads is a snapshot used for the quick-path only — we intentionally
+  // do NOT add it to deps so this effect fires exactly once per navigation entry.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, location.key, isLoggedIn, user?.id])
+
+  // ─── Stage B: Activate the resolved conversation after threads hydrate ────
+  // Runs whenever pendingConvId, dmThreads, or isLoadingConvs changes.
+  // Separating "resolve" from "activate" means Stage A never races with the
+  // initial conversation load — activation simply waits until dmThreads is ready.
+  useEffect(() => {
+    if (!pendingConvId || isLoadingConvs) return
+
+    const threadId = `c_${pendingConvId}`
+
+    // Happy path: the thread is already in the loaded list.
+    const thread = dmThreads.find((t) => t._convId === pendingConvId)
+    if (thread) {
+      setActiveThreadId(thread.id)
+      setPendingConvId(null)
+      pendingDmTargetRef.current = null
+      return
+    }
+
+    // Recovery path: getUserConversations ran before the DB restore completed
+    // (left_at was still set at query time), so the thread was excluded from the
+    // initial load. We synthesise it from the stored target info and add it.
+    const pending = pendingDmTargetRef.current
+    if (!pending) return
+
+    const newThread = {
+      id: threadId,
+      _convId: pendingConvId,
+      type: 'dm',
+      participantId: pending.id,
+      unread: 0,
+      lastMessage: null,
+    }
+    setDmThreads((prev) => {
+      // Remove any stale entry for this participant, then add the canonical one.
+      const withoutStale = prev.filter((t) => t.participantId !== pending.id)
+      if (withoutStale.some((t) => t._convId === pendingConvId)) return prev
+      return [...withoutStale, newThread]
+    })
+    setActiveThreadId(threadId)
+    setPendingConvId(null)
+    pendingDmTargetRef.current = null
+  }, [pendingConvId, dmThreads, isLoadingConvs])
 
   // ─── Auto-open jam chat when navigated from the jam detail modal ──────────
   useEffect(() => {
@@ -307,6 +479,20 @@ const Chat = () => {
     let cancelled = false
     setIsLoadingMsgs(true)
 
+    // Debounce timer for mark-as-read while thread stays active.
+    // We do NOT call markConversationRead on every incoming message —
+    // instead we debounce so multi-tab/device churn is minimal.
+    let markReadTimer = null
+    const scheduleMarkRead = (latestId) => {
+      clearTimeout(markReadTimer)
+      markReadTimer = setTimeout(() => {
+        if (!cancelled && user?.id && latestId) {
+          chatService.markConversationRead(thread._convId, user.id, latestId)
+            .catch(err => console.error('[Chat] markConversationRead failed:', err))
+        }
+      }, 1500)
+    }
+
     chatService.getMessages(thread._convId)
       .then((rows) => {
         if (cancelled) return
@@ -314,6 +500,18 @@ const Chat = () => {
           ...prev,
           [activeThreadId]: rows.map(normalizeMessage),
         }))
+        // Zero out the badge immediately in local state for instant feedback,
+        // then commit to DB via debounced write.
+        if (rows.length > 0) {
+          const latestId = rows[rows.length - 1].id
+          setDmThreads(prev => prev.map(t =>
+            t.id === activeThreadId ? { ...t, unread: 0 } : t
+          ))
+          setJamThreads(prev => prev.map(t =>
+            t.id === activeThreadId ? { ...t, unread: 0 } : t
+          ))
+          scheduleMarkRead(latestId)
+        }
       })
       .catch((err) => {
         console.error('[Chat] Failed to load messages:', err)
@@ -341,14 +539,17 @@ const Chat = () => {
       setJamThreads(prev => prev.map(t =>
         t.id === activeThreadId ? { ...t, lastMessage } : t
       ))
+      // Debounce mark-as-read for messages arriving while thread is active.
+      scheduleMarkRead(newRow.id)
     })
 
     return () => {
       cancelled = true
+      clearTimeout(markReadTimer)
       unsubRef.current?.()
       unsubRef.current = null
     }
-  }, [activeThreadId, isLoggedIn]) 
+  }, [activeThreadId, isLoggedIn])
 
   useEffect(() => () => unsubRef.current?.(), [])
 
@@ -419,6 +620,26 @@ const Chat = () => {
     if (!thread?._convId) return
 
     setSendError(null)
+
+    // Optimistic bump: move this conversation to the top immediately so the
+    // sender sees instant feedback. Subscription B will confirm with the
+    // authoritative last_message_at from the DB — if they differ, the
+    // realtime event wins and corrects the order.
+    const optimisticTs = new Date().toISOString()
+    const optimisticLast = { senderId: String(user.id), content: text, isoTimestamp: optimisticTs }
+    const bumpToTop = (threads) => {
+      const updated = threads.map(t =>
+        t.id === activeThreadId ? { ...t, lastMessage: optimisticLast } : t
+      )
+      return [...updated].sort((a, b) => {
+        const ta = a.lastMessage?.isoTimestamp ?? ''
+        const tb = b.lastMessage?.isoTimestamp ?? ''
+        return tb < ta ? -1 : tb > ta ? 1 : 0
+      })
+    }
+    setDmThreads(bumpToTop)
+    setJamThreads(bumpToTop)
+
     try {
       await chatService.sendMessage(thread._convId, user.id, text)
     } catch (err) {
@@ -598,7 +819,16 @@ const Chat = () => {
           </div>
         )}
 
-        {!activeThread && !isLoadingConvs && (
+        {!activeThread && !isLoadingConvs && pendingConvId && (
+          // A conversation is resolved but Stage B hasn't activated it yet
+          // (threads still hydrating or being synthesised). Show a spinner
+          // instead of the empty state to avoid a misleading flash.
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+          </div>
+        )}
+
+        {!activeThread && !isLoadingConvs && !pendingConvId && (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
             <div
               className="flex items-center justify-center rounded-2xl"
@@ -711,9 +941,9 @@ const Chat = () => {
         onClose={() => setHideDMConfirm(false)}
         onConfirm={handleConfirmHideDM}
         loading={hidingDM}
-        title="Hide Conversation?"
+        title="Delete Conversation?"
         body="This will remove the conversation from your list. The other person won't be affected."
-        confirmLabel="Hide"
+        confirmLabel="Delete"
       />
     </div>
   )

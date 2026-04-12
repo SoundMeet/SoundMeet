@@ -109,7 +109,9 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
     subInfo    = `${thread.memberCount} members · ${thread.onlineCount} online`
   } else if (thread?.type === 'dm') {
     participant = (users || []).find((u) => u.id === thread.participantId)
-    threadName  = participant?.name || ''
+    // Fallback chain: resolved name → 'Direct Message' (never '')
+    // An empty string would cause FallbackAvatar to render '?' which looks broken.
+    threadName  = participant?.name || 'Direct Message'
     const s     = participant?.status
     subInfo     = s === 'online' ? 'Online' : s === 'away' ? 'Away' : 'Offline'
   }
@@ -270,7 +272,7 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
           </>
         )}
 
-        {/* DM: kebab menu → Hide Conversation */}
+        {/* DM: kebab menu → Delete Conversation */}
         {!isJam && onHideDM && (
           <button
             onClick={(e) => { e.stopPropagation(); onHideDM() }}
