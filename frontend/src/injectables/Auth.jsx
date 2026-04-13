@@ -96,6 +96,7 @@ export function AuthProvider({ children }) {
     if (data.city !== undefined)                form.append("city", data.city);
     if (data.state !== undefined)               form.append("state", data.state);
     if (data.onboarding_complete !== undefined) form.append("onboarding_complete", String(data.onboarding_complete));
+    if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
     // Music links
     if (data.spotify !== undefined)             form.append("spotify", data.spotify);
     if (data.soundcloud !== undefined)          form.append("soundcloud", data.soundcloud);

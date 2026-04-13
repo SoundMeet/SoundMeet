@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom"
+import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { useEffect } from "react"
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -46,6 +46,8 @@ const OnboardingGuard = ({ children }) => {
 
 const App = () => {
   const { isLoading } = useAuth()
+  const location = useLocation()
+  const isProfile = location.pathname.startsWith('/profile')
 
   // Prevent a flash of unauthenticated UI while the session is being restored
   if (isLoading) {
@@ -61,7 +63,7 @@ const App = () => {
       <NotificationsProvider>
         <AuthModalProvider>
           <div className='bg-linear-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
-            <div className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur">
+            <div className={`sticky top-0 z-50 backdrop-blur ${isProfile ? "bg-neutral-900/80" : ""}`}>
               <Navbar />
             </div>
           <div className="pb-[60px] md:pb-0">

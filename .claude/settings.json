@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm ls:*)",
       "Bash(ssh -T git@github.com)",
-      "Read(//c/Users/galag/.ssh/**)"
+      "Read(//c/Users/galag/.ssh/**)",
+      "Bash(python manage.py showmigrations chat)"
     ]
   }
 }

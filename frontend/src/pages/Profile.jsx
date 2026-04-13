@@ -9,6 +9,7 @@ import CropperThings from "../components/CropperThings";
 import { useAuth } from "../injectables/Auth";
 import { useAuthModal } from "../context/AuthModalContext";
 import { formatAvatarUrl } from "../utils/formatAvatarUrl";
+import { useFriends } from "../context/FriendsContext";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_SNIPPETS = 5;
@@ -461,6 +462,7 @@ const Profile = () => {
   const { username: routeUsername } = useParams();
   const { user: loggedInUser, isLoggedIn, updateProfile } = useAuth();
   const { openModal } = useAuthModal();
+  const { friends } = useFriends();
 
   // viewedUser — the profile being displayed. Starts as the logged-in user,
   // then gets replaced by the fetched profile when viewing someone else.
@@ -510,6 +512,13 @@ const Profile = () => {
 
   // ── Add Friend state — only relevant when viewing someone else's profile ──
   const [friendStatus, setFriendStatus] = useState("none"); // "none" | "pending" | "friends"
+
+  // Seed friendStatus from the already-loaded friends list in FriendsContext
+  useEffect(() => {
+    if (isOwnProfile || !viewedUser?.user_id) return;
+    const isFriend = friends.some((f) => String(f.id) === String(viewedUser.user_id));
+    setFriendStatus(isFriend ? "friends" : "none");
+  }, [friends, viewedUser?.user_id, isOwnProfile]);
 
   const handleAddFriend = () => {
     if (!isLoggedIn) { openModal("login"); return; }
@@ -615,11 +624,16 @@ const Profile = () => {
     if (user.profile_banner) setBanner(formatAvatarUrl(user.profile_banner));
 
     // Seed pills from genres, instruments, and vibes — color stable per tag.id
+    // Supabase (viewedUser) returns flattened arrays as .genres/.instruments/.vibes
+    // Django (loggedInUser) returns them as .genres_liked/.instruments_liked/.vibes_liked
     const colors = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
+    const genresList      = (user.genres      ?? user.genres_liked      ?? []).filter(t => t?.id && t?.name);
+    const instrumentsList = (user.instruments ?? user.instruments_liked ?? []).filter(t => t?.id && t?.name);
+    const vibesList       = (user.vibes       ?? user.vibes_liked       ?? []).filter(t => t?.id && t?.name);
     const userTags = [
-      ...(user.genres_liked ?? []).filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `g_${t.id}` })),
-      ...(user.instruments_liked ?? []).filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `i_${t.id}` })),
-      ...(user.vibes_liked ?? []).filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `v_${t.id}` })),
+      ...genresList.map(t => ({ ...t, uid: `g_${t.id}` })),
+      ...instrumentsList.map(t => ({ ...t, uid: `i_${t.id}` })),
+      ...vibesList.map(t => ({ ...t, uid: `v_${t.id}` })),
     ];
     if (userTags.length > 0) {
       setPills(userTags.map((tag) => ({
@@ -745,15 +759,18 @@ const Profile = () => {
   // ── Jams state — fetched from jamService, capped at 9, local-only removal ──
   const [jams, setJams] = useState([]);
   const [jamsLoading, setJamsLoading] = useState(true);
+  const [hostedJamsCount, setHostedJamsCount] = useState(0);
 
   useEffect(() => {
-    if (!user?.id) return;
+    const jamUserId = isOwnProfile ? loggedInUser?.id : viewedUser?.user_id;
+    if (!jamUserId) return;
     setJamsLoading(true);
     Promise.all([
-      jamService.getMyAttendingJams(user.id, null),
-      jamService.getMyCreatedJams(user.id, null),
+      jamService.getMyAttendingJams(jamUserId, null),
+      jamService.getMyCreatedJams(jamUserId, null),
     ])
       .then(([attending, created]) => {
+        setHostedJamsCount(created.length);
         const seen = new Set();
         const merged = [...attending, ...created].filter((j) => {
           if (seen.has(j.id)) return false;
@@ -766,7 +783,7 @@ const Profile = () => {
       })
       .catch(console.error)
       .finally(() => setJamsLoading(false));
-  }, [user?.id]);
+  }, [isOwnProfile, loggedInUser?.id, viewedUser?.user_id]);
 
   const removeJam = (jamId) => setJams((prev) => prev.filter((j) => j.id !== jamId));
 
@@ -1469,7 +1486,7 @@ const Profile = () => {
                   {isOwnProfile ? (
                     <button
                       onClick={() => setAvailableToJam(v => !v)}
-                      className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all duration-200"
+                      className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all duration-200 cursor-pointer"
                       style={{
                         background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg,
                         border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}`,
@@ -1943,53 +1960,14 @@ const Profile = () => {
                   <div className="p-5 flex flex-col gap-3">
                     <SectionHeading>Stats</SectionHeading>
                     <div className="flex flex-col gap-2">
-                      <Tile left={<><span style={{marginRight:6}}>🎸</span>Total Jams</>}  right={totalJams}    accent={true} />
-                      <Tile left={<><span style={{marginRight:6}}>🔴</span>Live now</>}    right={liveJams}     accent={false} />
-                      <Tile left={<><span style={{marginRight:6}}>📅</span>Upcoming</>}    right={upcomingJams} accent={false} />
+                      <Tile left={<><span style={{marginRight:6}}>🎸</span>Total Jams</>}   right={totalJams}        accent={true} />
+                      <Tile left={<><span style={{marginRight:6}}>🔴</span>Live now</>}     right={liveJams}         accent={false} />
+                      <Tile left={<><span style={{marginRight:6}}>📅</span>Upcoming</>}     right={upcomingJams}     accent={false} />
+                      <Tile left={<><span style={{marginRight:6}}>🎤</span>Hosted</>}       right={hostedJamsCount}  accent={false} />
+                      <Tile left={<><span style={{marginRight:6}}>⭐</span>Skill Level</>} right={user?.skill_level || "—"} accent={false} />
                     </div>
                   </div>
 
-                  {/* ── ADD FRIEND — only visible on other people's profiles ── */}
-                  {!isOwnProfile && (
-                    <div className="p-5 mt-auto">
-                      {friendStatus === "friends" ? (
-                        <div className="w-full rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2"
-                          style={{ background: "rgba(22,163,74,0.15)", border: "1px solid rgba(22,163,74,0.35)", color: "#4ade80" }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                            <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          Friends
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleAddFriend}
-                          disabled={friendStatus === "pending"}
-                          className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 group relative overflow-hidden"
-                          style={{
-                            background: friendStatus === "pending" ? "rgba(202,138,4,0.12)" : "rgba(220,46,115,0.12)",
-                            border: friendStatus === "pending" ? "1px solid rgba(202,138,4,0.30)" : "1px solid rgba(220,46,115,0.30)",
-                            color: friendStatus === "pending" ? "#ca8a04" : "#DC2E73",
-                            boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.15)" : "none",
-                            cursor: friendStatus === "pending" ? "default" : "pointer",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (friendStatus !== "none") return;
-                            e.currentTarget.style.background = "rgba(220,46,115,0.22)";
-                            e.currentTarget.style.boxShadow = "0 0 28px rgba(220,46,115,0.35)";
-                            e.currentTarget.style.transform = "translateY(-1px)";
-                          }}
-                          onMouseLeave={(e) => {
-                            if (friendStatus !== "none") return;
-                            e.currentTarget.style.background = "rgba(220,46,115,0.12)";
-                            e.currentTarget.style.boxShadow = "0 0 20px rgba(220,46,115,0.15)";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          {friendStatus === "pending" ? "✓ Sent" : "+ Add Friend"}
-                        </button>
-                      )}
-                    </div>
-                  )}
 
                 </div>
               </div>
