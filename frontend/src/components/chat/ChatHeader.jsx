@@ -106,20 +106,13 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
 
   if (isJam) {
     threadName = thread.name
-    subInfo    = `${thread.memberCount} members · ${thread.onlineCount} online`
+    subInfo    = `${thread.memberCount} members`
   } else if (thread?.type === 'dm') {
     participant = (users || []).find((u) => u.id === thread.participantId)
     // Fallback chain: resolved name → 'Direct Message' (never '')
     // An empty string would cause FallbackAvatar to render '?' which looks broken.
     threadName  = participant?.name || 'Direct Message'
-    const s     = participant?.status
-    subInfo     = s === 'online' ? 'Online' : s === 'away' ? 'Away' : 'Offline'
   }
-
-  const statusDotColor =
-    participant?.status === 'online' ? '#22C55E' :
-    participant?.status === 'away'   ? '#F7C10D' :
-    'rgba(229,226,225,0.25)'
 
   return (
     <div
@@ -198,30 +191,20 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
             }
           </div>
 
-          {/* Status / member count */}
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {!isJam && (
+          {/* Member count / thread info */}
+          {subInfo && (
+            <div className="mt-0.5">
               <span
                 style={{
-                  display:         'inline-block',
-                  width:           6,
-                  height:          6,
-                  borderRadius:    '50%',
-                  backgroundColor: statusDotColor,
-                  flexShrink:      0,
+                  fontSize:      '0.68rem',
+                  color:         'rgba(229,226,225,0.38)',
+                  letterSpacing: '0.02em',
                 }}
-              />
-            )}
-            <span
-              style={{
-                fontSize:      '0.68rem',
-                color:         'rgba(229,226,225,0.38)',
-                letterSpacing: '0.02em',
-              }}
-            >
-              {subInfo}
-            </span>
-          </div>
+              >
+                {subInfo}
+              </span>
+            </div>
+          )}
 
           {/* Participant chips — jam chats only, shown once attendee data is available */}
           {isJam && (

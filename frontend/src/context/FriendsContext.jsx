@@ -31,7 +31,6 @@ function normalizeFriend(rawUser) {
     displayName: profile?.display_name || rawUser.username || 'Unknown',
     avatarUrl: formatAvatarUrl(profile?.pfp) || null,
     instruments: [],
-    isOnline: false,
   }
 }
 
@@ -315,7 +314,6 @@ export function FriendsProvider({ children }) {
             displayName: user.displayName,
             avatarUrl: user.avatarUrl,
             instruments: user.instruments,
-            isOnline: user.isOnline,
             lastActive: new Date().toISOString(),
           },
         ])

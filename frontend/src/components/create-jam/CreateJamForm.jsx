@@ -128,13 +128,15 @@ const Stepper = ({ value, onChange }) => {
  * CreateJamForm — owns all form state and step navigation.
  *
  * Props:
- *   options       CreateJamOptionSets  — provided by CreateJamModal via useFormOptions()
- *   onClose       () => void
- *   initialValues object?              — pre-fills form for edit mode
+ *   options        CreateJamOptionSets  — provided by CreateJamModal via useFormOptions()
+ *   onClose        () => void
+ *   onJamCreated   (jamId: string, title: string, isPrivate: boolean) => void  — create mode only
+ *   initialValues  object?              — pre-fills form for edit mode
  */
 const CreateJamForm = ({
   options,
   onClose,
+  onJamCreated,
   initialValues,
 }) => {
   const isEditMode = !!initialValues;
@@ -263,10 +265,15 @@ const CreateJamForm = ({
     try {
       if (isEditMode) {
         await jamService.updateJam(initialValues.jamId, form);
+        onClose();
       } else {
-        await jamService.createJam(form, user.id);
+        const result = await jamService.createJam(form, user.id);
+        if (onJamCreated) {
+          onJamCreated(String(result.jam_id), form.title, form.isPrivate);
+        } else {
+          onClose();
+        }
       }
-      onClose();
     } catch (err) {
       console.error("Create jam failed:", err);
       setSubmitError("Something went wrong. Please try again.");

@@ -24,27 +24,6 @@ function FallbackAvatar({ name, size }) {
   )
 }
 
-// ─── Inline presence dot for DM avatar corner ────────────────────────────────
-function PresencePip({ status }) {
-  if (!status || status === 'offline') return null
-  const color = status === 'online' ? '#22C55E' : '#F7C10D'
-  return (
-    <div
-      style={{
-        position:        'absolute',
-        bottom:          0,
-        right:           0,
-        width:           9,
-        height:          9,
-        borderRadius:    '50%',
-        backgroundColor: color,
-        border:          '1.5px solid rgba(15,15,15,0.9)',
-        boxShadow:       status === 'online' ? '0 0 4px rgba(34,197,94,0.5)' : 'none',
-      }}
-    />
-  )
-}
-
 // ─── Format timestamp for sidebar (WhatsApp-style) ───────────────────────────
 function formatListTime(isoTimestamp) {
   if (!isoTimestamp) return null
@@ -123,14 +102,6 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
       : null
     const previewIsInvite = !isOwn && previewResult?.isInvite
 
-    const statusColor =
-      participant.status === 'online' ? 'rgba(34,197,94,0.75)' :
-      participant.status === 'away'   ? 'rgba(247,193,13,0.75)' :
-      'rgba(229,226,225,0.3)'
-    const statusLabel =
-      participant.status === 'online' ? 'Online' :
-      participant.status === 'away'   ? 'Away'   : 'Offline'
-
     return (
       <div className="relative">
         <div
@@ -144,8 +115,8 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
           onTouchMove={cancelPress}
           onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true) }}
         >
-          {/* Avatar with presence pip */}
-          <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
+          {/* Avatar */}
+          <div className="flex-shrink-0" style={{ width: 36, height: 36 }}>
             {participant.avatar ? (
               <img
                 src={participant.avatar}
@@ -156,7 +127,6 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
             ) : (
               <FallbackAvatar name={participant.name} size={36} />
             )}
-            <PresencePip status={participant.status} />
           </div>
 
           {/* Name + preview (or status fallback) */}
@@ -171,21 +141,21 @@ const ChatListItem = ({ item, isActive, onClick, onHide, users, currentUserId })
             >
               {participant.name}
             </div>
-            <div
-              className="truncate leading-tight mt-0.5"
-              style={{
-                fontSize: '0.69rem',
-                color: previewIsInvite
-                  ? 'rgba(220,46,115,0.75)'
-                  : item.unread > 0
-                    ? 'rgba(229,226,225,0.75)'
-                    : previewLabel
-                      ? 'rgba(229,226,225,0.4)'
-                      : statusColor,
-              }}
-            >
-              {previewLabel ?? statusLabel}
-            </div>
+            {previewLabel && (
+              <div
+                className="truncate leading-tight mt-0.5"
+                style={{
+                  fontSize: '0.69rem',
+                  color: previewIsInvite
+                    ? 'rgba(220,46,115,0.75)'
+                    : item.unread > 0
+                      ? 'rgba(229,226,225,0.75)'
+                      : 'rgba(229,226,225,0.4)',
+                }}
+              >
+                {previewLabel}
+              </div>
+            )}
           </div>
 
           {/* Right column: time + unread badge */}
