@@ -149,7 +149,7 @@ function SectionLabel({ count }) {
 // ─── Friend result row ────────────────────────────────────────────────────────
 
 function FriendRow({ friend, onClick }) {
-  const { displayName, username, avatarUrl, isOnline } = friend
+  const { displayName, username, avatarUrl } = friend
 
   return (
     <button
@@ -159,13 +159,9 @@ function FriendRow({ friend, onClick }) {
       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      {/* Avatar + online dot */}
-      <div className="relative flex-shrink-0">
+      {/* Avatar */}
+      <div className="flex-shrink-0">
         <Avatar src={avatarUrl} name={displayName} size={36} />
-        {isOnline && (
-          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 block"
-            style={{ boxShadow: '0 0 0 1.5px rgba(18,18,20,0.96)' }} />
-        )}
       </div>
 
       {/* Name + handle */}
@@ -178,9 +174,6 @@ function FriendRow({ friend, onClick }) {
             </span>
           )}
         </div>
-        {isOnline && (
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(52,211,153,0.6)' }}>Online</p>
-        )}
       </div>
 
       {/* Arrow hint */}

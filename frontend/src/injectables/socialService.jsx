@@ -196,7 +196,6 @@ export const socialService = {
       instruments: (p.instruments_liked || []).map((l) => l.instrument?.name).filter(Boolean),
       genres: (p.genres_liked || []).map((l) => l.genre?.name).filter(Boolean),
       vibes: (p.vibes_liked || []).map((l) => l.vibe?.name).filter(Boolean),
-      isOnline: false,
       relationshipStatus: 'none',
     }));
   },

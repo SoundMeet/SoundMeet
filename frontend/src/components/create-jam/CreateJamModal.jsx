@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import CreateJamForm from "./CreateJamForm";
+import JamCreatedSheet from "./JamCreatedSheet";
 import { useFormOptions } from "../../hooks/useFormOptions";
 
 /**
@@ -10,6 +12,7 @@ import { useFormOptions } from "../../hooks/useFormOptions";
  *   - Modal open/close lifecycle (overlay, portal, ESC handling)
  *   - Animated entrance / exit
  *   - Form reset on close (delegated to CreateJamForm via key prop)
+ *   - Post-create success state (JamCreatedSheet) when jam is created
  *
  * This component intentionally has no form state — it is purely a
  * presentational shell. All form logic lives in CreateJamForm.
@@ -28,6 +31,21 @@ const CreateJamModal = ({
   initialValues,
 }) => {
   const { options, isLoading } = useFormOptions()
+  const [phase, setPhase]           = useState('form')  // 'form' | 'created'
+  const [createdJam, setCreatedJam] = useState(null)    // { id, title, isPrivate }
+
+  // Reset success state whenever the modal re-opens
+  useEffect(() => {
+    if (open) {
+      setPhase('form')
+      setCreatedJam(null)
+    }
+  }, [open])
+
+  const handleJamCreated = (jamId, title, isPrivate) => {
+    setCreatedJam({ id: jamId, title, isPrivate })
+    setPhase('created')
+  }
   return (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
@@ -95,14 +113,43 @@ const CreateJamModal = ({
            * Using `open` as the key unmounts + remounts the form on each open,
            * giving a clean slate without managing reset logic in the form.
            */}
-          {!isLoading && options && (
-            <CreateJamForm
-              key={open ? "open" : "closed"}
-              options={options}
-              onClose={() => onOpenChange(false)}
-              initialValues={initialValues}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {phase === 'created' && createdJam ? (
+              <motion.div
+                key="created"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                <JamCreatedSheet
+                  jamId={createdJam.id}
+                  jamTitle={createdJam.title}
+                  isPrivate={createdJam.isPrivate}
+                  onClose={() => onOpenChange(false)}
+                />
+              </motion.div>
+            ) : (
+              !isLoading && options && (
+                <motion.div
+                  key="form"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+                >
+                  <CreateJamForm
+                    key={open ? "open" : "closed"}
+                    options={options}
+                    onClose={() => onOpenChange(false)}
+                    onJamCreated={handleJamCreated}
+                    initialValues={initialValues}
+                  />
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
         </motion.div>
       </Dialog.Content>
     </Dialog.Portal>

@@ -146,7 +146,7 @@ function ActionBtn({ label, accent = false, onClick }) {
 // ─── Result row ───────────────────────────────────────────────────────────────
 
 export function UserSearchResult({ user, activeQuery }) {
-  const { id, displayName, username, avatarUrl, instruments, genres, vibes, isOnline, relationshipStatus } = user
+  const { id, displayName, username, avatarUrl, instruments, genres, vibes, relationshipStatus } = user
   const navigate = useNavigate()
 
   const lq = (activeQuery || '').toLowerCase().trim()
@@ -166,12 +166,8 @@ export function UserSearchResult({ user, activeQuery }) {
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       {/* Avatar */}
-      <div className="relative flex-shrink-0">
+      <div className="flex-shrink-0">
         <Avatar src={avatarUrl} name={displayName} size={36} />
-        {isOnline && (
-          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 block"
-            style={{ boxShadow: '0 0 0 1.5px rgba(18,18,20,0.96)' }} />
-        )}
       </div>
 
       {/* Name + tags */}

@@ -88,7 +88,6 @@ const Chat = () => {
         id: String(user.id),
         name: user.display_name || user.username || 'Me',
         avatar: user.pfp ?? null,
-        status: 'online',
       }
     : null
 
@@ -155,7 +154,6 @@ const Chat = () => {
               name: jamNames[String(conv.jam_id)] ?? `Jam #${conv.jam_id}`,
               active: false,
               memberCount: participants.length,
-              onlineCount: 0,
               jamId: String(conv.jam_id),
               unread: conv.unreadCount ?? 0,
               lastMessage,
@@ -174,7 +172,6 @@ const Chat = () => {
                 id: otherUserId,
                 name: `Loading...`,
                 avatar: null,
-                status: 'offline',
               }
             }
 
@@ -201,7 +198,6 @@ const Chat = () => {
                 id: uid,
                 name: profile.display_name || `User #${uid}`,
                 avatar: formatAvatarUrl(profile.pfp),
-                status: 'offline'
               }
             })
           } catch (err) {
@@ -384,7 +380,7 @@ const Chat = () => {
     setChatUsers((prev) =>
       prev.some((u) => u.id === targetProfile.id)
         ? prev
-        : [...prev, { ...targetProfile, status: 'offline' }]
+        : [...prev, { ...targetProfile }]
     )
 
     // Quick path: if the DM is already visible in the loaded thread list we can

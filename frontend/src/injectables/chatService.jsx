@@ -80,12 +80,21 @@ export const chatService = {
     if (!userIds || userIds.length === 0) return [];
 
     const { data, error } = await supabase
-      .from('chat_profile') 
-      .select('user_id, display_name, pfp')
+      .from('chat_profile')
+      .select(`
+        user_id, display_name, pfp,
+        instruments_liked:chat_profile_instruments_liked (
+          instrument:chat_instrument (name)
+        )
+      `)
       .in('user_id', userIds);
 
     if (error) throw error;
-    return data ?? [];
+
+    return (data ?? []).map((p) => ({
+      ...p,
+      mainInstrument: p.instruments_liked?.[0]?.instrument?.name ?? null,
+    }));
   },
 
   async getOrCreateDMChat(currentUserId, targetUserId) {
