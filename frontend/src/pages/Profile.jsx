@@ -483,7 +483,10 @@ const Profile = () => {
     }
     setViewedUserLoading(true);
     apiService.getProfileById(routeUsername)
-      .then(data => setViewedUser(data))
+    .then(data => {
+  console.log("viewedUser pfp:", data?.pfp);
+  setViewedUser(data);
+    })
       .catch(err => {
         console.error("Failed to load profile:", err);
         setViewedUser(null);
@@ -620,8 +623,8 @@ const Profile = () => {
     setAbout(user.about || "");
     setHeadline(user.headline || "");
     setAvailableToJam(user.available_to_jam ?? false);
-    if (user.pfp) setProfilePic(formatAvatarUrl(user.pfp));
-    if (user.profile_banner) setBanner(formatAvatarUrl(user.profile_banner));
+    setProfilePic(user.pfp ? formatAvatarUrl(user.pfp) : null);
+    setBanner(user.profile_banner ? formatAvatarUrl(user.profile_banner) : null);
 
     // Seed pills from genres, instruments, and vibes — color stable per tag.id
     // Supabase (viewedUser) returns flattened arrays as .genres/.instruments/.vibes
