@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { jamService } from "../../injectables/jamService";
 import { showService } from "../../injectables/showService";
@@ -13,6 +14,7 @@ import { socialService } from "../../injectables/socialService";
 import { formatAvatarUrl } from "../../utils/formatAvatarUrl";
 import { hexToRgba } from "../../utils/discovery";
 import { nameToInitials } from "../../utils/eventComputed";
+import { ProfilesRUS } from "../../services/ProfilesRUS";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -342,7 +344,7 @@ const AttendeeRow = ({
   attendee, adminId, accent,
   isFriend, isYou, isAdminMode, isShow,
   onRemove, isRemoving, confirmingRemove, onConfirmRemove, onCancelRemove,
-  requestSent, onAddFriend, onCancelRequest,
+  requestSent, onAddFriend, onCancelRequest, onOpenProfile,
 }) => {
   const [hoveringRequest, setHoveringRequest] = useState(false);
   const isHost    = String(attendee.userId) === String(adminId);
@@ -364,22 +366,33 @@ const AttendeeRow = ({
       {/* 3-zone row: avatar | content | action */}
       <div className="flex items-start gap-3">
 
-        {/* Zone 1 — avatar */}
-        <AttendeeAvatar
-          name={attendee.displayName}
-          pfp={attendee.pfp}
-          accent={accent}
-          isHost={isHost}
-        />
+        {/* Zone 1 — avatar (clickable to profile) */}
+        <button
+          onClick={() => onOpenProfile?.()}
+          className="flex-shrink-0 transition-opacity hover:opacity-75 active:opacity-60"
+          style={{ background: "none", border: "none", padding: 0, cursor: onOpenProfile ? "pointer" : "default" }}
+          aria-label={`View ${attendee.displayName}'s profile`}
+        >
+          <AttendeeAvatar
+            name={attendee.displayName}
+            pfp={attendee.pfp}
+            accent={accent}
+            isHost={isHost}
+          />
+        </button>
 
         {/* Zone 2 — content */}
         <div className="flex-1 min-w-0">
 
           {/* Name + status badges */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[13px] font-semibold text-white leading-tight">
+            <button
+              onClick={() => onOpenProfile?.()}
+              className="text-[13px] font-semibold text-white leading-tight transition-opacity hover:opacity-75"
+              style={{ background: "none", border: "none", padding: 0, cursor: onOpenProfile ? "pointer" : "default" }}
+            >
               {attendee.displayName}
-            </span>
+            </button>
             {isHost && (
               <Badge color={accent} bg={hexToRgba(accent, 0.13)} border={hexToRgba(accent, 0.2)}>
                 Host
@@ -515,6 +528,7 @@ const AttendeeRow = ({
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 export function ManageAttendeesModal({ open, onClose, item, accent, currentUserId, isAdminMode = true }) {
+  const navigate = useNavigate();
   const isShow = item?.type === "promote_show";
   const [attendees,       setAttendees]       = useState([]);
   const [friendIds,       setFriendIds]       = useState(new Set());
@@ -850,6 +864,7 @@ export function ManageAttendeesModal({ open, onClose, item, accent, currentUserI
                             requestSent={sentRequests.has(String(attendee.userId))}
                             onAddFriend={() => handleAddFriend(attendee.userId)}
                             onCancelRequest={() => handleCancelRequest(attendee.userId)}
+                            onOpenProfile={attendee.profileId ? () => { onClose?.(); ProfilesRUS(navigate, attendee.profileId); } : undefined}
                           />
                         </div>
                       );

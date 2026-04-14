@@ -97,7 +97,7 @@ function ParticipantChips({ participants }) {
 
 // ─── ChatHeader ───────────────────────────────────────────────────────────────
 // participants: derived from jam attendee data; empty array = still loading or DM
-const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick, onMembersClick, onHideDM }) => {
+const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick, onMembersClick, onHideDM, onDmHeaderClick }) => {
   const isJam = thread?.type === 'jam'
 
   let threadName  = ''
@@ -130,18 +130,24 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
       <div
         className={[
           'flex items-center gap-3 min-w-0 flex-1',
-          isJam && onHeaderClick
+          (isJam && onHeaderClick) || (!isJam && onDmHeaderClick)
             ? 'cursor-pointer rounded-xl px-2 py-1 -mx-2 -my-1 transition-colors duration-150 hover:bg-white/5 active:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2E73]/50'
             : '',
         ].join(' ')}
-        role={isJam && onHeaderClick ? 'button' : undefined}
-        tabIndex={isJam && onHeaderClick ? 0 : undefined}
-        aria-label={isJam && onHeaderClick ? `View attendees for ${threadName}` : undefined}
-        onClick={isJam && onHeaderClick ? onHeaderClick : undefined}
+        role={(isJam && onHeaderClick) || (!isJam && onDmHeaderClick) ? 'button' : undefined}
+        tabIndex={(isJam && onHeaderClick) || (!isJam && onDmHeaderClick) ? 0 : undefined}
+        aria-label={
+          isJam && onHeaderClick ? `View attendees for ${threadName}`
+          : !isJam && onDmHeaderClick ? `View ${threadName}'s profile`
+          : undefined
+        }
+        onClick={isJam && onHeaderClick ? onHeaderClick : !isJam && onDmHeaderClick ? onDmHeaderClick : undefined}
         onKeyDown={
           isJam && onHeaderClick
             ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onHeaderClick() } }
-            : undefined
+            : !isJam && onDmHeaderClick
+              ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDmHeaderClick() } }
+              : undefined
         }
       >
         {/* Avatar / jam icon */}
