@@ -8,6 +8,10 @@ import { FaGoogle } from 'react-icons/fa'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 
+const ACCENT_GRAD     = 'linear-gradient(135deg, #DC2E73 0%, #FB4040 100%)'
+const ACCENT_GRAD_DIM = 'linear-gradient(135deg, rgba(220,46,115,0.5) 0%, rgba(251,64,64,0.5) 100%)'
+const ACCENT_GLOW     = 'rgba(220,46,115,0.22)'
+
 const GENDER_OPTIONS = [
   { value: 'MAN',               label: 'Man' },
   { value: 'WOMAN',             label: 'Woman' },
@@ -78,21 +82,23 @@ function CountryDropdown({ value, onChange }) {
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', flex: 1 }}>
-      {/* Trigger */}
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="jam-input w-full flex items-center justify-between"
-        style={{ cursor: 'pointer', textAlign: 'left' }}
+        className="auth-input auth-input-compact"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'pointer', textAlign: 'left', width: '100%',
+        }}
       >
-        <span style={{ color: value ? 'inherit' : 'rgba(255,255,255,0.35)', fontSize: '13px' }}>
+        <span style={{ color: value ? '#f0f0f0' : 'rgba(240,240,240,0.26)', fontSize: '13px' }}>
           {value || 'Country'}
         </span>
         <svg
-          width="11" height="11" viewBox="0 0 24 24" fill="none"
+          width="10" height="10" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2.5"
           style={{
-            opacity: 0.4, flexShrink: 0, marginLeft: 6,
+            opacity: 0.35, flexShrink: 0, marginLeft: 6,
             transform: open ? 'rotate(180deg)' : 'none',
             transition: 'transform 0.2s',
           }}
@@ -101,52 +107,50 @@ function CountryDropdown({ value, onChange }) {
         </svg>
       </button>
 
-      {/* Dropdown — opens UPWARD so it doesn't push the page */}
+      {/* Dropdown — opens upward */}
       {open && (
         <div
           style={{
             position: 'absolute',
-            bottom: 'calc(100% + 6px)',  // upward
+            bottom: 'calc(100% + 6px)',
             left: 0, right: 0,
-            background: '#1a1a1e',
+            background: '#141418',
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: '12px',
             zIndex: 9999,
             overflow: 'hidden',
-            boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
+            boxShadow: '0 -12px 40px rgba(0,0,0,0.6)',
           }}
         >
-          {/* Search */}
-          <div style={{ padding: '7px 7px 4px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ padding: '7px 7px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ position: 'relative' }}>
               <svg
-                width="12" height="12" viewBox="0 0 24 24" fill="none"
+                width="11" height="11" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2"
-                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', opacity: 0.35, pointerEvents: 'none' }}
+                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', opacity: 0.3, pointerEvents: 'none' }}
               >
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
               <input
                 ref={searchRef}
                 type="text"
-                placeholder="Search country..."
+                placeholder="Search country…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 style={{
                   width: '100%', padding: '6px 10px 6px 28px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '8px', color: '#fff', fontSize: '12px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: '8px', color: '#f0f0f0', fontSize: '12px',
                   fontFamily: 'Sora, sans-serif', outline: 'none',
                 }}
               />
             </div>
           </div>
 
-          {/* List */}
           <div style={{ maxHeight: '160px', overflowY: 'auto', scrollbarWidth: 'none' }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '10px', textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.3)', fontFamily: 'Sora, sans-serif' }}>
+              <div style={{ padding: '10px', textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif' }}>
                 No results
               </div>
             ) : (
@@ -159,10 +163,10 @@ function CountryDropdown({ value, onChange }) {
                     width: '100%', textAlign: 'left',
                     padding: '8px 14px', fontSize: '12px',
                     fontFamily: 'Sora, sans-serif',
-                    background: value === country ? 'rgba(220,46,115,0.15)' : 'transparent',
-                    color: value === country ? '#DC2E73' : 'rgba(255,255,255,0.75)',
+                    background: value === country ? 'rgba(251,64,64,0.12)' : 'transparent',
+                    color: value === country ? '#FB4040' : 'rgba(255,255,255,0.72)',
                     border: 'none', cursor: 'pointer',
-                    transition: 'background 0.15s',
+                    transition: 'background 0.12s',
                   }}
                   onMouseEnter={e => { if (value !== country) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
                   onMouseLeave={e => { if (value !== country) e.currentTarget.style.background = 'transparent' }}
@@ -213,66 +217,99 @@ export default function SignupForm() {
     }
   }
 
-  // Compact shared input style — smaller padding so everything fits
-  const compactInput = {
-    padding: '8px 12px',
-    fontSize: '13px',
-  }
-
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
 
-      {/* Google placeholder */}
+      {/* Google button */}
       <button
         type="button"
-        className="w-full flex items-center justify-center gap-2.5 rounded-xl font-medium transition-colors duration-150 hover:bg-white/[0.09] focus:outline-none"
         style={{
-          padding: '8px',
-          background: 'rgba(255,255,255,0.06)',
-          color: 'rgba(255,255,255,0.72)',
-          fontFamily: 'Sora, sans-serif',
-          fontSize: '13px',
+          width: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '10px', padding: '10px',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          color: 'rgba(255,255,255,0.6)',
+          fontSize: '13px', fontFamily: 'Sora, sans-serif', fontWeight: 500,
+          cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
         }}
       >
-        <FaGoogle className="text-sm opacity-70" />
+        <FaGoogle style={{ fontSize: '12px', opacity: 0.65 }} />
         Continue with Google
       </button>
 
       {/* Divider */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1" style={{ height: '1px', background: 'rgba(255,255,255,0.08)' }} />
-        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif' }}>or</span>
-        <div className="flex-1" style={{ height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
+        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.22)', fontFamily: 'Sora, sans-serif', letterSpacing: '0.04em' }}>or</span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
       </div>
 
       {/* Error */}
       {error && (
-        <p style={{ fontSize: '11px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(251,64,64,0.1)', color: '#fb4040', fontFamily: 'Sora, sans-serif' }}>
+        <p style={{
+          fontSize: '12px', padding: '9px 13px', borderRadius: '10px',
+          background: 'rgba(251,64,64,0.08)', border: '1px solid rgba(251,64,64,0.18)',
+          color: '#fb6060', fontFamily: 'Sora, sans-serif', margin: 0,
+        }}>
           {error}
         </p>
       )}
 
-      {/* Required fields */}
-      <input className="jam-input" style={compactInput} type="text"     name="username" placeholder="Username" value={form.username} onChange={handleChange} required autoComplete="username" />
-      <input className="jam-input" style={compactInput} type="email"    name="email"    placeholder="Email"    value={form.email}    onChange={handleChange} required autoComplete="email" />
-      <div className="relative">
-        <input className="jam-input" style={{ ...compactInput, paddingRight: '2.75rem' }} type={showPassword ? 'text' : 'password'} name="password" placeholder="Password" value={form.password} onChange={handleChange} required autoComplete="new-password" />
+      {/* Account fields */}
+      <input
+        className="auth-input auth-input-compact"
+        type="text" name="username" placeholder="Username"
+        value={form.username} onChange={handleChange}
+        required autoComplete="username" aria-label="Username"
+      />
+      <input
+        className="auth-input auth-input-compact"
+        type="email" name="email" placeholder="Email"
+        value={form.email} onChange={handleChange}
+        required autoComplete="email" aria-label="Email"
+      />
+      <div style={{ position: 'relative' }}>
+        <input
+          className="auth-input auth-input-compact"
+          type={showPassword ? 'text' : 'password'}
+          name="password" placeholder="Password"
+          value={form.password} onChange={handleChange}
+          required autoComplete="new-password" aria-label="Password"
+          style={{ paddingRight: '2.75rem' }}
+        />
         <button
           type="button"
           onClick={() => setShowPassword((v) => !v)}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
-          className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors duration-150 focus:outline-none"
-          style={{ color: showPassword ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.28)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = showPassword ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.28)' }}
+          style={{
+            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)',
+            transition: 'color 0.15s', padding: 0, outline: 'none',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.72)' }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)'
+          }}
         >
           {showPassword ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
               <line x1="1" y1="1" x2="23" y2="23"/>
             </svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
@@ -280,20 +317,39 @@ export default function SignupForm() {
         </button>
       </div>
 
+      {/* About you divider */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px', marginBottom: '1px' }}>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+        <span style={{
+          fontSize: '8.5px', fontFamily: 'Sora, sans-serif', fontWeight: 500,
+          letterSpacing: '0.1em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.18)',
+        }}>
+          About you
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+      </div>
+
       {/* Age + Gender */}
       <div style={{ display: 'flex', gap: '10px' }}>
         <input
-          className="jam-input" style={{ ...compactInput, flex: 1 }}
+          className="auth-input auth-input-compact"
+          style={{ flex: 1 }}
           type="number" name="age" placeholder="Age" min="13" max="120"
-          value={form.age} onChange={handleChange}
+          value={form.age} onChange={handleChange} aria-label="Age"
         />
         <select
-          className="jam-input" style={{ ...compactInput, flex: 1, appearance: 'none', cursor: 'pointer' }}
+          className="auth-input auth-input-compact"
+          style={{
+            flex: 1, appearance: 'none', cursor: 'pointer',
+            color: form.gender ? '#f0f0f0' : 'rgba(240,240,240,0.26)',
+          }}
           name="gender" value={form.gender} onChange={handleChange}
+          aria-label="Gender"
         >
-          <option value="" style={{ background: '#121212' }}>Gender</option>
+          <option value="" style={{ background: '#141418' }}>Gender</option>
           {GENDER_OPTIONS.map(o => (
-            <option key={o.value} value={o.value} style={{ background: '#121212' }}>{o.label}</option>
+            <option key={o.value} value={o.value} style={{ background: '#141418' }}>{o.label}</option>
           ))}
         </select>
       </div>
@@ -301,9 +357,10 @@ export default function SignupForm() {
       {/* City + Country */}
       <div style={{ display: 'flex', gap: '10px' }}>
         <input
-          className="jam-input" style={{ ...compactInput, flex: 1 }}
+          className="auth-input auth-input-compact"
+          style={{ flex: 1 }}
           type="text" name="city" placeholder="City"
-          value={form.city} onChange={handleChange}
+          value={form.city} onChange={handleChange} aria-label="City"
         />
         <CountryDropdown
           value={form.country}
@@ -315,27 +372,45 @@ export default function SignupForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl font-semibold transition-all duration-200 focus:outline-none"
         style={{
-          padding: '9px',
-          background: loading ? 'rgba(220,46,115,0.5)' : '#DC2E73',
-          color: '#fff', fontSize: '13px',
-          fontFamily: 'Sora, sans-serif',
-          opacity: loading ? 0.75 : 1,
-          boxShadow: loading ? 'none' : '0 0 20px rgba(220,46,115,0.25)',
-          marginTop: '2px',
+          width: '100%', padding: '11px', marginTop: '2px',
+          background: loading ? ACCENT_GRAD_DIM : ACCENT_GRAD,
+          border: 'none', borderRadius: '12px',
+          color: '#fff', fontSize: '13.5px',
+          fontFamily: 'Sora, sans-serif', fontWeight: 600,
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+          boxShadow: loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}`,
+          transition: 'box-shadow 0.2s ease',
+          letterSpacing: '0.01em',
+        }}
+        onMouseEnter={(e) => {
+          if (!loading) e.currentTarget.style.boxShadow = '0 4px 28px rgba(220,46,115,0.32)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}`
         }}
       >
         {loading ? 'Creating account…' : 'Create account'}
       </button>
 
       {/* Switch to login */}
-      <p style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontFamily: 'Sora, sans-serif' }}>
+      <p style={{
+        textAlign: 'center', fontSize: '12px',
+        color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif',
+        margin: '2px 0 0',
+      }}>
         Already have an account?{' '}
         <button
           type="button"
           onClick={() => switchView('login')}
-          style={{ color: '#DC2E73', fontWeight: 600, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', fontFamily: 'Sora, sans-serif' }}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#FB4040', fontWeight: 600,
+            fontSize: '12px', fontFamily: 'Sora, sans-serif',
+            textDecoration: 'underline', textUnderlineOffset: '2px',
+            padding: 0,
+          }}
         >
           Log in
         </button>
