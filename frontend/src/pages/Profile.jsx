@@ -1,16 +1,67 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { jamService } from "../injectables/jamService";
 import { apiService } from "../injectables/apiCalls";
 import { postService } from "../injectables/postService";
 import { musicSnipService } from "../injectables/musicSnipService";
 import CropperThings from "../components/CropperThings";
+import EventDetailModal from "../components/event-detail/EventDetailModal";
+import { FeedPost } from "../components/friends/FeedPost";
+import { extractEventLink, stripEventLink } from "../utils/eventLinkParser";
+import { EventInviteCard } from "../components/event-invite/EventInviteCard";
 import { useAuth } from "../injectables/Auth";
 import { useAuthModal } from "../context/AuthModalContext";
 import { formatAvatarUrl } from "../utils/formatAvatarUrl";
 import { useFriends } from "../context/FriendsContext";
+import { getDiscoveryAccentColor, hexToRgba, DISCOVERY_VARIANTS } from "../utils/discovery";
+import { ProfileLinksCard, LinksEditSection, HeroLinks } from "../components/profile/ProfileLinksCard";
+import { LINK_PLATFORMS } from "../utils/linkPlatforms";
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Jam card sub-components (mirrors MyJams CompactEventCard style) ───────────
+function JamTypeBadge({ type }) {
+  const variant = DISCOVERY_VARIANTS[type] ?? DISCOVERY_VARIANTS.jam;
+  const color = variant.accentColor;
+  return (
+    <span
+      className="inline-flex items-center text-[9px] font-bold uppercase tracking-[0.14em] px-1.5 py-0.5 rounded"
+      style={{ color, background: hexToRgba(color, 0.14) }}
+    >
+      {variant.label}
+    </span>
+  );
+}
+
+function JamStatusPill({ item }) {
+  const isLive = item?.timeSlot === "live" || item?.isLive;
+  const isCreator = item?.canEdit;
+  const isAttendee = item?.isAttendee;
+  if (isLive) return (
+    <span
+      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+      style={{ color: "#FB4040", background: "rgba(251,64,64,0.12)" }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-[#FB4040] animate-pulse inline-block" />
+      Live
+    </span>
+  );
+  if (isCreator) return (
+    <span
+      className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+      style={{ color: "#DC2E73", background: "rgba(220,46,115,0.10)" }}
+    >
+      Hosting
+    </span>
+  );
+  if (isAttendee) return (
+    <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full text-neutral-400 bg-neutral-800">
+      Going
+    </span>
+  );
+  return null;
+}
 
 const MAX_SNIPPETS = 5;
 const DRAG_DELETE_THRESHOLD = 140;
@@ -142,7 +193,7 @@ const PILL_EMOJI_MAP = {
   house: "🏠", drum: "🥁", bass: "🔊",
   // Instruments
   guitar: "🎸", piano: "🎹", violin: "🎻", drums: "🥁", saxophone: "🎷",
-  trumpet: "🎺", cello: "🎻", bass: "🎸", vocals: "🎤", singing: "🎤",
+  trumpet: "🎺", cello: "🎻", vocals: "🎤", singing: "🎤",
   flute: "🪈", ukulele: "🪕", keyboard: "🎹", synth: "🎛️", harp: "🪗",
   "bass guitar": "🎸", "electric guitar": "🎸", "acoustic guitar": "🪕",
   // Vibes
@@ -159,288 +210,6 @@ function getPillEmoji(text) {
   return "🎵";
 }
 
-// ── InterestsSidebar ──────────────────────────────────────────────────────────
-function InterestsSidebar({ pills, jams, user, city, country, availableToJam, onToggleAvailable, onReorderPills, isOwnProfile, cardColor, textOverride }) {
-  const totalJams    = jams.length;
-  const liveJams     = jams.filter(j => j.isLive).length;
-  const upcomingJams = jams.filter(j => !j.isLive).length;
-
-  const CATEGORIES = [
-    { key: "g", label: "Genres" },
-    { key: "i", label: "Instruments" },
-    { key: "v", label: "Vibes" },
-  ];
-
-  const grouped = CATEGORIES.map(cat => ({
-    ...cat,
-    pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_") && p.text),
-  })).filter(cat => cat.pills.length > 0);
-
-  const ungrouped = pills.filter(p => p.text && !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
-
-  const dark          = needsDarkText(cardColor.bg, textOverride);
-  const textPrimary   = dark ? "#111"             : "#fff";
-  const textSecondary = dark ? "#444"             : "#d4d4d4";
-  const textDim       = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
-  const dividerColor  = dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.18)";
-  const tileBg        = dark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.03)";
-  const tileBorder    = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
-
-  const locationStr = [city, country].filter(Boolean).join(", ");
-  const joinedRaw   = user?.date_joined ?? user?.created_at ?? user?.joined_at ?? null;
-  const memberSince = joinedRaw
-    ? new Date(joinedRaw).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-    : null;
-
-  // ── Per-category drag state ──────────────────────────────────────────────
-  const [dragState, setDragState] = useState(null);
-  const dragStartY    = useRef(0);
-  const movedRef      = useRef(false);
-  const containerRefs = useRef({});
-
-  const handlePillDown = (e, catKey, localIdx) => {
-    if (!isOwnProfile || !onReorderPills) return;
-    e.preventDefault();
-    dragStartY.current = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
-    movedRef.current   = false;
-    setDragState({ catKey, fromIdx: localIdx, overIdx: localIdx });
-  };
-
-  useEffect(() => {
-    if (!dragState) return;
-    const onMove = (e) => {
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      if (Math.abs(clientY - dragStartY.current) > 5) movedRef.current = true;
-      const container = containerRefs.current[dragState.catKey];
-      if (!container) return;
-      const items = container.querySelectorAll("[data-pill-item]");
-      let closest = dragState.overIdx;
-      let closestDist = Infinity;
-      items.forEach((el, i) => {
-        const rect = el.getBoundingClientRect();
-        const dist = Math.abs(clientY - (rect.top + rect.height / 2));
-        if (dist < closestDist) { closestDist = dist; closest = i; }
-      });
-      setDragState(prev => prev ? { ...prev, overIdx: closest } : null);
-    };
-    const onUp = () => {
-      if (movedRef.current && dragState && dragState.fromIdx !== dragState.overIdx) {
-        const catPills   = pills.filter(p => typeof p.id === "string" && p.id.startsWith(dragState.catKey + "_"));
-        const reordered  = [...catPills];
-        const [moved]    = reordered.splice(dragState.fromIdx, 1);
-        reordered.splice(dragState.overIdx, 0, moved);
-        let reorderedCopy = [...reordered];
-        const newPills = pills.map(p => {
-          if (typeof p.id === "string" && p.id.startsWith(dragState.catKey + "_")) {
-            return reorderedCopy.shift();
-          }
-          return p;
-        });
-        onReorderPills(newPills);
-      }
-      setDragState(null);
-      movedRef.current = false;
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup",   onUp);
-    window.addEventListener("touchmove", onMove, { passive: false });
-    window.addEventListener("touchend",  onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup",   onUp);
-      window.removeEventListener("touchmove", onMove);
-      window.removeEventListener("touchend",  onUp);
-    };
-  }, [dragState, pills, onReorderPills]);
-
-  const SectionDivider = () => (
-    <div style={{ height: "1px", background: dividerColor, margin: "0 20px" }} />
-  );
-  const SectionHeading = ({ children }) => (
-    <h2 className="text-2xl" style={{ color: textPrimary, transition: "color 0.4s ease" }}>{children}</h2>
-  );
-  const Tile = ({ left, right, accent }) => (
-    <div className="flex items-center justify-between rounded-xl px-3 py-2"
-      style={{ background: accent ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${accent ? "rgba(220,46,115,0.15)" : tileBorder}` }}>
-      <span className="text-sm" style={{ color: textSecondary }}>{left}</span>
-      <span className="text-sm font-bold" style={{ color: accent ? "#DC2E73" : textPrimary }}>{right}</span>
-    </div>
-  );
-
-  return (
-    <div className="w-[210px] shrink-0 flex flex-col">
-      <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col flex-1"
-        style={{
-          background: cardColor.bg, border: `1px solid ${cardColor.border}`,
-          boxShadow: `0 0 40px ${cardColor.glow}`, minHeight: "1295px",
-          transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
-        }}
-      >
-
-        {/* ── INTERESTS ── */}
-        <div className="p-5 flex flex-col gap-3">
-          <SectionHeading>Interests</SectionHeading>
-
-          {/* Sound chips — color pulled from the pill itself */}
-          {pills.length > 0 && (() => {
-            const chips = ["g", "i", "v"].map(key => {
-              const match = pills.find(p => typeof p.id === "string" && p.id.startsWith(key + "_"));
-              return match ? { key, color: match.color, text: match.text, emoji: getPillEmoji(match.text) } : null;
-            }).filter(Boolean);
-            if (chips.length === 0) return null;
-            return (
-              <div className="flex flex-wrap gap-1.5">
-                {chips.map(chip => (
-                  <span key={chip.key} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
-                    style={{ background: chip.color + "18", border: `1px solid ${chip.color}35`, color: chip.color }}>
-                    <span style={{ fontSize: "11px" }}>{chip.emoji}</span>
-                    <span className="truncate" style={{ maxWidth: "72px" }}>{chip.text}</span>
-                  </span>
-                ))}
-              </div>
-            );
-          })()}
-
-          {pills.length === 0 ? (
-            <p className="text-sm" style={{ color: textSecondary }}>No interests added yet.</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {grouped.map((cat, catIdx) => {
-                const isVibes = cat.key === "v";
-                return (
-                  <div key={cat.key} className="flex flex-col gap-1.5">
-                    <span className="text-sm font-semibold" style={{ color: textSecondary, transition: "color 0.4s ease" }}>
-                      {cat.label}
-                    </span>
-                    <div ref={el => { containerRefs.current[cat.key] = el; }} className="flex flex-col gap-1.5">
-                      {cat.pills.map((pill, localIdx) => {
-                        const isDragging = dragState?.catKey === cat.key && dragState.fromIdx === localIdx;
-                        const isOver     = dragState?.catKey === cat.key && dragState.overIdx === localIdx && dragState.fromIdx !== localIdx;
-                        const isTopVibe  = isVibes && localIdx < 3;
-                        return (
-                          <div key={pill.id ?? localIdx} data-pill-item
-                            style={{
-                              transition: dragState?.catKey === cat.key && !isDragging ? "transform 0.15s ease" : "none",
-                              transform: isOver ? (dragState.fromIdx < localIdx ? "translateY(4px)" : "translateY(-4px)") : "none",
-                              opacity: isDragging ? 0.35 : 1,
-                            }}
-                          >
-                            <div
-                              onMouseDown={e => handlePillDown(e, cat.key, localIdx)}
-                              onTouchStart={e => handlePillDown(e.touches[0], cat.key, localIdx)}
-                            className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${isOwnProfile ? "cursor-grab active:cursor-grabbing" : ""}`}
-                              style={{
-                                background: pill.color + "12", border: `1px solid ${pill.color}28`,
-                                boxShadow: isDragging ? `0 0 14px ${pill.color}44` : "none",
-                                transition: "box-shadow 0.15s ease",
-                              }}
-                            >
-                              <span className="shrink-0 flex items-center justify-center rounded-lg"
-                                style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
-                                {getPillEmoji(pill.text)}
-                              </span>
-                              <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>
-                                {pill.text}
-                              </span>
-                              {isTopVibe && (
-                                <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                                  style={{ background: pill.color + "22", border: `1px solid ${pill.color}40`, color: pill.color, letterSpacing: "0.02em" }}>
-                                  ★
-                                </span>
-                              )}
-                              {isOwnProfile && (
-                                <svg width="7" height="11" viewBox="0 0 7 11" fill="none" style={{ opacity: 0.22, flexShrink: 0, color: textPrimary }}>
-                                  <circle cx="1.5" cy="1.5" r="1.1" fill="currentColor"/>
-                                  <circle cx="5.5" cy="1.5" r="1.1" fill="currentColor"/>
-                                  <circle cx="1.5" cy="5.5" r="1.1" fill="currentColor"/>
-                                  <circle cx="5.5" cy="5.5" r="1.1" fill="currentColor"/>
-                                  <circle cx="1.5" cy="9.5" r="1.1" fill="currentColor"/>
-                                  <circle cx="5.5" cy="9.5" r="1.1" fill="currentColor"/>
-                                </svg>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {isVibes && cat.pills.length > 0 && (
-                      <p className="text-[10px] font-medium mt-0.5" style={{ color: textDim }}>
-                        ★ Top {Math.min(3, cat.pills.length)} shown as top interests
-                      </p>
-                    )}
-                    {catIdx < grouped.length - 1 && (
-                      <div className="mt-0.5" style={{ height: "1px", background: dividerColor }} />
-                    )}
-                  </div>
-                );
-              })}
-              {ungrouped.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  {grouped.length > 0 && <div style={{ height: "1px", background: dividerColor }} />}
-                  {ungrouped.map((pill, i) => (
-                    <div key={pill.id ?? i} className="flex items-center gap-2 rounded-xl px-2.5 py-2"
-                      style={{ background: pill.color + "12", border: `1px solid ${pill.color}28` }}>
-                      <span className="shrink-0 flex items-center justify-center rounded-lg"
-                        style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
-                        {getPillEmoji(pill.text)}
-                      </span>
-                      <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>{pill.text}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <SectionDivider />
-
-        {/* ── PROFILE ── */}
-        <div className="p-5 flex flex-col gap-3">
-          <SectionHeading>Profile</SectionHeading>
-          <div className="flex flex-col gap-2">
-            {locationStr && (
-              <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
-                <span style={{ fontSize: "13px" }}>📍</span>
-                <span className="text-sm truncate" style={{ color: textSecondary }}>{locationStr}</span>
-              </div>
-            )}
-            {memberSince && (
-              <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
-                <div className="flex items-center gap-2">
-                  <span style={{ fontSize: "13px" }}>🗓️</span>
-                  <span className="text-sm" style={{ color: textSecondary }}>Joined</span>
-                </div>
-                <span className="text-sm font-bold" style={{ color: textPrimary }}>{memberSince}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: "13px" }}>🎵</span>
-                <span className="text-sm" style={{ color: textSecondary }}>Interests</span>
-              </div>
-              <span className="text-sm font-bold" style={{ color: textPrimary }}>{pills.length}</span>
-            </div>
-          </div>
-        </div>
-
-        <SectionDivider />
-
-        {/* ── STATS ── */}
-        <div className="p-5 flex flex-col gap-3">
-          <SectionHeading>Stats</SectionHeading>
-          <div className="flex flex-col gap-2">
-            <Tile left={<><span style={{marginRight:6}}>🎸</span>Total Jams</>}  right={totalJams}    accent={true} />
-            <Tile left={<><span style={{marginRight:6}}>🔴</span>Live now</>}    right={liveJams}     accent={false} />
-            <Tile left={<><span style={{marginRight:6}}>📅</span>Upcoming</>}    right={upcomingJams} accent={false} />
-          </div>
-        </div>
-
-
-      </div>
-    </div>
-  );
-}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -448,21 +217,15 @@ function InterestsSidebar({ pills, jams, user, city, country, availableToJam, on
 const Profile = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Name & Location");
-  const [nameHover, setNameHover] = useState(false);
-
-  // ── Interests card drag state (lifted from IIFE to satisfy Rules of Hooks) ─
-  const [intDragState, setIntDragState] = useState(null);
-  const intDragStartY    = useRef(0);
-  const intMovedRef      = useRef(false);
-  const intContainerRefs = useRef({});
 
   // ── Route param — /profile/:username ─────────────────────────────────────
   // If a username is present in the URL we're viewing someone else's profile.
   // If not, we're viewing our own. isOwnProfile gates all edit affordances.
   const { username: routeUsername } = useParams();
-  const { user: loggedInUser, isLoggedIn, updateProfile } = useAuth();
+  const navigate = useNavigate();
+  const { user: loggedInUser, isLoggedIn, updateProfile, fetchProfile } = useAuth();
   const { openModal } = useAuthModal();
-  const { friends } = useFriends();
+  const { friends, sentRequests, sendFriendRequest } = useFriends();
 
   // viewedUser — the profile being displayed. Starts as the logged-in user,
   // then gets replaced by the fetched profile when viewing someone else.
@@ -503,81 +266,37 @@ const Profile = () => {
   const [profilePic, setProfilePic] = useState(null);
   const [banner,     setBanner]     = useState(null);
   const [about,      setAbout]      = useState("");
-  const [headline,   setHeadline]   = useState("");
   const [aboutPhoto, setAboutPhoto] = useState(null);
   const [name,       setName]       = useState("");
   const [location,   setLocation]   = useState("");
   const [city,       setCity]       = useState("");
   const [country,    setCountry]    = useState("");
 
-  // Availability toggle — local state, shown in the Interests sidebar
-  const [availableToJam, setAvailableToJam] = useState(false);
-
   // ── Add Friend state — only relevant when viewing someone else's profile ──
   const [friendStatus, setFriendStatus] = useState("none"); // "none" | "pending" | "friends"
 
-  // Seed friendStatus from the already-loaded friends list in FriendsContext
+  // Seed friendStatus from the already-loaded friends + sent requests in FriendsContext
   useEffect(() => {
     if (isOwnProfile || !viewedUser?.user_id) return;
-    const isFriend = friends.some((f) => String(f.id) === String(viewedUser.user_id));
-    setFriendStatus(isFriend ? "friends" : "none");
-  }, [friends, viewedUser?.user_id, isOwnProfile]);
+    const isFriend     = friends.some((f) => String(f.id) === String(viewedUser.user_id));
+    const hasSentReq   = sentRequests.some((r) => String(r.toUser?.id) === String(viewedUser.user_id));
+    setFriendStatus(isFriend ? "friends" : hasSentReq ? "pending" : "none");
+  }, [friends, sentRequests, viewedUser?.user_id, isOwnProfile]);
 
-  const handleAddFriend = () => {
+  const handleAddFriend = async () => {
     if (!isLoggedIn) { openModal("login"); return; }
     if (friendStatus !== "none") return;
     setFriendStatus("pending");
-    apiService.sendFriendRequest(user?.user_id)
-      .catch(err => console.error("Failed to send friend request:", err));
+    try {
+      await sendFriendRequest(viewedUser.user_id);
+    } catch (err) {
+      console.error("Failed to send friend request:", err);
+      setFriendStatus("none");
+    }
   };
 
   // pills – seeded from user.genres_liked, instruments_liked, vibes_liked
   const [pills, setPills] = useState([]);
-
-  // ── Interests card drag effect (depends on pills + intDragState) ──────────
-  useEffect(() => {
-    if (!intDragState) return;
-    const onMove = (e) => {
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      if (Math.abs(clientY - intDragStartY.current) > 5) intMovedRef.current = true;
-      const container = intContainerRefs.current[intDragState.catKey];
-      if (!container) return;
-      const items = container.querySelectorAll("[data-pill-item]");
-      let closest = intDragState.overIdx, closestDist = Infinity;
-      items.forEach((el, i) => {
-        const rect = el.getBoundingClientRect();
-        const dist = Math.abs(clientY - (rect.top + rect.height / 2));
-        if (dist < closestDist) { closestDist = dist; closest = i; }
-      });
-      setIntDragState(prev => prev ? { ...prev, overIdx: closest } : null);
-    };
-    const onUp = () => {
-      if (intMovedRef.current && intDragState && intDragState.fromIdx !== intDragState.overIdx) {
-        const catPills  = pills.filter(p => typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_"));
-        const reordered = [...catPills];
-        const [moved]   = reordered.splice(intDragState.fromIdx, 1);
-        reordered.splice(intDragState.overIdx, 0, moved);
-        let copy = [...reordered];
-        const newPills = pills.map(p => {
-          if (typeof p.id === "string" && p.id.startsWith(intDragState.catKey + "_")) return copy.shift();
-          return p;
-        });
-        setPills(newPills);
-      }
-      setIntDragState(null);
-      intMovedRef.current = false;
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup",   onUp);
-    window.addEventListener("touchmove", onMove, { passive: false });
-    window.addEventListener("touchend",  onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup",   onUp);
-      window.removeEventListener("touchmove", onMove);
-      window.removeEventListener("touchend",  onUp);
-    };
-  }, [intDragState, pills]);
 
   // ── Pill picker state ─────────────────────────────────────────────────────
   const [allTags, setAllTags] = useState([]);
@@ -587,58 +306,71 @@ const Profile = () => {
   const [tagsLoading, setTagsLoading] = useState(false);
 
   const PILL_COLORS = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
-  const MAX_PILLS = 12;
+  const MAX_PILLS = 9;
 
-  // Toggle a tag in the picker — single source of truth, rebuilds pills from selection
+  // Toggle a tag in the picker.
+  // setPills is called OUTSIDE the setSelectedTagIds updater to avoid a stale
+  // allTags closure — functional updaters must be pure (no side-effects).
   const toggleTag = (tag) => {
+    const color = PILL_COLORS[tag.id % PILL_COLORS.length];
     setSelectedTagIds((prev) => {
       const next = new Set(prev);
       if (next.has(tag.uid)) {
         next.delete(tag.uid);
       } else {
-        if (next.size >= MAX_PILLS) return prev;
         next.add(tag.uid);
       }
-      const newPills = allTags
-        .filter((t) => next.has(t.uid))
-        .map((t) => ({
-          id: t.uid,
-          text: t.name,
-          color: PILL_COLORS[t.id % PILL_COLORS.length],
-        }));
-      setPills(newPills);
       return next;
+    });
+    setPills((prevPills) => {
+      if (prevPills.some((p) => p.id === tag.uid)) {
+        return prevPills.filter((p) => p.id !== tag.uid);
+      }
+      return [...prevPills, { id: tag.uid, text: tag.name, color }];
     });
   };
 
-  // Seed local state from the authenticated user object whenever it resolves.
-  // city + country are joined into "City, Country" format matching the location field.
-  useEffect(() => {
-    if (!user) return;
-    setName(user.display_name || user.username || "");
-    const parts = [user.city, user.country].filter(Boolean);
+  // Seed local edit form state from a user object.
+  // Called on initial user load and whenever the modal is opened/cancelled to reset unsaved edits.
+  const seedFormFromUser = (u) => {
+    if (!u) return;
+    setName(u.display_name || u.username || "");
+    const parts = [u.city, u.country].filter(Boolean);
     setLocation(parts.join(", "));
-    setCity(user.city || "");
-    setCountry(user.country || "");
-    setAbout(user.about || "");
-    setHeadline(user.headline || "");
-    setAvailableToJam(user.available_to_jam ?? false);
-    setProfilePic(user.pfp ? formatAvatarUrl(user.pfp) : null);
-    setBanner(user.profile_banner ? formatAvatarUrl(user.profile_banner) : null);
+    setCity(u.city || "");
+    setCountry(u.country || "");
+    setAbout(u.about || "");
+    setProfilePic(u.pfp ? formatAvatarUrl(u.pfp) : null);
+    setBanner(u.profile_banner ? formatAvatarUrl(u.profile_banner) : null);
+    setLinks({
+      spotify:    u.spotify    || "",
+      soundcloud: u.soundcloud || "",
+      bandcamp:   u.bandcamp   || "",
+      youtube:    u.youtube    || "",
+      instagram:  u.instagram  || "",
+      tiktok:     u.tiktok     || "",
+    });
 
-    // Seed pills from genres, instruments, and vibes — color stable per tag.id
+    // Seed pills from genres, instruments, and vibes — color stable per tag.id.
     // Supabase (viewedUser) returns flattened arrays as .genres/.instruments/.vibes
     // Django (loggedInUser) returns them as .genres_liked/.instruments_liked/.vibes_liked
+    // PATCH responses return tag arrays as bare IDs (not objects) — skip pill update in that case
+    // so the locally-toggled state isn't wiped. fetchProfile() always returns full objects.
     const colors = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
-    const genresList      = (user.genres      ?? user.genres_liked      ?? []).filter(t => t?.id && t?.name);
-    const instrumentsList = (user.instruments ?? user.instruments_liked ?? []).filter(t => t?.id && t?.name);
-    const vibesList       = (user.vibes       ?? user.vibes_liked       ?? []).filter(t => t?.id && t?.name);
-    const userTags = [
-      ...genresList.map(t => ({ ...t, uid: `g_${t.id}` })),
-      ...instrumentsList.map(t => ({ ...t, uid: `i_${t.id}` })),
-      ...vibesList.map(t => ({ ...t, uid: `v_${t.id}` })),
-    ];
-    if (userTags.length > 0) {
+    const rawGenres      = u.genres      ?? u.genres_liked      ?? [];
+    const rawInstruments = u.instruments ?? u.instruments_liked ?? [];
+    const rawVibes       = u.vibes       ?? u.vibes_liked       ?? [];
+    // Only update pills if every item in every array is a full object (has .name).
+    // [].every() is vacuously true, so empty arrays from a real fetch still clear the pills correctly.
+    const hasFullObjects = rawGenres.every(t => typeof t === "object" && t?.name)
+                        && rawInstruments.every(t => typeof t === "object" && t?.name)
+                        && rawVibes.every(t => typeof t === "object" && t?.name);
+    if (hasFullObjects) {
+      const userTags = [
+        ...rawGenres.filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `g_${t.id}` })),
+        ...rawInstruments.filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `i_${t.id}` })),
+        ...rawVibes.filter(t => t?.id && t?.name).map(t => ({ ...t, uid: `v_${t.id}` })),
+      ];
       setPills(userTags.map((tag) => ({
         id: tag.uid,
         text: tag.name,
@@ -646,28 +378,14 @@ const Profile = () => {
       })));
       setSelectedTagIds(new Set(userTags.map((t) => t.uid)));
     }
+  };
 
-    // Seed visual theme from stored profile_theme JSON if the backend provides it.
-    // profile_theme shape: { cardColors, jamCardColor, cardTextOverrides, bannerDark }
-    if (user.profile_theme) {
-      try {
-        const theme = typeof user.profile_theme === "string"
-          ? JSON.parse(user.profile_theme)
-          : user.profile_theme;
-        if (theme.cardColors)       setCardColors(prev => ({ ...prev, ...theme.cardColors }));
-        if (theme.jamCardColor)     setJamCardColor(theme.jamCardColor);
-        if (theme.cardTextOverrides) setCardTextOverrides(prev => ({ ...prev, ...theme.cardTextOverrides }));
-        if (typeof theme.bannerDark === "boolean") setBannerDark(theme.bannerDark);
-      } catch (e) {
-        console.warn("Failed to parse profile_theme:", e);
-      }
-    }
+  // Seed from user whenever it resolves (initial load / after save re-fetch).
+  useEffect(() => {
+    if (!user) return;
+    seedFormFromUser(user);
   }, [user]);
 
-  // bannerDark – true when the banner image is dark enough that text
-  // should be white. Auto-detected from pixel sampling in saveCroppedBanner,
-  // but can be overridden manually with the toggle in the Banner edit section.
-  const [bannerDark, setBannerDark] = useState(false);
 
   // cardColors – per-card colour theme. Defaults to the first CARD_COLORS swatch.
   // Each value is a full swatch object { label, bg, border, glow }.
@@ -700,7 +418,13 @@ const Profile = () => {
     });
   };
 
+  // ── Social / artist links ────────────────────────────────────────────────────
+  const EMPTY_LINKS = { spotify: "", soundcloud: "", bandcamp: "", youtube: "", instagram: "", tiktok: "" };
+  const [links, setLinks] = useState(EMPTY_LINKS);
+
   const [globalTextOverride, setGlobalTextOverride] = useState(null);
+  const [interestsExpanded, setInterestsExpanded] = useState(false);
+  const [bioExpanded, setBioExpanded] = useState(false);
   const setGlobalText = (val) => {
     setGlobalTextOverride(val);
     setCardTextOverrides({ aboutMe: val, musicSnips: val, jams: val, posts: val, interests: val });
@@ -718,6 +442,7 @@ const Profile = () => {
 
   const [snippets, setSnippets] = useState([]);
   const [snippetModalOpen, setSnippetModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newSnippet, setNewSnippet] = useState({
     title: "",
     audioFile: null,
@@ -742,15 +467,6 @@ const Profile = () => {
 
   const [dragging, setDragging] = useState(null);
   const [dragX, setDragX] = useState(0);
-
-  // ── Jam drag state — kept separate from snippet drag so the two
-  // interactions can never interfere with each other. Same shape,
-  // same pattern, just prefixed with "jam".
-  const [jamDragging, setJamDragging]   = useState(null);
-  const [jamDragX,    setJamDragX]      = useState(0);
-  const jamDragStartXRef                = useRef(0);
-  const jamLastDragXRef                 = useRef(0);
-  const jamMovedRef                     = useRef(false);
 
   // ── Posts state ───────────────────────────────────────────────────────────
   const audioRef = useRef(null);
@@ -788,7 +504,6 @@ const Profile = () => {
       .finally(() => setJamsLoading(false));
   }, [isOwnProfile, loggedInUser?.id, viewedUser?.user_id]);
 
-  const removeJam = (jamId) => setJams((prev) => prev.filter((j) => j.id !== jamId));
 
   // ── Profile posts — up to 3 most recent ──────────────────────────────────────
   const timeAgo = (iso) => {
@@ -804,13 +519,14 @@ const Profile = () => {
   const [profilePostsLoading, setProfilePostsLoading] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) return;
+    const postsUserId = isOwnProfile ? loggedInUser?.id : viewedUser?.user_id;
+    if (!postsUserId) return;
     setProfilePostsLoading(true);
-    postService.getPostsByUser(user.id, loggedInUser?.id, 5)
+    postService.getPostsByUser(postsUserId, loggedInUser?.id, 5)
       .then(setProfilePosts)
       .catch(console.error)
       .finally(() => setProfilePostsLoading(false));
-  }, [user?.id, loggedInUser?.id]);
+  }, [isOwnProfile, loggedInUser?.id, viewedUser?.user_id]);
 
   const revokeObjectUrl = (url) => {
     if (typeof url === "string" && url.startsWith("blob:")) {
@@ -843,6 +559,8 @@ const Profile = () => {
   }, [loggedInUser?.id, viewedUser?.user_id, isOwnProfile]);
 
   const saveSnippet = async () => {
+    if (isSaving) return;
+
     if (!newSnippet.title.trim() && !newSnippet.audioFile) {
       showToast("Please add a title and audio file.");
       return;
@@ -860,16 +578,22 @@ const Profile = () => {
       return;
     }
 
+    setIsSaving(true);
     try {
       const saved = await musicSnipService.createSnip({ name: newSnippet.title, musicFile: newSnippet.audioFile });
-      setSnippets((prev) => [...prev, normalizeSnip(saved)]);
+      setNewSnippet({ title: "", audioFile: null, audioName: null });
+      setSnippetModalOpen(false);
+
+      // Optimistic add so the snippet appears immediately without waiting for a re-fetch
+      setSnippets((prev) => {
+        if (saved?.id && prev.some((s) => s.id === saved.id)) return prev;
+        return [...prev, normalizeSnip(saved)];
+      });
     } catch (err) {
       showToast("Failed to save snippet.");
-      return;
+    } finally {
+      setIsSaving(false);
     }
-
-    setNewSnippet({ title: "", audioFile: null, audioName: null });
-    setSnippetModalOpen(false);
   };
 
   const deleteSnippet = async (indexToDelete) => {
@@ -999,62 +723,6 @@ const Profile = () => {
     };
   }, [dragging]);
 
-  // ── Jam drag handlers ────────────────────────────────────────────────────
-  // Identical structure to the snippet drag handlers above.
-  // Using jam.id (not array index) to identify the card being dragged —
-  // safer because the jams array can shift (prepend/delete) between renders.
-
-  const handleJamDragStart = (jamId, event) => {
-    jamDragStartXRef.current = getClientX(event);
-    jamLastDragXRef.current  = 0;
-    jamMovedRef.current      = false;
-    setJamDragging(jamId);
-    setJamDragX(0);
-  };
-
-  const handleJamDragMove = (event) => {
-    if (jamDragging === null) return;
-    const distance = getClientX(event) - jamDragStartXRef.current;
-    if (Math.abs(distance) > 6) jamMovedRef.current = true;
-    jamLastDragXRef.current = distance;
-    setJamDragX(distance);
-  };
-
-  const handleJamDragEnd = () => {
-    if (jamDragging === null) return;
-    const jamId       = jamDragging;
-    const finalDist   = jamLastDragXRef.current;
-    setJamDragging(null);
-    setJamDragX(0);
-    if (Math.abs(finalDist) >= DRAG_DELETE_THRESHOLD) {
-      // If the stub is open for the card being deleted, close it first
-      // so we don't show a modal for a jam that no longer exists.
-      if (selectedJam?.id === jamId) setSelectedJam(null);
-      removeJam(jamId);
-    }
-  };
-
-  useEffect(() => {
-    if (jamDragging === null) return;
-
-    const onMouseMove = (e) => handleJamDragMove(e);
-    const onMouseUp   = ()  => handleJamDragEnd();
-    const onTouchMove = (e) => handleJamDragMove(e);
-    const onTouchEnd  = ()  => handleJamDragEnd();
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup",   onMouseUp);
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    window.addEventListener("touchend",  onTouchEnd);
-
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup",   onMouseUp);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend",  onTouchEnd);
-    };
-  }, [jamDragging]);
-
   useEffect(() => {
     return () => {
       stopPlayback();
@@ -1071,17 +739,8 @@ const Profile = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sectionButtons = [
-    "Name & Location",
-    "Profile Picture",
-    "Banner",
-    "About Me",
-    "Pills",
-    "Card Colors",
-  ];
-
   // Lock body scroll whenever any modal is open so the page can't scroll behind it.
-  const anyModalOpen = editOpen || snippetModalOpen || pillPickerOpen || pillViewerOpen || !!selectedJam;
+  const anyModalOpen = editOpen || snippetModalOpen || pillPickerOpen || pillViewerOpen || !!selectedJam || !!selectedPost;
   useEffect(() => {
     document.body.style.overflow = anyModalOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -1107,353 +766,301 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
-      <main className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-6">
+    <div className="h-[calc(100vh-4rem)] overflow-y-auto bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
+      <main className="mx-auto w-full max-w-[1400px] pb-8">
 
-        {/* ── Top-level layout: [content area] + [jams sidebar] ── */}
-        <div className="flex flex-col lg:flex-row gap-4 lg:items-start">
-
-          {/* ── LEFT+CENTER CONTENT AREA ── */}
-          <div className="flex flex-col gap-4 flex-1 min-w-0">
-
-            {/* Banner — scoped to left+center only, sidebar breaks through above it */}
+        {/* ─────────────────────────── BANNER ────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="relative w-full overflow-hidden rounded-b-2xl group/banner"
+          style={{
+            height: "180px",
+            background: banner
+              ? `url(${banner}) center/cover no-repeat`
+              : "linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 40%, #16213e 70%, #0f3460 100%)",
+            boxShadow: (() => {
+              const allGlows = [cardColors.aboutMe.glow, cardColors.musicSnips.glow, cardColors.jams.glow, cardColors.posts.glow, cardColors.interests.glow];
+              const colored = allGlows.filter(g => !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0"));
+              const freq = {};
+              colored.forEach(g => { freq[g] = (freq[g] || 0) + 1; });
+              const dominant = colored.sort((a, b) => (freq[b] || 0) - (freq[a] || 0))[0] ?? "rgba(220,46,115,0.4)";
+              return `0 0 24px ${dominant}, 0 10px 40px rgba(0,0,0,0.8)`;
+            })(),
+            transition: "box-shadow 0.4s ease",
+          }}
+        >
+          {banner && (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
+          )}
+          {isOwnProfile && (
             <div
-              className="relative flex h-[260px] w-full items-center overflow-hidden lg:overflow-visible rounded-2xl bg-neutral-200 px-6 md:px-10"
-              onMouseEnter={() => isOwnProfile && editOpen && setNameHover(true)}
-              onMouseLeave={() => setNameHover(false)}
-              style={{
-                backgroundImage: banner ? `url(${banner})` : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                boxShadow: (() => {
-                  const allGlows = [
-                    cardColors.aboutMe.glow,
-                    cardColors.musicSnips.glow,
-                    cardColors.jams.glow,
-                    cardColors.posts.glow,
-                    cardColors.interests.glow,
-                  ];
-                  const colored = allGlows.filter(g =>
-                    !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0")
-                  );
-                  const freq = {};
-                  colored.forEach(g => { freq[g] = (freq[g] || 0) + 1; });
-                  const dominant = colored.sort((a, b) => (freq[b] || 0) - (freq[a] || 0))[0]
-                    ?? "rgba(220,46,115,0.6)";
-                  return `0 0 20px ${dominant}, 0 10px 40px rgba(0,0,0,0.8)`;
-                })(),
-                transition: "box-shadow 0.4s ease",
-              }}
+              className="absolute inset-0 z-20 flex items-end justify-center pb-4 opacity-0 group-hover/banner:opacity-100 transition-opacity duration-200 cursor-pointer"
+              onClick={() => { setEditOpen(true); setActiveSection("Banner"); }}
+              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 65%)" }}
             >
-              {isOwnProfile && (
-                <button
-                  onClick={() => setEditOpen(true)}
-                  className="absolute inset-0 z-30 cursor-pointer opacity-0"
-                  aria-label="Open profile editor"
-                />
-              )}
-
-              {/* ── Add Friend button — only visible on other people's profiles, hidden when edit modal is open ── */}
-              {!isOwnProfile && !editOpen && friendStatus === "friends" && (
-                <div className="absolute bottom-4 right-4 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ background: "rgba(22,163,74,0.18)", border: "1px solid rgba(74,222,128,0.35)", color: "#4ade80" }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Friends
-                </div>
-              )}
-              {!isOwnProfile && !editOpen && friendStatus !== "friends" && (
-                <button
-                  onClick={handleAddFriend}
-                  disabled={friendStatus === "pending"}
-                  className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200"
-                  style={{
-                    background: friendStatus === "pending" ? "rgba(255,255,255,0.10)" : "#DC2E73",
-                    border: friendStatus === "pending" ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(220,46,115,0.6)",
-                    color: friendStatus === "pending" ? "rgba(255,255,255,0.5)" : "#fff",
-                    boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.35)" : "none",
-                    cursor: friendStatus === "pending" ? "default" : "pointer",
-                  }}
-                >
-                  {friendStatus === "pending" ? (
-                    <>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Sent
-                    </>
-                  ) : (
-                    <>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/>
-                        <path d="M20 8v3M18.5 9.5h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                      </svg>
-                      Add Friend
-                    </>
-                  )}
-                </button>
-              )}
-              <div className="relative z-10 flex items-center">
-                <div
-                  className="h-[180px] w-[180px] rounded-full border-4 border-white/70 bg-cover bg-center shadow-lg md:h-[210px] md:w-[210px]"
-                  style={{
-                    backgroundImage: profilePic ? `url(${profilePic})` : undefined,
-                    backgroundColor: profilePic ? "transparent" : "#db2777",
-                  }}
-                />
-                <div className="ml-5 md:ml-8">
-                  <div className="flex items-center gap-2">
-                    <h1 className={`text-2xl font-semibold md:text-3xl ${bannerDark ? "text-white" : "text-black"}`}>
-                      {name}
-                    </h1>
-                    {user?.username && (
-                      <span className="text-xs" style={{ color: bannerDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.40)" }}>
-                        @{user.username}
-                      </span>
-                    )}
-                    <svg width="14" height="14" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"
-                      style={{ opacity: nameHover ? 1 : 0, transition: "opacity 0.25s ease", flexShrink: 0 }}>
-                      <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke={bannerDark ? "white" : "#333"} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className={`text-sm md:text-base ${bannerDark ? "text-white/80" : "text-neutral-700"}`}>{location}</p>
-                    <svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"
-                      style={{ opacity: nameHover ? 1 : 0, transition: "opacity 0.25s ease", flexShrink: 0 }}>
-                      <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke={bannerDark ? "rgba(255,255,255,0.7)" : "#555"} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
+              <div
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
+                style={{ background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.18)", backdropFilter: "blur(10px)" }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+                Change Banner
               </div>
             </div>
+          )}
+        </motion.div>
 
-            {/* ── Two-column content grid below banner ── */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
+        {/* ── AVATAR + IDENTITY HEADER ─────────────────────────────────────────── */}
+        {/* Avatar bleeds above the content area via negative margin-top          */}
+        <div className="px-4 md:px-6 relative z-30" style={{ marginTop: "-50px" }}>
+          <div className="flex items-end justify-between gap-4">
 
-          {/* ── LEFT COLUMN ── */}
-          <div className="flex flex-col gap-4">
-
-            {/* About Me container */}
-            <div
-              className="h-[500px] rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
+            {/* Avatar */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
+              className={`w-[96px] h-[96px] shrink-0 rounded-full relative overflow-hidden group/avatar${isOwnProfile ? " cursor-pointer" : ""}`}
+              onClick={isOwnProfile ? () => { setEditOpen(true); setActiveSection("Profile Picture"); } : undefined}
               style={{
-                background: cardColors.aboutMe.bg,
-                border: `1px solid ${cardColors.aboutMe.border}`,
-                boxShadow: `0 0 40px ${cardColors.aboutMe.glow}`,
-                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+                background: "linear-gradient(135deg, #DC2E73 0%, #7C3AED 100%)",
+                border: "3px solid #0E0E0E",
+                boxShadow: "0 0 0 2.5px rgba(220,46,115,0.35), 0 8px 24px rgba(0,0,0,0.7)",
               }}
             >
-
-              {/* About Me heading + bio + optional rotated photo */}
-              <div className="flex flex-1 gap-4 min-h-0">
-
-                {/* Text side */}
-                <div className="flex flex-col gap-2 flex-1 min-w-0">
-                  <h2
-                    className="text-2xl shrink-0"
-                    style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#111" : "#fff", transition: "color 0.4s ease" }}
-                  >
-                    About Me
-                  </h2>
-
-                  {/* Headline subsection */}
-                  <div className="shrink-0">
-                    <p
-                      className="text-sm font-semibold mb-0.5"
-                      style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
-                    >
-                      Headline
-                    </p>
-                    {headline ? (
-                      <p
-                        className="text-sm leading-relaxed break-words"
-                        style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
-                      >
-                        {headline}
-                      </p>
-                    ) : (
-                      <p
-                        className="text-sm italic"
-                        style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", transition: "color 0.4s ease" }}
-                      >
-                        {isOwnProfile ? "Add your headline!" : "empty... :("}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Divider between headline and bio */}
-                  <div className="shrink-0" style={{ height: "1px", background: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)" }} />
-
-                  {about ? (
-                    <p
-                      className="text-sm leading-relaxed break-words"
-                      style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "#444" : "#d4d4d4", transition: "color 0.4s ease" }}
-                    >
-                      {about}
-                    </p>
-                  ) : (
-                    <p
-                      className="text-sm leading-relaxed italic"
-                      style={{ color: needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe) ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", transition: "color 0.4s ease" }}
-                    >
-                      {isOwnProfile ? "(bio goes here)" : "empty too... :("}
-                    </p>
-                  )}
-                </div>
-
-                {/* Rotated photo — only shown when the user has picked one */}
-                {aboutPhoto && (
-                  <div className="shrink-0 self-center">
-                    <div
-                      className="w-[120px] h-[150px] rounded-xl overflow-hidden border-4 border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
-                      style={{
-                        transform: "rotate(6deg)",
-                        backgroundImage: `url(${aboutPhoto})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                  </div>
-                )}
-
-              </div>
-            </div>
-
-            {/* Your Music Snips container */}
-            <div
-              className="h-[500px] rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
-              style={{
-                background: cardColors.musicSnips.bg,
-                border: `1px solid ${cardColors.musicSnips.border}`,
-                boxShadow: `0 0 40px ${cardColors.musicSnips.glow}`,
-                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
-              }}
-            >
-              <div className="flex items-center justify-between shrink-0">
-                <h2
-                  className="text-2xl"
-                  style={{ color: needsDarkText(cardColors.musicSnips.bg, cardTextOverrides.musicSnips) ? "#111" : "#fff", transition: "color 0.4s ease" }}
-                >
-                  Music Snips
-                </h2>
-                {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
-                  <button
-                    onClick={() => setSnippetModalOpen(true)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-r from-[#D33280] to-[#EA65C2] text-xl text-black transition hover:scale-110 shadow-[0_12px_50px_rgba(60,20,20,0.3)]"
-                  >
-                    +
-                  </button>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-4">
-                {snippets.length === 0 ? (
-                  isOwnProfile ? (
-                    <button
-                      onClick={() => setSnippetModalOpen(true)}
-                      className="rounded-2xl border border-dashed border-neutral-600 bg-neutral-800 py-8 text-center text-neutral-400 transition hover:bg-neutral-700"
-                    >
-                      Add your first snippet
-                    </button>
-                  ) : (
-                    <p className="text-center py-8 text-sm text-neutral-600">No snippets yet.</p>
-                  )
+              {(() => {
+                const avatarSrc = profilePic || formatAvatarUrl(user?.pfp);
+                return avatarSrc ? (
+                  <img src={avatarSrc} alt={name || "avatar"} className="w-full h-full object-cover" />
                 ) : (
-                  snippets.map((snippet, index) => {
-                    const isDragging = dragging === index;
-                    const offsetX = isDragging ? dragX : 0;
-                    const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
+                  <span className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white select-none">
+                    {(name || "?")[0].toUpperCase()}
+                  </span>
+                );
+              })()}
+              {isOwnProfile && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="13" r="4" stroke="white" strokeWidth="2"/>
+                  </svg>
+                </div>
+              )}
+            </motion.div>
 
-                    return (
-                      <div key={index} className="relative group/snip">
-                        {/* Hover tooltip — visible only when idle (not dragging, not playing) */}
-                        {!isDragging && playingIndex !== index && (
-                          <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 z-30
-                            opacity-0 group-hover/snip:opacity-100 transition-opacity duration-200
-                            bg-neutral-800 text-white text-[11px] px-3 py-1 whitespace-nowrap"
-                            style={{ borderRadius: "40px", boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
-                          >
-                            {playingIndex === index ? "Click to pause" : "Click to play · Drag to delete"}
-                          </div>
-                        )}
-                        {/* Ping ring — lives inside the card wrapper so it scrolls with it */}
-                        {playingIndex === index && pulse[index] && (
-                          <div
-                            key={pulse[index]}
-                            className="animate-ping pointer-events-none absolute inset-0 rounded-full border border-white/70 z-20"
-                          />
-                        )}
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-visible">
-                          {isDragging && (
-                            <div className="absolute inset-0 rounded-full bg-red-500/15" />
-                          )}
-                          {isDragging && dragProgress > 0.45 && (
-                            <div className="absolute right-5 text-sm font-medium text-red-300">
-                              Release to delete
-                            </div>
-                          )}
-                        </div>
-                        <div
-                          onMouseDown={(e) => handleDragStart(index, e)}
-                          onTouchStart={(e) => handleDragStart(index, e)}
-                          onClick={(e) => {
-                            if (!movedRef.current) {
-                              playSnippet(snippet, index);
-                            }
-                            movedRef.current = false;
-                          }}
-                          className="relative z-10 flex cursor-pointer items-center justify-between rounded-full bg-neutral-700 px-6 py-4 text-white transition"
-                          style={{
-                            // scale(1.04) on the playing card is purely visual via transform —
-                            // it never affects document flow so siblings never shift.
-                            transform: `translateX(${offsetX}px) rotate(${offsetX * 0.04}deg) scale(${playingIndex === index && !isDragging ? 1.04 : 1})`,
-                            opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : 1,
-                            transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease",
-                            backgroundImage: snippet.background
-                              ? `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${snippet.background})`
-                              : undefined,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }}
-                        >
-                          <span
-                            className="pr-4 min-w-0"
-                            style={{
-                              overflow: "hidden",
-                              whiteSpace: "nowrap",
-                              maskImage: "linear-gradient(to right, black 60%, transparent 100%)",
-                              WebkitMaskImage: "linear-gradient(to right, black 60%, transparent 100%)",
-                            }}
-                          >{snippet.title}</span>
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full border-4 border-white/70">
-                              <div className={`h-2 w-2 rounded-full bg-white ${playingIndex === index ? "animate-pulse" : ""}`} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+            {/* CTAs — right side, aligned to avatar baseline */}
+            <div className="flex items-center gap-2 pb-1">
+              {!isOwnProfile && !editOpen && (
+                <>
+                  {isLoggedIn && viewedUser?.user_id && friendStatus === "friends" && (
+                    <button
+                      onClick={() => navigate("/chat", { state: { openDmWith: { id: viewedUser.user_id, displayName: viewedUser.display_name || viewedUser.username || "", username: viewedUser.username || "", avatarUrl: formatAvatarUrl(viewedUser.pfp) || null } } })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 hover:scale-105"
+                      style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.80)", backdropFilter: "blur(8px)" }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/></svg>
+                      Message
+                    </button>
+                  )}
+                  {friendStatus === "friends" ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                      style={{ background: "rgba(22,163,74,0.18)", border: "1px solid rgba(74,222,128,0.35)", color: "#4ade80", backdropFilter: "blur(8px)" }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Friends
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleAddFriend}
+                      disabled={friendStatus === "pending"}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200"
+                      style={{
+                        background: friendStatus === "pending" ? "rgba(255,255,255,0.10)" : "#DC2E73",
+                        border: friendStatus === "pending" ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(220,46,115,0.6)",
+                        color: friendStatus === "pending" ? "rgba(255,255,255,0.5)" : "#fff",
+                        boxShadow: friendStatus === "none" ? "0 0 20px rgba(220,46,115,0.35)" : "none",
+                        cursor: friendStatus === "pending" ? "default" : "pointer",
+                        backdropFilter: "blur(8px)",
+                      }}
+                    >
+                      {friendStatus === "pending" ? (
+                        <><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>Sent</>
+                      ) : (
+                        <><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/><path d="M20 8v3M18.5 9.5h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>Add Friend</>
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
+          </div>
 
-          </div>{/* end LEFT COLUMN */}
+          {/* ── IDENTITY + HERO LINKS — two-column at lg ─────────────────────── */}
+          <div className="mt-3 flex flex-col lg:flex-row lg:items-start gap-x-6">
 
-          {/* ── RIGHT COLUMN — Interests + Posts ── */}
-          <div className="flex flex-col gap-4">
-
-            {/* Interests card — full drag+drop with favorites chips */}
+            {/* Left: name + identity */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut", delay: 0.14 }}
+              className="flex-1 min-w-0"
+            >
+            <div className="flex items-baseline gap-2.5 flex-wrap">
+              <h1 className="text-4xl font-black tracking-tight text-white leading-none">{name || "—"}</h1>
+              {user?.username && (
+                <span className="text-sm text-white/30 font-medium">@{user.username}</span>
+              )}
+            </div>
+            {/* Musical identity summary line — derived from top genre · instrument · vibe */}
             {(() => {
-              const dark          = needsDarkText(cardColors.interests.bg, cardTextOverrides.interests);
-              const textPrimary   = dark ? "#111"             : "#fff";
-              const textSecondary = dark ? "#444"             : "#d4d4d4";
-              const textDim       = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
-              const dividerCol    = dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.18)";
-              const tileBg        = dark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.03)";
-              const tileBorder    = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
+              const topInst  = pills.find(p => typeof p.id === "string" && p.id.startsWith("i_"));
+              const topGenre = pills.find(p => typeof p.id === "string" && p.id.startsWith("g_"));
+              const topVibe  = pills.find(p => typeof p.id === "string" && p.id.startsWith("v_"));
+              const parts = [topGenre?.text, topInst?.text, topVibe?.text].filter(Boolean);
+              if (parts.length === 0) return null;
+              return (
+                <p className="text-sm text-white/40 mt-1 font-medium tracking-wide">
+                  {parts.join(" · ")}
+                </p>
+              );
+            })()}
+            {location && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-40">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
+                </svg>
+                <span className="text-xs text-white/40">{location}</span>
+              </div>
+            )}
+            {/* Primary instrument / genre / vibe identity chips */}
+            {(() => {
+              const topInstrument = pills.find(p => typeof p.id === "string" && p.id.startsWith("i_"));
+              const topGenre      = pills.find(p => typeof p.id === "string" && p.id.startsWith("g_"));
+              const topVibe       = pills.find(p => typeof p.id === "string" && p.id.startsWith("v_"));
+              const chips = [topInstrument, topGenre, topVibe].filter(Boolean);
+              return (
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {chips.map(chip => (
+                    <span
+                      key={chip.id}
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold"
+                      style={{ background: chip.color + "20", border: `1px solid ${chip.color}45`, color: chip.color }}
+                    >
+                      <span style={{ fontSize: "12px" }}>{getPillEmoji(chip.text)}</span>
+                      {chip.text}
+                    </span>
+                  ))}
+                  {user?.skill_level && (
+                    <span className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)" }}>
+                      ⭐ {user.skill_level}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
+              {/* ── Edit Profile CTA ─────────────────────────────────────── */}
+              {isOwnProfile && (
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    onClick={() => { setEditOpen(true); setActiveSection("Name & Location"); }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 hover:scale-105 hover:border-white/25"
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.13)",
+                      color: "rgba(255,255,255,0.6)",
+                    }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
+                      <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Edit Profile
+                  </button>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Right: hero links — renders null when no active links */}
+            <HeroLinks links={links} isOwnProfile={isOwnProfile} />
+
+          </div>{/* end identity + hero links */}
+        </div>
+
+        {/* ── TWO-COLUMN BODY ──────────────────────────────────────────────────── */}
+        <div className="mt-5 px-4 md:px-6 flex flex-col lg:flex-row gap-4 lg:items-start">
+
+          {/* ════════════════════════════════════════════════════════════════════
+              LEFT SIDEBAR — stats + sound identity
+          ════════════════════════════════════════════════════════════════════ */}
+          <div className="w-full lg:w-[272px] shrink-0 flex flex-col gap-3">
+
+            {/* ── PROFILE METADATA ───────────────────────────────────────────── */}
+            {(() => {
+              const joinedRaw   = user?.date_joined ?? user?.created_at ?? user?.joined_at ?? null;
+              const memberSince = joinedRaw
+                ? new Date(joinedRaw).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                : null;
+              const totalJams = jams.length;
+              const liveJams  = jams.filter(j => j.isLive).length;
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: "easeOut", delay: 0.10 }}
+                  className="rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-md"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  {/* Live badge */}
+                  {liveJams > 0 && (
+                    <span className="self-start flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold"
+                      style={{ background: "rgba(220,46,115,0.18)", border: "1px solid rgba(220,46,115,0.35)", color: "#DC2E73" }}>
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#DC2E73]" />
+                      </span>
+                      {liveJams} Live Now
+                    </span>
+                  )}
+                  {/* Jam stat numbers */}
+                  {(totalJams > 0 || hostedJamsCount > 0) && (
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-xl font-black text-white leading-none">{totalJams}</span>
+                        <span className="text-[10px] text-white/35 mt-0.5">Jams</span>
+                      </div>
+                      <div className="w-px h-6 bg-white/10" />
+                      <div className="flex flex-col">
+                        <span className="text-xl font-black text-white leading-none">{hostedJamsCount}</span>
+                        <span className="text-[10px] text-white/35 mt-0.5">Hosted</span>
+                      </div>
+                      {snippets.length > 0 && (
+                        <>
+                          <div className="w-px h-6 bg-white/10" />
+                          <div className="flex flex-col">
+                            <span className="text-xl font-black text-white leading-none">{snippets.length}</span>
+                            <span className="text-[10px] text-white/35 mt-0.5">Clips</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {/* Member since */}
+                  {memberSince && (
+                    <div className="flex items-center gap-2 pt-1 border-t border-white/[0.06]">
+                      <span style={{ fontSize: "12px" }}>🗓️</span>
+                      <span className="text-xs text-white/40">Member since {memberSince}</span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })()}
+
+            {/* ── SOUND / INTERESTS ──────────────────────────────────────────── */}
+            {(() => {
               const CATEGORIES = [
                 { key: "g", label: "Genres" },
                 { key: "i", label: "Instruments" },
@@ -1463,358 +1070,381 @@ const Profile = () => {
                 ...cat,
                 pills: pills.filter(p => typeof p.id === "string" && p.id.startsWith(cat.key + "_") && p.text),
               })).filter(cat => cat.pills.length > 0);
-              const ungrouped = pills.filter(p => p.text && !CATEGORIES.some(cat => typeof p.id === "string" && p.id.startsWith(cat.key + "_")));
 
-              const handleIntPillDown = (e, catKey, localIdx) => {
-                if (!isOwnProfile) return;
-                e.preventDefault();
-                intDragStartY.current = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
-                intMovedRef.current   = false;
-                setIntDragState({ catKey, fromIdx: localIdx, overIdx: localIdx });
-              };
+              const MAX_PER_CAT = 4;
+              const totalHidden = interestsExpanded
+                ? 0
+                : grouped.reduce((acc, cat) => acc + Math.max(0, cat.pills.length - MAX_PER_CAT), 0);
+
+              if (grouped.length === 0 && !isOwnProfile) return null;
 
               return (
-                <div
-                  className="relative h-[500px] rounded-2xl p-5 backdrop-blur-md flex flex-col gap-3"
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: "easeOut", delay: 0.15 }}
+                  className="rounded-2xl p-4 backdrop-blur-md flex flex-col gap-3"
                   style={{
                     background: cardColors.interests.bg,
                     border: `1px solid ${cardColors.interests.border}`,
-                    boxShadow: `0 0 40px ${cardColors.interests.glow}`,
+                    boxShadow: `0 0 30px ${cardColors.interests.glow}`,
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
-                  <h2 className="text-2xl shrink-0" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Interests</h2>
-
-                  {/* ── Availability toggle — top-right corner ── */}
-                  {isOwnProfile ? (
-                    <button
-                      onClick={() => setAvailableToJam(v => !v)}
-                      className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all duration-200 cursor-pointer"
-                      style={{
-                        background: availableToJam ? "rgba(220,46,115,0.12)" : tileBg,
-                        border: `1px solid ${availableToJam ? "rgba(220,46,115,0.35)" : tileBorder}`,
-                      }}
-                    >
-                      <span className="relative flex h-1.5 w-1.5 shrink-0">
-                        {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
-                      </span>
-                      <span className="text-[11px] font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
-                        {availableToJam ? "Open to Jam" : "Not Available"}
-                      </span>
-                    </button>
-                  ) : (
-                    <div
-                      className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
-                      style={{
-                        background: availableToJam ? "rgba(220,46,115,0.08)" : tileBg,
-                        border: `1px solid ${availableToJam ? "rgba(220,46,115,0.25)" : tileBorder}`,
-                      }}
-                    >
-                      <span className="relative flex h-1.5 w-1.5 shrink-0">
-                        {availableToJam && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />}
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: availableToJam ? "#DC2E73" : (dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)") }} />
-                      </span>
-                      <span className="text-[11px] font-medium" style={{ color: availableToJam ? "#DC2E73" : textDim }}>
-                        {availableToJam ? "Open to Jam" : "Not Available"}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Favorites chips — first pill per category, color pulled from the pill itself */}
-                  {pills.length > 0 && (() => {
-                    const chips = ["g", "i", "v"].map(key => {
-                      const match = pills.find(p => typeof p.id === "string" && p.id.startsWith(key + "_"));
-                      return match ? { key, color: match.color, text: match.text, emoji: getPillEmoji(match.text) } : null;
-                    }).filter(Boolean);
-                    if (chips.length === 0) return null;
+                  {(() => {
+                    const dark       = needsDarkText(cardColors.interests.bg, cardTextOverrides.interests);
+                    const textLabel  = dark ? "rgba(0,0,0,0.40)"  : "rgba(255,255,255,0.35)";
+                    const dividerCol = dark ? "rgba(0,0,0,0.10)"  : "rgba(255,255,255,0.07)";
                     return (
-                      <div className="flex flex-wrap gap-1.5 shrink-0">
-                        {chips.map(chip => (
-                          <span key={chip.key} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
-                            style={{ background: chip.color + "18", border: `1px solid ${chip.color}35`, color: chip.color }}>
-                            <span style={{ fontSize: "11px" }}>{chip.emoji}</span>
-                            <span className="truncate" style={{ maxWidth: "90px" }}>{chip.text}</span>
-                          </span>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Pill list — scrollable, drag-to-reorder */}
-                  <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
-                    {pills.length === 0 ? (
-                      <p className="text-sm" style={{ color: textSecondary }}>No interests added yet.</p>
-                    ) : (
-                      <div className="flex flex-col gap-3">
-                        {grouped.map((cat, catIdx) => {
-                          const isVibes = cat.key === "v";
-                          return (
-                            <div key={cat.key} className="flex flex-col gap-1.5">
-                              <span className="text-sm font-semibold" style={{ color: textSecondary, transition: "color 0.4s ease" }}>
-                                {cat.label}
-                              </span>
-                              <div ref={el => { intContainerRefs.current[cat.key] = el; }} className="flex flex-col gap-1.5">
-                                {cat.pills.map((pill, localIdx) => {
-                                  const isDragging = intDragState?.catKey === cat.key && intDragState.fromIdx === localIdx;
-                                  const isOver     = intDragState?.catKey === cat.key && intDragState.overIdx === localIdx && intDragState.fromIdx !== localIdx;
-                                  const isTop      = localIdx < 3;
-                                  return (
-                                    <div key={pill.id ?? localIdx} data-pill-item
-                                      style={{
-                                        transition: intDragState?.catKey === cat.key && !isDragging ? "transform 0.15s ease" : "none",
-                                        transform: isOver ? (intDragState.fromIdx < localIdx ? "translateY(4px)" : "translateY(-4px)") : "none",
-                                        opacity: isDragging ? 0.35 : 1,
-                                      }}
-                                    >
-                                      <div
-                                        onMouseDown={e => handleIntPillDown(e, cat.key, localIdx)}
-                                        onTouchStart={e => handleIntPillDown(e.touches[0], cat.key, localIdx)}
-                                        className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${isOwnProfile ? "cursor-grab active:cursor-grabbing" : ""}`}
-                                        style={{
-                                          background: pill.color + "12", border: `1px solid ${pill.color}28`,
-                                          boxShadow: isDragging ? `0 0 14px ${pill.color}44` : "none",
-                                          transition: "box-shadow 0.15s ease",
-                                        }}
-                                      >
-                                        <span className="shrink-0 flex items-center justify-center rounded-lg"
-                                          style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
-                                          {getPillEmoji(pill.text)}
-                                        </span>
-                                        <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>
-                                          {pill.text}
-                                        </span>
-                                        {isTop && (
-                                          <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                                            style={{ background: pill.color + "22", border: `1px solid ${pill.color}40`, color: pill.color, letterSpacing: "0.02em" }}>
-                                            ★
-                                          </span>
-                                        )}
-                                        {isOwnProfile && (
-                                          <svg width="7" height="11" viewBox="0 0 7 11" fill="none" style={{ opacity: 0.22, flexShrink: 0, color: textPrimary }}>
-                                            <circle cx="1.5" cy="1.5" r="1.1" fill="currentColor"/>
-                                            <circle cx="5.5" cy="1.5" r="1.1" fill="currentColor"/>
-                                            <circle cx="1.5" cy="5.5" r="1.1" fill="currentColor"/>
-                                            <circle cx="5.5" cy="5.5" r="1.1" fill="currentColor"/>
-                                            <circle cx="1.5" cy="9.5" r="1.1" fill="currentColor"/>
-                                            <circle cx="5.5" cy="9.5" r="1.1" fill="currentColor"/>
-                                          </svg>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {isVibes && cat.pills.length > 0 && (
-                                <p className="text-[10px] font-medium mt-0.5" style={{ color: textDim }}>
-                                  ★ Top {Math.min(3, cat.pills.length)} shown as top interests
-                                </p>
-                              )}
-                              {catIdx < grouped.length - 1 && (
-                                <div className="mt-0.5" style={{ height: "1px", background: dividerCol }} />
-                              )}
-                            </div>
-                          );
-                        })}
-                        {ungrouped.length > 0 && (
-                          <div className="flex flex-col gap-1.5">
-                            {grouped.length > 0 && <div style={{ height: "1px", background: dividerCol }} />}
-                            {ungrouped.map((pill, i) => (
-                              <div key={pill.id ?? i} className="flex items-center gap-2 rounded-xl px-2.5 py-2"
-                                style={{ background: pill.color + "12", border: `1px solid ${pill.color}28` }}>
-                                <span className="shrink-0 flex items-center justify-center rounded-lg"
-                                  style={{ width: "26px", height: "26px", background: pill.color + "20", border: `1px solid ${pill.color}38`, fontSize: "13px" }}>
-                                  {getPillEmoji(pill.text)}
-                                </span>
-                                <span className="flex-1 text-xs font-medium truncate" style={{ color: pill.color }}>{pill.text}</span>
-                              </div>
-                            ))}
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: textLabel }}>Sound</span>
+                          {isOwnProfile && (
+                            <button
+                              onClick={async () => {
+                                setPillPickerOpen(true);
+                                if (allTags.length === 0) {
+                                  setTagsLoading(true);
+                                  try {
+                                    const { genres, instruments, vibes } = await apiService.getAllFormOptions();
+                                    setAllTags([
+                                      ...(genres ?? []).map(t => ({ ...t, uid: `g_${t.id}` })),
+                                      ...(instruments ?? []).map(t => ({ ...t, uid: `i_${t.id}` })),
+                                      ...(vibes ?? []).map(t => ({ ...t, uid: `v_${t.id}` })),
+                                    ]);
+                                    setSelectedTagIds(new Set(pills.map(p => p.id).filter(Boolean)));
+                                  } catch (err) { console.error("Failed to fetch tags:", err); }
+                                  finally { setTagsLoading(false); }
+                                } else {
+                                  setSelectedTagIds(new Set(pills.map(p => p.id).filter(Boolean)));
+                                }
+                              }}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-md transition-all hover:opacity-80"
+                              style={{ color: "#DC2E73", background: "rgba(220,46,115,0.10)", border: "1px solid rgba(220,46,115,0.20)" }}
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                        {grouped.length === 0 ? (
+                          <p className="text-xs" style={{ color: textLabel }}>
+                            {isOwnProfile ? "Tap Edit to add your genres, instruments & vibes" : "No tags yet"}
+                          </p>
+                        ) : (
+                          <div className="flex flex-col gap-2.5">
+                            {grouped.map((cat, catIdx) => {
+                              const visible = interestsExpanded ? cat.pills : cat.pills.slice(0, MAX_PER_CAT);
+                              return (
+                                <div key={cat.key} className="flex flex-col gap-1.5">
+                                  <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: textLabel }}>{cat.label}</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {visible.map(pill => (
+                                      <span key={pill.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium"
+                                        style={{ background: pill.color + "18", border: `1px solid ${pill.color}30`, color: pill.color }}>
+                                        <span style={{ fontSize: "10px" }}>{getPillEmoji(pill.text)}</span>
+                                        {pill.text}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  {catIdx < grouped.length - 1 && (
+                                    <div style={{ height: "1px", background: dividerCol, marginTop: "2px" }} />
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {totalHidden > 0 && (
+                              <button onClick={() => isOwnProfile ? setInterestsExpanded(true) : setPillViewerOpen(true)}
+                                className="self-start text-[11px] font-medium transition-all hover:opacity-80"
+                                style={{ color: textLabel }}>
+                                +{totalHidden} more
+                              </button>
+                            )}
+                            {interestsExpanded && (
+                              <button onClick={() => setInterestsExpanded(false)}
+                                className="self-start text-[11px] transition-all hover:opacity-80"
+                                style={{ color: textLabel }}>
+                                Show less ↑
+                              </button>
+                            )}
                           </div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      </>
+                    );
+                  })()}
+                </motion.div>
               );
             })()}
 
-            {/* Posts & Feed card — h-[500px] matching other cards */}
-            <div
-              className="h-[500px] rounded-2xl p-6 backdrop-blur-md flex flex-col gap-4"
+          </div>{/* end LEFT SIDEBAR */}
+
+          {/* ════════════════════════════════════════════════════════════════════
+              RIGHT CONTENT COLUMN — music clips, bio, jams, posts
+          ════════════════════════════════════════════════════════════════════ */}
+          <div className="flex-1 min-w-0 flex flex-col gap-4">
+
+            {/* ── MUSIC CLIPS — hidden on other-profile when empty ───────────── */}
+            {(snippets.length > 0 || isOwnProfile) && <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
+              className="rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
               style={{
-                background: cardColors.posts.bg,
-                border: `1px solid ${cardColors.posts.border}`,
-                boxShadow: `0 0 40px ${cardColors.posts.glow}`,
+                background: cardColors.musicSnips.bg,
+                border: `1px solid ${cardColors.musicSnips.border}`,
+                boxShadow: `0 0 40px ${cardColors.musicSnips.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
-              {/* header */}
               {(() => {
-                const postsDark = needsDarkText(cardColors.posts.bg, cardTextOverrides.posts);
-                const postsText      = postsDark ? "#111"              : "#fff";
-                const postsTextDim   = postsDark ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.4)";
-                const postsTextDimmer= postsDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.22)";
-                const postsDivider   = postsDark ? "rgba(0,0,0,0.1)"  : "rgba(255,255,255,0.07)";
-                const postsCardBg    = postsDark ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.03)";
-                const postsCardBorder= postsDark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)";
-
+                const dark        = needsDarkText(cardColors.musicSnips.bg, cardTextOverrides.musicSnips);
+                const textPrimary = dark ? "#111"             : "#fff";
+                const textDim     = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
                 return (
                   <>
                     <div className="flex items-center justify-between shrink-0">
-                      <h2 className="text-2xl" style={{ color: postsText, transition: "color 0.4s ease" }}>
-                        Posts &amp; Feed
-                      </h2>
-                      <Link
-                        to="/feed"
-                        className="text-xs font-medium transition-opacity hover:opacity-70"
-                        style={{ color: postsTextDim }}
-                      >
-                        View all →
-                      </Link>
-                    </div>
-
-                    {/* post stubs */}
-                    <div className="flex flex-row gap-2 flex-1 overflow-x-auto white-scrollbar pb-1">
-                      {profilePostsLoading ? (
-                        <div className="flex flex-1 items-center justify-center">
-                          <div
-                            className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-                            style={{ borderColor: "rgba(220,46,115,0.4)", borderTopColor: "transparent" }}
-                          />
-                        </div>
-                      ) : profilePosts.length === 0 ? (
-                        <div
-                          className="flex flex-1 items-center justify-center rounded-2xl border border-dashed text-sm"
-                          style={{
-                            borderColor: postsDark ? "rgba(0,0,0,0.2)" : "#404040",
-                            background:  postsDark ? "rgba(0,0,0,0.05)" : "rgba(23,23,23,0.5)",
-                            color:       postsTextDimmer,
-                          }}
+                      <div className="flex items-center gap-2">
+                        <span style={{ fontSize: "15px" }}>🎵</span>
+                        <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>
+                          Music Clips
+                        </h2>
+                        {snippets.length > 0 && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
+                            style={{ background: "rgba(220,46,115,0.15)", color: "#DC2E73" }}>
+                            {snippets.length}/{MAX_SNIPPETS}
+                          </span>
+                        )}
+                      </div>
+                      {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
+                        <button
+                          onClick={() => setSnippetModalOpen(true)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-black text-lg transition hover:scale-110"
+                          style={{ background: "linear-gradient(135deg, #D33280, #EA65C2)", boxShadow: "0 4px 16px rgba(220,46,115,0.4)" }}
                         >
-                          No posts yet
-                        </div>
-                      ) : (
-                        profilePosts.map((post, i) => (
-                          <div
-                            key={post.id}
-                            className={`rounded-xl overflow-hidden flex flex-col shrink-0 cursor-pointer transition-all duration-150 hover:brightness-110 ${i >= 3 ? "hidden lg:flex" : ""}`}
+                          +
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {snippets.length === 0 ? (
+                        isOwnProfile ? (
+                          <button
+                            onClick={() => setSnippetModalOpen(true)}
+                            className="flex flex-col items-center justify-center gap-2 rounded-2xl py-8 transition-all duration-200 hover:opacity-80"
                             style={{
-                              width: "155px",
-                              background: postsCardBg,
-                              border: `1px solid ${postsCardBorder}`,
+                              border: `1px dashed ${dark ? "rgba(0,0,0,0.20)" : "rgba(255,255,255,0.12)"}`,
+                              background: "rgba(255,255,255,0.02)",
                             }}
-                            onClick={() => setSelectedPost(post)}
                           >
-                            {/* top — avatar + name */}
-                            <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
-                              {post.author.avatarUrl ? (
-                                <img
-                                  src={post.author.avatarUrl}
-                                  alt={post.author.displayName}
-                                  className="w-6 h-6 rounded-full object-cover shrink-0"
-                                />
-                              ) : (
-                                <div
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-                                  style={{
-                                    background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))",
-                                    color: "#DC2E73",
-                                  }}
-                                >
-                                  {post.author.displayName?.[0]?.toUpperCase()}
+                            <span style={{ fontSize: "24px" }}>🎙️</span>
+                            <span className="text-sm font-medium" style={{ color: textDim }}>Share a recording</span>
+                            <span className="text-xs" style={{ color: textDim, opacity: 0.6 }}>Let people hear what you play</span>
+                          </button>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center gap-2 py-6">
+                            <span style={{ fontSize: "22px", opacity: 0.25 }}>🎵</span>
+                            <p className="text-sm" style={{ color: textDim }}>No clips yet</p>
+                          </div>
+                        )
+                      ) : (
+                        snippets.map((snippet, index) => {
+                          const isDragging   = dragging === index;
+                          const offsetX      = isDragging ? dragX : 0;
+                          const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
+                          const isPlaying    = playingIndex === index;
+                          return (
+                            <div key={index} className="relative group/snip">
+                              {!isDragging && !isPlaying && (
+                                <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 z-30
+                                  opacity-0 group-hover/snip:opacity-100 transition-opacity duration-200
+                                  bg-neutral-800 text-white text-[11px] px-3 py-1 whitespace-nowrap"
+                                  style={{ borderRadius: "40px", boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
+                                  Click to play · Drag to delete
                                 </div>
                               )}
-                              <span className="text-[10px] font-semibold truncate" style={{ color: postsText }}>
-                                {post.author.displayName}
-                              </span>
-                            </div>
-
-                            {/* text content — always right below header */}
-                            {post.content && (
-                              <p
-                                className="text-[11px] leading-relaxed px-3"
+                              {isPlaying && pulse[index] && (
+                                <div key={pulse[index]} className="animate-ping pointer-events-none absolute inset-0 rounded-2xl border border-[#DC2E73]/40 z-20" />
+                              )}
+                              {isDragging && <div className="pointer-events-none absolute inset-0 rounded-2xl bg-red-500/10 z-0" />}
+                              {isDragging && dragProgress > 0.45 && (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-4 z-10">
+                                  <span className="text-xs font-medium text-red-300">Release to delete</span>
+                                </div>
+                              )}
+                              <div
+                                onMouseDown={(e) => handleDragStart(index, e)}
+                                onTouchStart={(e) => handleDragStart(index, e)}
+                                onClick={() => { if (!movedRef.current) playSnippet(snippet, index); movedRef.current = false; }}
+                                className="relative z-10 flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 transition-colors"
                                 style={{
-                                  color: postsTextDim,
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: post.media?.images?.[0] ? 2 : 4,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
+                                  transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
+                                  opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : 1,
+                                  transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
+                                  background: isPlaying ? "rgba(220,46,115,0.12)" : (dark ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.05)"),
+                                  border: isPlaying ? "1px solid rgba(220,46,115,0.30)" : `1px solid ${dark ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)"}`,
+                                  backgroundImage: snippet.background
+                                    ? `linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)),url(${snippet.background})`
+                                    : undefined,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
                                 }}
                               >
-                                {post.content}
-                              </p>
-                            )}
-
-                            {/* image — contained with gap */}
-                            {post.media?.images?.[0] && (
-                              <div className="px-3 mt-2">
-                                <img
-                                  src={post.media.images[0]}
-                                  alt=""
-                                  className="w-full rounded-lg object-cover"
-                                  style={{ height: "90px" }}
-                                />
+                                {/* Play / Pause button */}
+                                <div className="shrink-0 flex items-center justify-center rounded-xl transition-colors duration-200"
+                                  style={{
+                                    width: "36px", height: "36px",
+                                    background: isPlaying ? "#DC2E73" : (dark ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)"),
+                                    border: isPlaying ? "none" : `1px solid ${dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.10)"}`,
+                                  }}
+                                >
+                                  {isPlaying ? (
+                                    <svg width="10" height="12" viewBox="0 0 10 12" fill="white">
+                                      <rect x="0" y="0" width="3" height="12" rx="1.5"/>
+                                      <rect x="7" y="0" width="3" height="12" rx="1.5"/>
+                                    </svg>
+                                  ) : (
+                                    <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
+                                      <path d="M1 1l8 5-8 5V1z" fill={dark ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.5)"}/>
+                                    </svg>
+                                  )}
+                                </div>
+                                {/* Title + waveform bars */}
+                                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                  <span className="text-sm font-semibold truncate"
+                                    style={{ color: isPlaying ? "#DC2E73" : textPrimary }}>
+                                    {snippet.title}
+                                  </span>
+                                  {/* Waveform — static bars, animate during playback */}
+                                  <div className="flex items-end gap-[2px]" style={{ height: "12px" }}>
+                                    {[3,6,4,8,5,10,7,5,9,6,4,7,5,8,4,6,3,7,5,9].map((h, i) => (
+                                      <div key={i} className="rounded-full"
+                                        style={{
+                                          width: "2px", height: `${h}px`,
+                                          background: isPlaying
+                                            ? `rgba(220,46,115,${0.45 + (i % 3) * 0.18})`
+                                            : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)"),
+                                          animation: isPlaying ? `waveform-bounce ${0.6 + (i % 4) * 0.15}s ease-in-out infinite` : "none",
+                                          animationDelay: isPlaying ? `${i * 0.055}s` : "0s",
+                                          transformOrigin: "bottom",
+                                          transition: "background 0.3s ease",
+                                        }}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                {/* Playing dot indicator */}
+                                <div className="shrink-0 h-2 w-2 rounded-full transition-colors duration-200"
+                                  style={{ background: isPlaying ? "#DC2E73" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)") }} />
                               </div>
-                            )}
-
-                            {/* bottom — likes + comments + time */}
-                            <div className="flex items-center justify-between px-3 py-2 mt-auto">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>♥ {post.likes}</span>
-                                <span className="text-[10px]" style={{ color: postsTextDimmer }}>💬 {post.comments}</span>
-                              </div>
-                              <span className="text-[10px]" style={{ color: postsTextDimmer }}>{timeAgo(post.createdAt)}</span>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </>
                 );
               })()}
-            </div>
+            </motion.div>}
+            {/* end music clips guard */}
 
-          </div>{/* end RIGHT COLUMN */}
+            {/* ── ABOUT ME — hidden on other-profile when no bio ──────────────── */}
+            {(about || isOwnProfile) && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.38, ease: "easeOut", delay: 0.12 }}
+              className="rounded-2xl p-5 backdrop-blur-md"
+              style={{
+                background: cardColors.aboutMe.bg,
+                border: `1px solid ${cardColors.aboutMe.border}`,
+                boxShadow: `0 0 40px ${cardColors.aboutMe.glow}`,
+                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+              }}
+            >
+              {(() => {
+                const dark      = needsDarkText(cardColors.aboutMe.bg, cardTextOverrides.aboutMe);
+                const textLabel = dark ? "rgba(0,0,0,0.40)"  : "rgba(255,255,255,0.35)";
+                const textBody  = dark ? "#444"              : "#d4d4d4";
+                const textEmpty = dark ? "rgba(0,0,0,0.25)"  : "rgba(255,255,255,0.2)";
+                return (
+                  <div className="flex gap-4">
+                    <div className="flex flex-col gap-2 flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-widest"
+                          style={{ color: textLabel, transition: "color 0.4s ease" }}>About</span>
+                        {isOwnProfile && about && (
+                          <button
+                            onClick={() => { setEditOpen(true); setActiveSection("About Me"); }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all hover:opacity-80"
+                            style={{ color: "#DC2E73", background: "rgba(220,46,115,0.10)", border: "1px solid rgba(220,46,115,0.20)" }}
+                          >
+                            <svg width="8" height="8" viewBox="0 0 13 13" fill="none">
+                              <path d="M9.5 1.5a1.414 1.414 0 0 1 2 2L4 11H1.5V8.5L9.5 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                      {about ? (
+                        <>
+                          <p
+                            className={`text-sm leading-relaxed${bioExpanded ? "" : " line-clamp-4"}`}
+                            style={{ color: textBody, transition: "color 0.4s ease" }}
+                          >{about}</p>
+                          {about.length > 120 && (
+                            <button
+                              onClick={() => setBioExpanded(v => !v)}
+                              className="self-start text-xs font-semibold mt-1 transition-opacity hover:opacity-70"
+                              style={{ color: "#DC2E73" }}
+                            >
+                              {bioExpanded ? "Show less ↑" : "Read more ↓"}
+                            </button>
+                          )}
+                        </>
+                      ) : isOwnProfile ? (
+                        <button
+                          onClick={() => { setEditOpen(true); setActiveSection("About Me"); }}
+                          className="flex flex-col items-start gap-1 w-full text-left rounded-xl p-3 transition-all duration-200 hover:opacity-80"
+                          style={{
+                            border: `1px dashed ${dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.10)"}`,
+                            background: "rgba(255,255,255,0.02)",
+                          }}
+                        >
+                          <span className="text-sm font-medium" style={{ color: dark ? "rgba(0,0,0,0.30)" : "rgba(255,255,255,0.30)" }}>
+                            Write your story...
+                          </span>
+                          <span className="text-xs" style={{ color: dark ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.15)" }}>
+                            Tell people about your musical journey
+                          </span>
+                        </button>
+                      ) : (
+                        <p className="text-sm italic" style={{ color: textEmpty, transition: "color 0.4s ease" }}>
+                          No bio yet.
+                        </p>
+                      )}
+                    </div>
+                    {aboutPhoto && (
+                      <div className="shrink-0 self-start">
+                        <div className="w-[80px] h-[100px] rounded-xl overflow-hidden border-4 border-white/80 shadow-lg"
+                          style={{ transform: "rotate(5deg)", backgroundImage: `url(${aboutPhoto})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </motion.div>
+            )}{/* end about guard */}
 
-            </div>{/* end two-column content grid */}
-          </div>{/* end LEFT+CENTER CONTENT AREA */}
-
-          {/* ── JAMS SIDEBAR — same structure as old InterestsSidebar: breaks through banner, minHeight: 1295px ── */}
-          {(() => {
-            const dark          = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
-            const textPrimary   = dark ? "#111"             : "#fff";
-            const textSecondary = dark ? "#444"             : "#d4d4d4";
-            const textDim       = dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
-            const dividerColor  = dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.18)";
-            const tileBg        = dark ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.03)";
-            const tileBorder    = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
-
-            const locationStr = [city, country].filter(Boolean).join(", ");
-            const joinedRaw   = user?.date_joined ?? user?.created_at ?? user?.joined_at ?? null;
-            const memberSince = joinedRaw
-              ? new Date(joinedRaw).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-              : null;
-            const totalJams    = jams.length;
-            const liveJams     = jams.filter(j => j.isLive).length;
-            const upcomingJams = jams.filter(j => !j.isLive).length;
-
-            const SectionDivider = () => (
-              <div style={{ height: "1px", background: dividerColor, margin: "0 20px" }} />
-            );
-            const SectionHeading = ({ children }) => (
-              <h2 className="text-2xl" style={{ color: textPrimary, transition: "color 0.4s ease" }}>{children}</h2>
-            );
-            const Tile = ({ left, right, accent }) => (
-              <div className="flex items-center justify-between rounded-xl px-3 py-2"
-                style={{ background: accent ? "rgba(220,46,115,0.08)" : tileBg, border: `1px solid ${accent ? "rgba(220,46,115,0.15)" : tileBorder}` }}>
-                <span className="text-sm" style={{ color: textSecondary }}>{left}</span>
-                <span className="text-sm font-bold" style={{ color: accent ? "#DC2E73" : textPrimary }}>{right}</span>
-              </div>
-            );
-
-            return (
-              <div className="w-full lg:w-[210px] lg:shrink-0 flex flex-col lg:self-stretch">
-                <div className="rounded-2xl overflow-hidden backdrop-blur-md flex flex-col h-full"
+            {/* ── JAMS ───────────────────────────────────────────────────────── */}
+            {(() => {
+              const dark          = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
+              const textPrimary   = dark ? "#111" : "#fff";
+              const textSecondary = dark ? "#555" : "#d4d4d4";
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.38, ease: "easeOut", delay: 0.16 }}
+                  className="rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
                   style={{
                     background: cardColors.jams.bg,
                     border: `1px solid ${cardColors.jams.border}`,
@@ -1822,462 +1452,223 @@ const Profile = () => {
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
-
-                  {/* ── JAMS LIST ── */}
-                  <div className="p-5 flex flex-col gap-3">
-                    <SectionHeading>Jams</SectionHeading>
-
-                    {/* Live now chip */}
-                    {liveJams > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium"
-                          style={{ background: "rgba(220,46,115,0.18)", border: "1px solid rgba(220,46,115,0.35)", color: "#DC2E73" }}>
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "#DC2E73" }} />
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: "#DC2E73" }} />
-                          </span>
-                          {liveJams} Live Now
-                        </span>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Jams</h2>
+                    {jams.length > 0 && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
+                        style={{ background: dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)", color: textSecondary }}>
+                        {jams.length}
+                      </span>
                     )}
-
-                    {jamsLoading ? (
-                      <div className="flex items-center justify-center py-6">
-                        <div className="w-5 h-5 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
-                      </div>
-                    ) : jams.length === 0 ? (
-                      <p className="text-sm" style={{ color: textSecondary }}>No jams yet.</p>
-                    ) : (
-                      <div className="flex flex-col gap-2 overflow-y-auto pr-0.5" style={{ maxHeight: "380px", scrollbarWidth: "none" }}>
-                        {jams.map((jam) => {
-                          const isDragging   = jamDragging === jam.id;
-                          const offsetX      = isDragging ? jamDragX : 0;
-                          const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
-                          const isPast       = jam.timeSlot === "past";
-                          const bgLum        = bgLuminance(jamCardColor.bg);
-                          const blendD       = Math.max(0, (bgLum - 80) / 175);
-                          const noteColor    = isPast ? "rgba(255,255,255,0.18)" : jam.isLive ? "#DC2E73" : "#ca8a04";
-                          const titleColor   = jam.isLive
-                            ? (isPast ? `rgba(180,180,180,0.4)` : `color-mix(in srgb, #DC2E73 ${Math.round(100 - blendD * 45)}%, #000)`)
-                            : (isPast ? `rgba(160,160,160,0.35)` : `color-mix(in srgb, #ca8a04 ${Math.round(100 - blendD * 45)}%, #000)`);
-                          const subtitleColor = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.22 : (0.35 + blendD * 0.3)})`;
-                          const dateColor    = jam.isLive
-                            ? (isPast ? `rgba(160,160,160,0.35)` : `color-mix(in srgb, #DC2E73 ${Math.round(90 - blendD * 40)}%, #000)`)
-                            : (isPast ? `rgba(140,140,140,0.28)` : bgLum > 140 ? `color-mix(in srgb, #ca8a04 ${Math.round(90 - blendD * 40)}%, #000)` : `color-mix(in srgb, #ca8a04 85%, rgba(255,255,255,0.0))`);
-                          const lockColor    = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.18 : (0.4 - blendD * 0.2)})`;
-                          const divColor     = `rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},${isPast ? 0.06 : 0.12})`;
-                          const cardBg       = jamCardColor.label === "Dark"
-                            ? (isPast ? "linear-gradient(135deg,#181818 60%,#1f1f1f 100%)" : "linear-gradient(135deg,#1e1e1e 60%,#2a2a2a 100%)")
-                            : jamCardColor.bg;
-                          const cardBorder   = isPast
-                            ? `1px solid rgba(${bgLum > 140 ? "0,0,0" : "255,255,255"},0.06)`
-                            : jam.isLive
-                              ? `1px solid color-mix(in srgb, rgba(220,46,115,0.35) 100%, ${jamCardColor.border})`
-                              : `1px solid color-mix(in srgb, rgba(202,138,4,0.25) 100%, ${jamCardColor.border})`;
-
-                          return (
-                            <div key={jam.id} className="relative">
-                              {isDragging && dragProgress > 0.45 && (
-                                <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-3 z-10">
-                                  <span className="text-[10px] font-medium text-red-300">Delete</span>
+                  </div>
+                  {jamsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-5 h-5 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+                    </div>
+                  ) : jams.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 py-6">
+                      <span style={{ fontSize: "22px", opacity: 0.25 }}>🎸</span>
+                      <p className="text-sm" style={{ color: dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)" }}>No jams yet</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {jams.map((jam) => {
+                        const isPast       = jam.timeSlot === "past";
+                        const color        = getDiscoveryAccentColor(jam);
+                        const glyph        = DISCOVERY_VARIANTS[jam.type]?.markerGlyph ?? "J";
+                        const dateLine     = jam.dateTime ?? jam.metaSecondary ?? jam.date;
+                        return (
+                          <div key={jam.id} className="relative">
+                            <div
+                              onClick={() => setSelectedJam(jam)}
+                              className="group relative z-10 w-full rounded-2xl p-4 text-left cursor-pointer select-none overflow-hidden"
+                              style={{
+                                background: jam.canEdit
+                                  ? "linear-gradient(135deg, rgba(220,46,115,0.08), rgba(220,46,115,0.03))"
+                                  : "rgba(255,255,255,0.04)",
+                                border: jam.canEdit
+                                  ? "1px solid rgba(220,46,115,0.20)"
+                                  : "1px solid rgba(255,255,255,0.07)",
+                                opacity: isPast ? 0.55 : 1,
+                              }}
+                            >
+                              <div className="absolute left-0 top-4 bottom-4 w-[2px] rounded-full opacity-35" style={{ background: color }} />
+                              <div className="pl-2">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="h-6 w-6 shrink-0 rounded-md flex items-center justify-center text-[10px] font-bold"
+                                    style={{ background: hexToRgba(color, 0.14), color }}>
+                                    {glyph}
+                                  </div>
+                                  <JamTypeBadge type={jam.type} />
+                                  <div className="ml-auto"><JamStatusPill item={jam} /></div>
                                 </div>
-                              )}
-                              {isDragging && (
-                                <div className="pointer-events-none absolute inset-0 rounded-xl bg-red-500/10 z-0" />
-                              )}
-                              <div
-                                onMouseDown={(e) => handleJamDragStart(jam.id, e)}
-                                onTouchStart={(e) => handleJamDragStart(jam.id, e)}
-                                onClick={() => { if (!jamMovedRef.current) setSelectedJam(jam); jamMovedRef.current = false; }}
-                                className="relative z-10 flex items-center gap-2 cursor-pointer select-none"
-                                style={{
-                                  background: cardBg, borderRadius: "14px", border: cardBorder,
-                                  padding: "10px 12px",
-                                  boxShadow: isPast ? "0 2px 8px -2px rgba(0,0,0,0.3)"
-                                    : jam.isLive ? "0 0 0 1px rgba(220,46,115,0.1), 0 6px 16px -4px rgba(220,46,115,0.15)"
-                                    : "0 0 0 1px rgba(202,138,4,0.08), 0 6px 16px -4px rgba(202,138,4,0.12)",
-                                  transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
-                                  opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : isPast ? 0.6 : 1,
-                                  transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
-                                }}
-                              >
-                                <div style={{ width: "1px", height: "32px", background: divColor, marginRight: "8px", flexShrink: 0 }} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate" style={{ fontSize: "12px", margin: 0, color: titleColor }}>{jam.title}</p>
-                                  <p className="truncate" style={{ fontSize: "10px", margin: "2px 0 0", color: subtitleColor }}>
-                                    {[jam.genre, jam.vibe].filter(Boolean).join(" · ")}
-                                  </p>
-                                  <p className="font-semibold" style={{ fontSize: "10px", margin: "2px 0 0", color: dateColor }}>
-                                    {isPast ? "Past" : jam.isLive ? "Live Now" : jam.timeSlot === "tonight" ? "Tonight" : jam.timeSlot === "tomorrow" ? "Tomorrow" : jam.timeSlot === "week" ? "This Week" : "Upcoming"}
-                                    {jam.dateTime ? ` · ${jam.dateTime}` : ""}
-                                  </p>
-                                </div>
-                                {jam.isPrivate && (
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" stroke={lockColor} strokeWidth="1.8"/>
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke={lockColor} strokeWidth="1.8" strokeLinecap="round"/>
-                                  </svg>
-                                )}
+                                <h3 className="text-[13px] font-bold text-white mb-1 leading-snug line-clamp-2">{jam.title}</h3>
+                                {dateLine && <p className="text-[11px] text-neutral-400">{dateLine}</p>}
+                                {jam.locationName && <p className="text-[10px] text-neutral-600 mt-0.5 truncate">{jam.locationName}</p>}
                               </div>
                             </div>
-                          );
-                        })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })()}
+
+            {/* ── LINKS ──────────────────────────────────────────────────────── */}
+            {(LINK_PLATFORMS.some(p => links[p.key]) || isOwnProfile) && (
+              <ProfileLinksCard
+                links={links}
+                isOwnProfile={isOwnProfile}
+                onEditClick={() => { setEditOpen(true); setActiveSection("Links"); }}
+              />
+            )}
+
+            {/* ── POSTS ──────────────────────────────────────────────────────── */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.38, ease: "easeOut", delay: 0.20 }}
+              className="rounded-2xl p-5 backdrop-blur-md flex flex-col gap-4"
+              style={{
+                background: cardColors.posts.bg,
+                border: `1px solid ${cardColors.posts.border}`,
+                boxShadow: `0 0 40px ${cardColors.posts.glow}`,
+                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+              }}
+            >
+              {(() => {
+                const dark       = needsDarkText(cardColors.posts.bg, cardTextOverrides.posts);
+                const textPrimary = dark ? "#111"             : "#fff";
+                const textMid     = dark ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.4)";
+                const textDimmer  = dark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.22)";
+                const dividerCol  = dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
+                return (
+                  <>
+                    <div className="flex items-center justify-between shrink-0">
+                      <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Posts</h2>
+                      <Link to="/feed" className="text-xs font-medium transition-opacity hover:opacity-70" style={{ color: textMid }}>
+                        Feed →
+                      </Link>
+                    </div>
+                    {profilePostsLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                          style={{ borderColor: "rgba(220,46,115,0.4)", borderTopColor: "transparent" }} />
+                      </div>
+                    ) : profilePosts.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-2 py-6">
+                        <span style={{ fontSize: "22px", opacity: 0.25 }}>💬</span>
+                        <p className="text-sm" style={{ color: textDimmer }}>
+                          {isOwnProfile ? "You haven't posted yet." : `${name || "This user"} hasn't posted yet.`}
+                        </p>
+                        <Link to="/feed" className="text-xs font-semibold mt-1 transition-opacity hover:opacity-70"
+                          style={{ color: "#DC2E73" }}>
+                          Check the Feed →
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        {profilePosts.map((post, i) => (
+                          <div key={post.id}>
+                            {i > 0 && <div style={{ height: "1px", background: dividerCol }} />}
+                            <div
+                              className="flex gap-3 py-3 px-2 -mx-2 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.03]"
+                              onClick={() => setSelectedPost(post)}
+                            >
+                              {post.author.avatarUrl ? (
+                                <img src={post.author.avatarUrl} alt={post.author.displayName}
+                                  className="w-8 h-8 rounded-full object-cover shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                                  style={{ background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))", color: "#DC2E73" }}>
+                                  {post.author.displayName?.[0]?.toUpperCase()}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-semibold" style={{ color: textPrimary }}>{post.author.displayName}</span>
+                                  <span className="text-[10px]" style={{ color: textDimmer }}>{timeAgo(post.createdAt)}</span>
+                                </div>
+                                {(() => {
+                                  const eventLink   = extractEventLink(post.content);
+                                  const displayText = eventLink ? stripEventLink(post.content) : post.content;
+                                  return (
+                                    <>
+                                      {displayText && (
+                                        <p className="text-xs leading-relaxed line-clamp-2" style={{ color: textMid }}>{displayText}</p>
+                                      )}
+                                      {eventLink ? (
+                                        <div className="mt-2">
+                                          <EventInviteCard type={eventLink.type} id={eventLink.id} compact={false} />
+                                        </div>
+                                      ) : post.media?.images?.[0] && (
+                                        <img src={post.media.images[0]} alt="" className="mt-2 w-full max-h-32 object-cover rounded-lg" />
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                                <div className="flex items-center gap-3 mt-1.5">
+                                  <span className="text-[10px]" style={{ color: textDimmer }}>♥ {post.likes}</span>
+                                  <span className="text-[10px]" style={{ color: textDimmer }}>💬 {post.comments}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
-                  </div>
+                  </>
+                );
+              })()}
+            </motion.div>
 
-                  <SectionDivider />
+          </div>{/* end RIGHT CONTENT COLUMN */}
 
-                  {/* ── PROFILE ── */}
-                  <div className="p-5 flex flex-col gap-3">
-                    <SectionHeading>Profile</SectionHeading>
-                    <div className="flex flex-col gap-2">
-                      {locationStr && (
-                        <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
-                          <span style={{ fontSize: "13px" }}>📍</span>
-                          <span className="text-sm truncate" style={{ color: textSecondary }}>{locationStr}</span>
-                        </div>
-                      )}
-                      {memberSince && (
-                        <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
-                          <div className="flex items-center gap-2">
-                            <span style={{ fontSize: "13px" }}>🗓️</span>
-                            <span className="text-sm" style={{ color: textSecondary }}>Joined</span>
-                          </div>
-                          <span className="text-sm font-bold" style={{ color: textPrimary }}>{memberSince}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: tileBg, border: `1px solid ${tileBorder}` }}>
-                        <div className="flex items-center gap-2">
-                          <span style={{ fontSize: "13px" }}>🎸</span>
-                          <span className="text-sm" style={{ color: textSecondary }}>Jams</span>
-                        </div>
-                        <span className="text-sm font-bold" style={{ color: textPrimary }}>{totalJams}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <SectionDivider />
-
-                  {/* ── STATS ── */}
-                  <div className="p-5 flex flex-col gap-3">
-                    <SectionHeading>Stats</SectionHeading>
-                    <div className="flex flex-col gap-2">
-                      <Tile left={<><span style={{marginRight:6}}>🎸</span>Total Jams</>}   right={totalJams}        accent={true} />
-                      <Tile left={<><span style={{marginRight:6}}>🔴</span>Live now</>}     right={liveJams}         accent={false} />
-                      <Tile left={<><span style={{marginRight:6}}>📅</span>Upcoming</>}     right={upcomingJams}     accent={false} />
-                      <Tile left={<><span style={{marginRight:6}}>🎤</span>Hosted</>}       right={hostedJamsCount}  accent={false} />
-                      <Tile left={<><span style={{marginRight:6}}>⭐</span>Skill Level</>} right={user?.skill_level || "—"} accent={false} />
-                    </div>
-                  </div>
-
-
-                </div>
-              </div>
-            );
-          })()}
-
-        </div>{/* end top-level flex row */}
+        </div>{/* end two-column body */}
       </main>
+
 
       {createPortal(
         <>
-          {/* ── Jam Stub Modal ────────────────────────────────────────────────────
-           *
-           * Lifted out of the jams panel and promoted to a fixed full-screen modal
-           * so it can blur the entire page behind it and close reliably on backdrop click.
-           *
-           * selectedJam drives open/closed — null = closed, jam object = open.
-           * The accent color and status are derived fresh from the jam's date
-           * via the shared isUpcoming() from jamUtils.js.
-           *
-           * Animation: stubSlideIn keyframe defined in index.css slides the card
-           * in from the left. It fires automatically on mount because React creates
-           * a new DOM element each time selectedJam changes from null → a jam.
-           * ──────────────────────────────────────────────────────────────────────── */}
-      {selectedJam && (() => {
-        const live       = selectedJam.isLive;
-        const accent     = live ? "#DC2E73" : "#ca8a04";
-        const accentDim  = live ? "rgba(220,46,115,0.18)" : "rgba(202,138,4,0.14)";
-        const accentBorder = live ? "rgba(220,46,115,0.30)" : "rgba(202,138,4,0.25)";
+          <EventDetailModal
+            item={selectedJam}
+            open={!!selectedJam}
+            onClose={() => setSelectedJam(null)}
+            viewerContext={{ isCreator: selectedJam?.canEdit ?? false }}
+            openedFrom="profile"
+          />
 
-        const statusLabel = live ? "Live Now"
-          : selectedJam.timeSlot === "tonight"  ? "Tonight"
-          : selectedJam.timeSlot === "tomorrow" ? "Tomorrow"
-          : selectedJam.timeSlot === "week"     ? "This Week"
-          : "Upcoming";
-
-        // Tag rows — genre gets 🎵, vibe gets 🌊 as fallback emojis
-        const tags = [
-          selectedJam.genre && { label: selectedJam.genre, emoji: getPillEmoji(selectedJam.genre), color: live ? "#DC2E73" : "#ca8a04" },
-          selectedJam.vibe  && { label: selectedJam.vibe,  emoji: getPillEmoji(selectedJam.vibe),  color: "#7c3aed" },
-        ].filter(Boolean);
-
-        // Extra optional fields the API may return
-        const host        = selectedJam.host        ?? selectedJam.creator?.display_name ?? selectedJam.creator?.username ?? null;
-        const location    = selectedJam.location    ?? selectedJam.venue ?? null;
-        const attendees   = selectedJam.attendees   ?? selectedJam.attendee_count ?? null;
-        const maxAttendees= selectedJam.maxAttendees ?? selectedJam.max_attendees ?? null;
-        const instruments = Array.isArray(selectedJam.instruments)
-          ? selectedJam.instruments.map(i => typeof i === "string" ? i : i?.name).filter(Boolean)
-          : null;
-
-        return (
-          <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4">
-            <div onClick={() => setSelectedJam(null)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
-
-            <div
-              className="relative z-10 w-[560px] max-w-[96vw] rounded-3xl overflow-hidden flex flex-col"
-              style={{
-                backgroundColor: "#0f0f0f",
-                border: `1px solid ${accentBorder}`,
-                boxShadow: `0 0 0 1px ${accentBorder}, 0 0 80px ${accentDim}, 0 32px 80px rgba(0,0,0,0.9)`,
-                animation: "stubSlideIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards",
-              }}
-              onClick={e => e.stopPropagation()}
+      {/* ── Post Modal — full FeedPost card in a modal shell ─────────────── */}
+      {selectedPost && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4 md:p-8">
+          <div
+            onClick={() => setSelectedPost(null)}
+            className="absolute inset-0 bg-black/75 backdrop-blur-md"
+          />
+          <div
+            className="relative z-10 w-full max-w-[560px] max-h-[88vh] overflow-y-auto hide-scrollbar rounded-2xl"
+            style={{
+              boxShadow: "0 0 0 1px rgba(255,255,255,0.07), 0 32px 80px rgba(0,0,0,0.9)",
+              animation: "stubSlideIn 0.26s cubic-bezier(0.4,0,0.2,1) forwards",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close button — sits above the card */}
+            <button
+              onClick={() => setSelectedPost(null)}
+              className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
+              style={{ color: "rgba(255,255,255,0.35)" }}
             >
-              {/* ── Header band ── */}
-              <div
-                className="relative px-7 pt-7 pb-6 flex flex-col gap-3"
-                style={{
-                  background: `linear-gradient(160deg, ${accentDim} 0%, rgba(0,0,0,0) 60%)`,
-                  borderBottom: `1px solid ${accentBorder}`,
-                }}
-              >
-                {/* Status pill + close */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {live && (
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: accent }} />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: accent }} />
-                      </span>
-                    )}
-                    <span
-                      className="text-xs font-semibold px-3 py-1 rounded-full tracking-wide"
-                      style={{ background: accentDim, border: `1px solid ${accentBorder}`, color: accent }}
-                    >
-                      {statusLabel}
-                    </span>
-                    <span className="text-xs text-white/30">
-                      {selectedJam.isPrivate ? "🔒 Private" : "🔓 Public"}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setSelectedJam(null)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Title */}
-                <h2 className="text-3xl font-bold leading-tight" style={{ color: accent }}>
-                  {selectedJam.title}
-                </h2>
-
-                {/* Genre + vibe tags inline */}
-                {tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((tag, i) => (
-                      <span
-                        key={i}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-                        style={{
-                          background: tag.color + "18",
-                          border: `1px solid ${tag.color}40`,
-                          color: tag.color,
-                        }}
-                      >
-                        <span>{tag.emoji}</span>
-                        {tag.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* ── Body ── */}
-              <div className="px-7 py-5 flex flex-col gap-5">
-
-                {/* Description */}
-                {selectedJam.description && (
-                  <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
-                    {selectedJam.description}
-                  </p>
-                )}
-
-                {/* Info grid — always show date/time, show extras if present */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Date / Time */}
-                  <div
-                    className="flex flex-col gap-1 rounded-2xl px-4 py-3"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                  >
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>When</span>
-                    <span className="text-sm font-medium text-white">{selectedJam.dateTime ?? statusLabel}</span>
-                  </div>
-
-                  {/* Access */}
-                  <div
-                    className="flex flex-col gap-1 rounded-2xl px-4 py-3"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                  >
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Access</span>
-                    <span className="text-sm font-medium text-white">{selectedJam.isPrivate ? "Private" : "Public"}</span>
-                  </div>
-
-                  {/* Host — if available */}
-                  {host && (
-                    <div
-                      className="flex flex-col gap-1 rounded-2xl px-4 py-3"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                    >
-                      <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Host</span>
-                      <span className="text-sm font-medium text-white truncate">{host}</span>
-                    </div>
-                  )}
-
-                  {/* Location — if available */}
-                  {location && (
-                    <div
-                      className="flex flex-col gap-1 rounded-2xl px-4 py-3"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                    >
-                      <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Location</span>
-                      <span className="text-sm font-medium text-white truncate">{location}</span>
-                    </div>
-                  )}
-
-                  {/* Attendees — if available */}
-                  {attendees !== null && (
-                    <div
-                      className="flex flex-col gap-1 rounded-2xl px-4 py-3"
-                      style={{ background: accentDim, border: `1px solid ${accentBorder}` }}
-                    >
-                      <span className="text-[10px] uppercase tracking-widest" style={{ color: accent + "99" }}>Attending</span>
-                      <span className="text-sm font-bold" style={{ color: accent }}>
-                        {attendees}{maxAttendees ? ` / ${maxAttendees}` : ""}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Instruments row — if available */}
-                {instruments && instruments.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>Instruments</span>
-                    <div className="flex flex-wrap gap-2">
-                      {instruments.map((inst, i) => (
-                        <span
-                          key={i}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-                          style={{
-                            background: "rgba(8,145,178,0.12)",
-                            border: "1px solid rgba(8,145,178,0.30)",
-                            color: "#38bdf8",
-                          }}
-                        >
-                          <span>{getPillEmoji(inst)}</span>
-                          {inst}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-              {/* ── Footer ── */}
-              <div
-                className="px-7 py-4 flex items-center justify-between"
-                style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}
-              >
-                <span className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
-                  #{selectedJam.id?.toString().slice(-6) ?? "—"}
-                </span>
-                <div className="text-base">
-                  {live ? "🎸🔥🎶" : "🎵✨🎹"}
-                </div>
-              </div>
-            </div>
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none">
+                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <FeedPost post={selectedPost} />
           </div>
-        );
-      })()}
-
-      {/* ── Post Stub Modal ────────────────────────────────────────────────────── */}
-      {selectedPost && (() => {
-        const post = selectedPost;
-        return (
-          <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4">
-            <div onClick={() => setSelectedPost(null)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
-            <div
-              className="relative z-10 w-[480px] max-w-[96vw] rounded-3xl overflow-hidden flex flex-col"
-              style={{
-                backgroundColor: "#0f0f0f",
-                border: "1px solid rgba(255,255,255,0.1)",
-                boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 32px 80px rgba(0,0,0,0.9)",
-                animation: "stubSlideIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards",
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              {/* header */}
-              <div
-                className="px-6 pt-6 pb-4 flex items-center justify-between"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                <div className="flex items-center gap-3">
-                  {post.author.avatarUrl ? (
-                    <img src={post.author.avatarUrl} alt={post.author.displayName} className="w-9 h-9 rounded-full object-cover" />
-                  ) : (
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
-                      style={{ background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))", color: "#DC2E73" }}
-                    >
-                      {post.author.displayName?.[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold text-white">{post.author.displayName}</p>
-                    <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
-                      {post.author.username} · {timeAgo(post.createdAt)}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedPost(null)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* image */}
-              {post.media?.images?.[0] && (
-                <img src={post.media.images[0]} alt="" className="w-full max-h-72 object-cover" />
-              )}
-
-              {/* content */}
-              {post.content && (
-                <div className="px-6 py-5">
-                  <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.75)" }}>
-                    {post.content}
-                  </p>
-                </div>
-              )}
-
-              {/* footer */}
-              <div
-                className="px-6 py-4 flex items-center gap-4"
-                style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <span className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>♥ {post.likes}</span>
-                <span className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>💬 {post.comments}</span>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* ── Pill Viewer Modal ─────────────────────────────────────────────────
        * Read-only view of selected pills — accessible to anyone viewing the profile.
@@ -2346,13 +1737,13 @@ const Profile = () => {
             <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
               <div>
                 <h3 className="text-base font-semibold text-white">Your Sound</h3>
-                <p className="text-xs text-neutral-600 mt-0.5">Pick up to {MAX_PILLS} tags that describe your music</p>
+                <p className="text-xs text-neutral-600 mt-0.5">Pick any tags that describe your music</p>
               </div>
               <span
                 className="text-xs px-2.5 py-1 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: selectedTagIds.size >= MAX_PILLS ? "#DC2E73" : "rgba(255,255,255,0.4)" }}
+                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}
               >
-                {selectedTagIds.size}/{MAX_PILLS}
+                {selectedTagIds.size} selected
               </span>
             </div>
 
@@ -2413,7 +1804,28 @@ const Profile = () => {
             {/* Footer */}
             <div className="px-6 pb-5 pt-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
               <button
-                onClick={() => setPillPickerOpen(false)}
+                onClick={async () => {
+                  setPillPickerOpen(false);
+                  // If opened directly from the Sound section (not from the Edit Profile modal),
+                  // save immediately — there's no "Save Changes" button for the user to hit.
+                  if (!editOpen) {
+                    const orderedGenreIds      = [...selectedTagIds].filter(uid => uid.startsWith("g_")).map(uid => +uid.slice(2));
+                    const orderedInstrumentIds = [...selectedTagIds].filter(uid => uid.startsWith("i_")).map(uid => +uid.slice(2));
+                    const orderedVibeIds       = [...selectedTagIds].filter(uid => uid.startsWith("v_")).map(uid => +uid.slice(2));
+                    try {
+                      await updateProfile({
+                        genres_liked:      orderedGenreIds,
+                        instruments_liked: orderedInstrumentIds,
+                        vibes_liked:       orderedVibeIds,
+                      });
+                      showToast("Sound updated!");
+                      fetchProfile().catch((err) => console.error("Background re-fetch failed:", err));
+                    } catch (err) {
+                      console.error("Failed to save sound tags:", err);
+                      showToast("Failed to save. Please try again.");
+                    }
+                  }
+                }}
                 className="w-full rounded-xl bg-[#DC2E73] py-2.5 text-sm font-semibold text-white hover:bg-pink-500 transition cursor-pointer"
               >
                 Done
@@ -2423,50 +1835,63 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Edit Modal — only rendered for own profile */}
+      {/* Edit Modal — own profile only */}
       {isOwnProfile && editOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
           <div
-            onClick={() => setEditOpen(false)}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => { seedFormFromUser(user); setEditOpen(false); }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
-
           <div
-            className="relative z-[1000] flex w-[900px] max-w-[94vw] max-h-[90vh] flex-col gap-6 rounded-3xl bg-neutral-900 p-6 text-white shadow-xl md:flex-row overflow-y-auto"
+            className="relative z-[1000] w-full max-w-[500px] max-h-[88vh] flex flex-col bg-[#0f0f0f] text-white rounded-3xl overflow-hidden"
+            style={{
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.9)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-full md:w-[250px]">
-              <h2 className="mb-4 text-2xl font-semibold">Profile Edits</h2>
-
-              <div className="space-y-3">
-                {sectionButtons.map((item) => {
-                  const isActive = activeSection === item;
-
-                  return (
-                    <button
-                      key={item}
-                      onClick={() => setActiveSection(item)}
-                      className="relative w-full overflow-hidden rounded-xl p-4 text-left transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                    >
-                      <div
-                        className={`absolute inset-0 bg-[#DC2E73] transition-all duration-300 ${
-                          isActive ? "w-full" : "w-0 group-hover:w-full"
-                        }`}
-                      />
-                      <span
-                        className={`relative z-10 transition-colors duration-200 ${
-                          isActive ? "text-black" : "text-white"
-                        }`}
-                      >
-                        {item}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 shrink-0"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <h2 className="text-lg font-semibold">Edit Profile</h2>
+              <button
+                onClick={() => { seedFormFromUser(user); setEditOpen(false); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
+                style={{ color: "rgba(255,255,255,0.4)" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            {/* Section tabs */}
+            <div className="flex items-center gap-1.5 px-5 py-3 overflow-x-auto hide-scrollbar shrink-0"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              {[
+                { key: "Name & Location", label: "Identity" },
+                { key: "Profile Picture", label: "Avatar" },
+                { key: "Banner",          label: "Banner" },
+                { key: "About Me",        label: "About" },
+                { key: "Pills",           label: "Sound" },
+                { key: "Card Colors",     label: "Theme" },
+                { key: "Links",           label: "Links" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveSection(key)}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap"
+                  style={{
+                    background: activeSection === key ? "rgba(220,46,115,0.18)" : "transparent",
+                    border: `1px solid ${activeSection === key ? "rgba(220,46,115,0.40)" : "rgba(255,255,255,0.09)"}`,
+                    color: activeSection === key ? "#DC2E73" : "rgba(255,255,255,0.45)",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="min-h-[320px] flex-1 rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-5">
               {activeSection === "Name & Location" && (
                 <div className="flex flex-col gap-5">
                   {/* Display name */}
@@ -2541,7 +1966,7 @@ const Profile = () => {
 
                   <label
                     htmlFor="profileUpload"
-                    className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3 text-neutral-300 transition-all duration-200 hover:border-transparent hover:bg-[#DC2E73] hover:text-black"
+                    className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3 text-neutral-300 transition-all duration-200 hover:border-transparent hover:bg-[#DC2E73] hover:text-white"
                   >
                     <i className="fa-solid fa-upload text-sm"></i>
                     <span className="text-sm font-medium">Upload Image</span>
@@ -2550,6 +1975,14 @@ const Profile = () => {
                   <p className="text-center text-xs text-neutral-500">
                     PNG, JPG recommended
                   </p>
+                  {profilePic && (
+                    <div className="flex justify-center">
+                      <div
+                        className="w-20 h-20 rounded-full border-2 border-white/10 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${profilePic})` }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2581,44 +2014,11 @@ const Profile = () => {
                       style={{ backgroundImage: `url(${banner})` }}
                     />
                   )}
-                  {/* Manual light/dark text override */}
-                  <div className="flex items-center justify-between rounded-xl bg-neutral-800 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-white">Light text on banner</p>
-                      <p className="text-xs text-neutral-500 mt-0.5">
-                        {bannerDark ? "Auto-detected: dark banner" : "Auto-detected: light banner"}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setBannerDark((v) => !v)}
-                      className="relative w-10 h-6 rounded-full transition-colors duration-200"
-                      style={{ background: bannerDark ? "#DC2E73" : "#404040" }}
-                    >
-                      <span
-                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
-                        style={{ left: bannerDark ? "calc(100% - 22px)" : "2px" }}
-                      />
-                    </button>
-                  </div>
                 </div>
               )}
 
               {activeSection === "About Me" && (
                 <div className="flex flex-col gap-4">
-                  {/* Headline input */}
-                  <div>
-                    <p className="mb-1.5 text-sm text-neutral-400">Headline</p>
-                    <input
-                      type="text"
-                      value={headline}
-                      maxLength={20}
-                      onChange={(e) => setHeadline(e.target.value)}
-                      placeholder="Add your headline!"
-                      className="w-full rounded-lg bg-neutral-800 px-3 py-2.5 text-sm text-white placeholder-neutral-600 outline-none border border-transparent focus:border-[#DC2E73]/40 transition-colors"
-                    />
-                    <p className="mt-1 text-xs text-neutral-400">{headline.length}/20 characters</p>
-                  </div>
-
                   {/* Bio textarea */}
                   <div>
                     <p className="mb-1.5 text-sm text-neutral-400">Bio</p>
@@ -2685,7 +2085,7 @@ const Profile = () => {
               {activeSection === "Pills" && (
                 <div className="flex flex-col gap-4" style={{ height: "280px" }}>
                   <p className="text-xs text-neutral-500">
-                    {pills.length}/{MAX_PILLS} selected — click the strip to edit
+                    {pills.length} selected — click the strip to edit
                   </p>
 
                   {/* Scrollable strip of selected pills — click to open picker */}
@@ -2788,7 +2188,7 @@ const Profile = () => {
                   />
                   <div className="h-px bg-white/[0.06]" />
                   <CardColorRow
-                    label="Interests"
+                    label="Sound"
                     value={cardColors.interests}
                     onChange={(c) => setCardColor("interests", c)}
                   />
@@ -2842,102 +2242,70 @@ const Profile = () => {
                 </div>
               )}
 
-              {/*
-               * ── SAVE — BACKEND WIRING GUIDE ──────────────────────────────
-               *
-               * Call updateProfile() from useAuth (add to destructure at top).
-               * All variables listed below are live in local state right now.
-               *
-               * ── ALREADY EXISTS ON YOUR MODEL ──────────────────────────────
-               *   display_name        → name              (string, max 15)
-               *   city                → city              (string, max 15)
-               *   country             → country           (string, max 15)
-               *   about               → about             (string, max 200)
-               *   pfp                 → profilePic        (dataURL → File before PATCH)
-               *   genres_liked        → orderedGenreIds   (int[], ordered — index 0 = favorite)
-               *   instruments_liked   → orderedInstrumentIds (int[], ordered)
-               *   vibes_liked         → orderedVibeIds    (int[], ordered)
-               *
-               * ── NEW FIELDS — ADD TO PROFILE MODEL ─────────────────────────
-               *   headline            → headline          (string, max 20)
-               *   available_to_jam    → availableToJam    (boolean)
-               *   banner              → banner            (dataURL → ImageField)
-               *   about_photo         → aboutPhoto        (dataURL → ImageField)
-               *   profile_theme       → profile_theme     (JSONField) — shape:
-               *     {
-               *       cardColors:        { aboutMe, musicSnips, jams, posts, interests },
-               *       jamCardColor:      swatch object for individual jam row cards,
-               *       cardTextOverrides: { aboutMe, musicSnips, jams, posts, interests },
-               *       bannerDark:        boolean (light text on banner)
-               *     }
-               *
-               * ── FRIEND REQUEST (separate endpoint) ────────────────────────
-               *   apiService.sendFriendRequest(userId)
-               *   friendStatus local state: "none" | "pending" | "friends"
-               *   Seed friendStatus on load from the viewed user's friend relation.
-               * ─────────────────────────────────────────────────────────────── */}
-              <div className="mt-6 flex gap-3">
-                {/* ▼▼▼ SAVE — calls updateProfile() → PATCH api/profiles/me/ ▼▼▼ */}
-                <button
-                  onClick={async () => {
-                    // ── Build ordered tag arrays from pill order ──────────────
-                    const orderedGenreIds      = pills.filter(p => p.id?.startsWith("g_")).map(p => +p.id.slice(2));
-                    const orderedInstrumentIds = pills.filter(p => p.id?.startsWith("i_")).map(p => +p.id.slice(2));
-                    const orderedVibeIds       = pills.filter(p => p.id?.startsWith("v_")).map(p => +p.id.slice(2));
-                    const profile_theme = {
-                      cardColors,
-                      jamCardColor,
-                      cardTextOverrides,
-                      bannerDark,
-                    };
+              {activeSection === "Links" && (
+                <LinksEditSection
+                  links={links}
+                  onChange={(key, val) => setLinks((prev) => ({ ...prev, [key]: val }))}
+                />
+              )}
 
-                    // ── Convert a dataURL to Blob (only when image was changed locally) ──
-                    const toBlob = (dataUrl) => {
-                      if (!dataUrl || !dataUrl.startsWith("data:")) return undefined;
-                      const [header, b64] = dataUrl.split(",");
-                      const mime = header.match(/:(.*?);/)[1];
-                      const bytes = atob(b64);
-                      const arr = new Uint8Array(bytes.length);
-                      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-                      return new Blob([arr], { type: mime });
-                    };
+            </div>
+            {/* Drawer footer */}
+            <div className="px-6 py-4 shrink-0 flex gap-3"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+              {/* ▼▼▼ SAVE — calls updateProfile() → PATCH api/profiles/me/ ▼▼▼ */}
+              <button
+                onClick={async () => {
+                  // ── Build tag ID arrays from selectedTagIds (always in sync with selection)
+                  const orderedGenreIds      = [...selectedTagIds].filter(uid => uid.startsWith("g_")).map(uid => +uid.slice(2));
+                  const orderedInstrumentIds = [...selectedTagIds].filter(uid => uid.startsWith("i_")).map(uid => +uid.slice(2));
+                  const orderedVibeIds       = [...selectedTagIds].filter(uid => uid.startsWith("v_")).map(uid => +uid.slice(2));
 
-                    try {
-                      // ── PATCH payload → updateProfile() in Auth.jsx ───────
-                      await updateProfile({
-                        display_name:       name,
-                        city,
-                        country,
-                        about,
-                        headline,
-                        available_to_jam:   availableToJam,
-                        pfp:                toBlob(profilePic),
-                        genres_liked:       orderedGenreIds,
-                        instruments_liked:  orderedInstrumentIds,
-                        vibes_liked:        orderedVibeIds,
-                        profile_theme:      JSON.stringify(profile_theme),
-                        profile_banner:     toBlob(banner),
-                        // about_photo:     toBlob(aboutPhoto),
-                      });
-                      // ─────────────────────────────────────────────────────
-                      showToast("Profile saved!");
-                      setEditOpen(false);
-                    } catch (err) {
-                      console.error("Failed to save profile:", err);
-                      showToast("Failed to save. Please try again.");
-                    }
-                  }}
-                  className="flex-1 rounded-full bg-[#DC2E73] px-4 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-pink-500 transition-colors"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setEditOpen(false)}
-                  className="rounded-full bg-neutral-700 px-4 py-2 text-sm text-white cursor-pointer hover:bg-neutral-600 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+                  // ── Convert a dataURL to Blob (only when image was changed locally) ──
+                  const toBlob = (dataUrl) => {
+                    if (!dataUrl || !dataUrl.startsWith("data:")) return undefined;
+                    const [header, b64] = dataUrl.split(",");
+                    const mime = header.match(/:(.*?);/)[1];
+                    const bytes = atob(b64);
+                    const arr = new Uint8Array(bytes.length);
+                    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+                    return new Blob([arr], { type: mime });
+                  };
+
+                  try {
+                    // ── PATCH payload → updateProfile() in Auth.jsx ───────
+                    await updateProfile({
+                      display_name:       name,
+                      city,
+                      country,
+                      about,
+                      pfp:                toBlob(profilePic),
+                      genres_liked:       orderedGenreIds,
+                      instruments_liked:  orderedInstrumentIds,
+                      vibes_liked:        orderedVibeIds,
+                      profile_banner:     toBlob(banner),
+                      // about_photo:     toBlob(aboutPhoto),
+                      ...links,
+                    });
+                    // Close immediately, then re-fetch in the background
+                    showToast("Profile saved!");
+                    setEditOpen(false);
+                    fetchProfile().catch((err) => console.error("Background re-fetch failed:", err));
+                  } catch (err) {
+                    console.error("Failed to save profile:", err);
+                    showToast("Failed to save. Please try again.");
+                  }
+                }}
+                className="flex-1 rounded-full bg-[#DC2E73] px-4 py-2.5 text-sm font-semibold text-white cursor-pointer hover:bg-pink-500 transition-colors"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => { seedFormFromUser(user); setEditOpen(false); }}
+                className="rounded-full bg-neutral-800 px-4 py-2.5 text-sm text-white/50 cursor-pointer hover:bg-neutral-700 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -2997,16 +2365,32 @@ const Profile = () => {
 
             <div className="flex justify-between">
               <button
-                onClick={() => setSnippetModalOpen(false)}
-                className="rounded-lg bg-neutral-700 px-4 py-2 text-sm hover:bg-neutral-600 transition"
+                onClick={() => {
+                  setSnippetModalOpen(false);
+                  setNewSnippet({ title: "", audioFile: null, audioName: null });
+                  // Reset the file input so re-opening doesn't show a stale filename
+                  const el = document.getElementById("snippetAudio");
+                  if (el) el.value = "";
+                }}
+                disabled={isSaving}
+                className="rounded-lg bg-neutral-700 px-4 py-2 text-sm hover:bg-neutral-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={saveSnippet}
-                className="rounded-lg bg-pink-600 px-4 py-2 text-sm hover:bg-pink-500 transition cursor-pointer"
+                disabled={isSaving}
+                className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ minWidth: "72px", justifyContent: "center" }}
               >
-                Save
+                {isSaving ? (
+                  <>
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save"
+                )}
               </button>
             </div>
           </div>
@@ -3023,32 +2407,11 @@ const Profile = () => {
             if (cropState.variant === "profile") {
               setProfilePic(dataURL);
             } else if (cropState.variant === "banner") {
-              const img = new Image();
-              img.onload = () => {
-                const sampleW = Math.floor(img.width * 0.3);
-                const c = document.createElement("canvas");
-                c.width = sampleW; c.height = img.height;
-                const ctx = c.getContext("2d");
-                if (ctx) {
-                  ctx.drawImage(img, 0, 0, sampleW, img.height, 0, 0, sampleW, img.height);
-                  const data = ctx.getImageData(0, 0, sampleW, img.height).data;
-                  const pixels = data.length / 4;
-                  let total = 0;
-                  for (let p = 0; p < data.length; p += 4) {
-                    total += 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
-                  }
-                  setBannerDark(total / pixels < 128);
-                }
-              };
-              img.src = dataURL;
               revokeObjectUrl(banner);
               setBanner(dataURL);
             } else if (cropState.variant === "square") {
               if (aboutPhoto) URL.revokeObjectURL(aboutPhoto);
               setAboutPhoto(dataURL);
-            } else if (cropState.variant === "portrait") {
-              if (newPost.image) URL.revokeObjectURL(newPost.image);
-              setNewPost((p) => ({ ...p, image: dataURL }));
             } else if (cropState.variant === "snippet") {
               revokeObjectUrl(newSnippet.background);
               setNewSnippet((prev) => ({ ...prev, background: dataURL }));
@@ -3086,11 +2449,18 @@ const Profile = () => {
               cursor: "pointer",
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-              <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5"/>
-              <path d="M8 5v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="8" cy="11" r="0.75" fill="white"/>
-            </svg>
+            {toast.toLowerCase().includes("fail") || toast.toLowerCase().includes("error") ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5"/>
+                <path d="M8 5v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="8" cy="11" r="0.75" fill="white"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5"/>
+                <path d="M4.5 8l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
             <span style={{ color: "#fff", fontSize: "13px", fontWeight: 500, lineHeight: 1.4 }}>
               {toast}
             </span>
