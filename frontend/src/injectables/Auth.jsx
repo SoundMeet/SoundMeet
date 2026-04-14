@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(!!getToken());
 
   const fetchProfile = useCallback(async () => {
-    const profile = await apiFetch("api/profiles/me/");
+    const profile = await apiFetch("api/profiles/me/", { cache: "no-store" });
     setUser(profile);
     return profile;
   }, []);
@@ -97,6 +97,9 @@ export function AuthProvider({ children }) {
     if (data.state !== undefined)               form.append("state", data.state);
     if (data.onboarding_complete !== undefined) form.append("onboarding_complete", String(data.onboarding_complete));
     if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
+    if (data.headline !== undefined)            form.append("headline", data.headline);
+    if (data.available_to_jam !== undefined)    form.append("available_to_jam", String(data.available_to_jam));
+    if (data.profile_theme !== undefined)       form.append("profile_theme", data.profile_theme);
     // Music links
     if (data.spotify !== undefined)             form.append("spotify", data.spotify);
     if (data.soundcloud !== undefined)          form.append("soundcloud", data.soundcloud);

@@ -19,6 +19,7 @@ import AppDropdown from './ui/AppDropdown'
 import AvatarButton from './AvatarButton'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
+import { formatAvatarUrl } from '../utils/formatAvatarUrl'
 
 // ─── Menu item config ─────────────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ function UserHeader({ user }) {
         style={{ background: '#2A2A2A' }}
       >
         {user?.pfp ? (
-          <img src={user.pfp} alt={displayName} className="w-full h-full object-cover" />
+          <img src={formatAvatarUrl(user.pfp)} alt={displayName} className="w-full h-full object-cover" />
         ) : (
           <span
             className="text-xs font-semibold select-none"

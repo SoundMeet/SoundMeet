@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../../context/NotificationsContext'
+import { ProfilesRUS } from '../../services/ProfilesRUS'
 
 export function FriendRequestCard({ request }) {
   const { acceptRequest, declineRequest } = useNotifications()
@@ -26,7 +27,7 @@ export function FriendRequestCard({ request }) {
       {/* User info row */}
       <div className="flex items-center gap-2.5">
         <button
-          onClick={() => navigate('/profile')}
+          onClick={() => ProfilesRUS(navigate, fromUser.profileId)}
           className="flex-shrink-0 rounded-full transition-opacity hover:opacity-80"
           type="button"
         >

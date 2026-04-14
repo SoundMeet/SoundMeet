@@ -61,7 +61,7 @@ def music_snips(request):
         if not profile_id:
             return Response({'error': 'profile_id is required.'}, status=400)
             
-        snips = MusicSnip.objects.filter(profile_id=profile_id)
+        snips = MusicSnip.objects.filter(profile__user_id=profile_id)
         
         snips_data = [
             {

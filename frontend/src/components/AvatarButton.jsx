@@ -18,6 +18,7 @@
  *   onClick    – toggle handler
  */
 import { FaUser } from 'react-icons/fa'
+import { formatAvatarUrl } from '../utils/formatAvatarUrl'
 
 function getInitials(user) {
   const name = user?.display_name || user?.username
@@ -64,7 +65,7 @@ export default function AvatarButton({ user, isLoggedIn, isOpen, onClick }) {
     >
       {user?.pfp ? (
         <img
-          src={user.pfp}
+          src={formatAvatarUrl(user.pfp)}
           alt={user.display_name ?? user.username ?? 'User avatar'}
           className="w-full h-full object-cover"
           onError={(e) => {
