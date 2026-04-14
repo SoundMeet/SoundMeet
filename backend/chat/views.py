@@ -1,3 +1,7 @@
+import random
+from django.core.mail import send_mail
+from django.utils import timezone
+from .models import EmailVerification
 from django.shortcuts import render, get_object_or_404
 import json
 from rest_framework.decorators import api_view, permission_classes
@@ -7,6 +11,8 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from .models import (
     Profile, Post, Comment, FriendRequest, Notification,
     BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation,
@@ -658,3 +664,116 @@ def apply_for_bandmate(request, listing_id):
             metadata={'applicant_id': request.user.id, 'listing_id': listing.id}
         )
     return Response({'status': 'Application submitted'})
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_verification_code(request):
+    email = request.data.get('email')
+    if not email:
+        return Response({'error': 'Email is required'}, status=400)
+
+    # Generate 6-digit code
+    code = str(random.randint(100000, 999999))
+
+    # Delete any existing unused codes for this email
+    EmailVerification.objects.filter(email=email, is_used=False).delete()
+
+    # Save new code
+    EmailVerification.objects.create(email=email, code=code)
+
+    # Send email
+    try:
+        send_mail(
+            subject='Your SoundMeet verification code',
+            message=f'Your verification code is: {code}\n\nThis code expires in 10 minutes.',
+            from_email=None,  # uses DEFAULT_FROM_EMAIL
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        return Response({'error': 'Failed to send email'}, status=500)
+
+    return Response({'status': 'Code sent'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_code(request):
+    email = request.data.get('email')
+    code = request.data.get('code')
+
+    if not email or not code:
+        return Response({'error': 'Email and code are required'}, status=400)
+
+    try:
+        verification = EmailVerification.objects.filter(
+            email=email,
+            code=code,
+            is_used=False
+        ).latest('created_at')
+    except EmailVerification.DoesNotExist:
+        return Response({'error': 'Invalid code'}, status=400)
+
+    if verification.is_expired():
+        return Response({'error': 'Code has expired'}, status=400)
+
+    verification.is_used = True
+    verification.save()
+
+    return Response({'status': 'verified'})
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def google_auth(request):
+    token = request.data.get('token')
+    if not token:
+        return Response({'error': 'Token is required'}, status=400)
+
+    try:
+        # Verify the token with Google
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            os.environ.get('GOOGLE_CLIENT_ID')
+        )
+
+        email = idinfo.get('email')
+        name = idinfo.get('name', '')
+        picture = idinfo.get('picture', '')
+
+        if not email:
+            return Response({'error': 'No email from Google'}, status=400)
+
+        # Check if user exists, create if not
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': email.split('@')[0][:15],
+            }
+        )
+
+        # If username taken, make it unique
+        if created:
+            base = email.split('@')[0][:12]
+            username = base
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base}{counter}"
+                counter += 1
+            user.username = username
+            user.save()
+
+            Profile.objects.get_or_create(
+                user=user,
+                defaults={'display_name': name[:15] or username}
+            )
+
+        token, _ = Token.objects.get_or_create(user=user)
+
+        return Response({
+            'token': token.key,
+            'user_id': user.id,
+            'username': user.username,
+            'created': created,
+        })
+
+    except ValueError as e:
+        return Response({'error': 'Invalid Google token'}, status=400)
