@@ -153,7 +153,14 @@
     font-size: 13px;
   }
 
-  /* MapLibre popup overrides */
+  /* Bottom nav — mobile only */
+@media (min-width: 768px) {
+  .bottom-nav-mobile {
+    display: none !important;
+  }
+}
+
+/* MapLibre popup overrides */
   .maplibregl-popup-content {
     background: transparent !important;
     padding: 0 !important;

@@ -6,7 +6,7 @@ import {
   useCallback,
 } from "react";
 
-const API_URL = "https://soundmeet-production.up.railway.app/";
+export const API_URL = "https://soundmeet-production.up.railway.app/";
 const TOKEN_KEY = "auth_token";
 const getToken = () => localStorage.getItem(TOKEN_KEY);
 const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
@@ -95,7 +95,7 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     setSession(data.token);
     const profile = await fetchProfile();
-    return profile;
+    return { profile, created: data.created, suggestedUsername: data.username };
   };
 
   const register = async (userData) => {
@@ -113,6 +113,17 @@ export function AuthProvider({ children }) {
     setIsLoggedIn(false);
     setUser(null);
   }, []);
+
+  const changePassword = async ({ currentPassword, newPassword, confirmNewPassword }) => {
+    const body = { new_password: newPassword, confirm_new_password: confirmNewPassword }
+    if (currentPassword) body.current_password = currentPassword
+    const data = await apiFetch('api/account/change-password/', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+    setSession(data.token)
+    await fetchProfile()
+  }
 
   const deleteAccount = async ({ password, confirmUsername }) => {
     const body = password
@@ -190,6 +201,7 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         register,
         logout,
+        changePassword,
         deleteAccount,
         fetchProfile,
         updateProfile,

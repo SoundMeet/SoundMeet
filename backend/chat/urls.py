@@ -30,5 +30,7 @@ urlpatterns = [
     path('api/send-verification-code/', views.send_verification_code, name='send_verification_code'),
     path('api/verify-code/', views.verify_code, name='verify_code'),
     path('api/auth/google/', views.google_auth, name='google_auth'),
+    path('api/auth/finalize-google/', views.finalize_google_signup, name='finalize_google_signup'),
+    path('api/account/change-password/', views.change_password, name='change_password'),
     path('api/account/delete/', views.delete_account, name='delete_account'),
 ]

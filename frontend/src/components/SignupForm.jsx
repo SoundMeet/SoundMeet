@@ -7,10 +7,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { FaGoogle } from 'react-icons/fa'
 import { useGoogleLogin } from '@react-oauth/google'
-import { useAuth } from '../injectables/Auth'
+import { useAuth, API_URL } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/'
+import GoogleSetupStep from './GoogleSetupStep'
 
 const ACCENT_GRAD     = 'linear-gradient(135deg, #DC2E73 0%, #FB4040 100%)'
 const ACCENT_GRAD_DIM = 'linear-gradient(135deg, rgba(220,46,115,0.5) 0%, rgba(251,64,64,0.5) 100%)'
@@ -138,6 +137,7 @@ export default function SignupForm() {
   const { closeModal, switchView } = useAuthModal()
 
   const [step, setStep] = useState('email')
+  const [googleSuggestedUsername, setGoogleSuggestedUsername] = useState('')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [resendTimer, setResendTimer] = useState(0)
@@ -153,15 +153,23 @@ export default function SignupForm() {
     return () => clearTimeout(t)
   }, [resendTimer])
 
-  const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  const handleChange = (e) => {
+    setError(null)
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true)
       setError(null)
       try {
-        await loginWithGoogle(tokenResponse.access_token)
-        closeModal()
+        const { created, suggestedUsername } = await loginWithGoogle(tokenResponse.access_token)
+        if (created) {
+          setGoogleSuggestedUsername(suggestedUsername || '')
+          setStep('google-complete')
+        } else {
+          closeModal()
+        }
       } catch (err) {
         setError(err?.error || 'Google sign up failed. Please try again.')
       } finally {
@@ -242,6 +250,11 @@ export default function SignupForm() {
     </p>
   )
 
+  // ── Google new-user setup ──────────────────────────────────────────────────
+  if (step === 'google-complete') return (
+    <GoogleSetupStep suggestedUsername={googleSuggestedUsername} />
+  )
+
   // ── Step 1: Email ──────────────────────────────────────────────────────────
   if (step === 'email') return (
     <form onSubmit={handleSendCode} style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
@@ -290,7 +303,14 @@ export default function SignupForm() {
           <span style={{ color: 'rgba(255,255,255,0.22)' }}>Resend in {resendTimer}s</span>
         ) : (
           <button type="button"
-            onClick={async () => { setError(null); setResendTimer(60); await fetch(`${API_URL}api/send-verification-code/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }) }}
+            onClick={async () => {
+              setError(null)
+              setResendTimer(60)
+              try {
+                const res = await fetch(`${API_URL}api/send-verification-code/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+                if (!res.ok) { setResendTimer(0); setError('Failed to resend code. Please try again.') }
+              } catch { setResendTimer(0); setError('Failed to resend code. Please try again.') }
+            }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FB4040', fontWeight: 600, fontSize: '12px', fontFamily: 'Sora, sans-serif', textDecoration: 'underline', padding: 0 }}
           >Resend code</button>
         )}
