@@ -243,6 +243,7 @@ def get_profile(request):
         'vibes_liked': list(profile.vibes_liked.values('id', 'name')),
         'artists_liked': list(profile.artists_liked.values('id', 'name', 'picture')),
         'friends_count': profile.friends_count,
+        'has_usable_password': request.user.has_usable_password(),
     })
 
 
@@ -771,3 +772,26 @@ def google_auth(request):
         'username': user.username,
         'created': created,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def delete_account(request):
+    user = request.user
+
+    if user.has_usable_password():
+        password = request.data.get('password', '')
+        if not password:
+            return Response({'error': 'Password is required.'}, status=400)
+        if not user.check_password(password):
+            return Response({'error': 'Incorrect password.'}, status=403)
+    else:
+        confirm_username = request.data.get('confirm_username', '')
+        if confirm_username.strip() != user.username:
+            return Response({'error': 'Username confirmation does not match.'}, status=403)
+
+    Token.objects.filter(user=user).delete()
+    user.delete()
+
+    return Response({'status': 'Account deleted.'}, status=200)

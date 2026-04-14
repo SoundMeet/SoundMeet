@@ -1,4 +1,8 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FaBell, FaLock, FaPalette, FaUser } from 'react-icons/fa'
+import { useAuth } from '../injectables/Auth'
+import { DeleteAccountSheet } from '../components/ui/DeleteAccountSheet'
 
 const SETTING_GROUPS = [
   {
@@ -70,6 +74,92 @@ function SettingGroup({ group }) {
   )
 }
 
+function DangerZoneSection() {
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [password, setPassword] = useState('')
+  const [confirmUsername, setConfirmUsername] = useState('')
+  const [error, setError] = useState('')
+  const { deleteAccount, user, isLoggedIn } = useAuth()
+  const navigate = useNavigate()
+
+  if (!isLoggedIn) return null
+
+  const isGoogleUser = user && !user.has_usable_password
+
+  const openSheet = () => {
+    setError('')
+    setPassword('')
+    setConfirmUsername('')
+    setSheetOpen(true)
+  }
+
+  const handleConfirm = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await deleteAccount({
+        password: isGoogleUser ? undefined : password,
+        confirmUsername: isGoogleUser ? confirmUsername : undefined,
+      })
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err?.error || 'Something went wrong. Please try again.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <div
+        className="rounded-2xl overflow-hidden mb-4"
+        style={{ background: '#1A1A1A', border: '1px solid rgba(251,64,64,0.10)' }}
+      >
+        <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-white/[0.06]">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(251,64,64,0.6)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: 'rgba(251,64,64,0.55)', fontFamily: 'Sora, sans-serif', fontSize: '0.68rem' }}
+          >
+            Danger Zone
+          </span>
+        </div>
+        <div className="px-1 py-1">
+          <button
+            onClick={openSheet}
+            className="flex items-center justify-between px-4 py-3 rounded-xl w-full text-left transition-colors duration-150 hover:bg-white/[0.04]"
+          >
+            <span className="text-sm font-medium" style={{ color: 'rgba(251,64,64,0.8)', fontFamily: 'Sora, sans-serif' }}>
+              Delete account
+            </span>
+            <span className="text-xs" style={{ color: 'rgba(251,64,64,0.35)', fontFamily: 'Sora, sans-serif' }}>
+              Permanent
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <DeleteAccountSheet
+        open={sheetOpen}
+        onClose={() => { if (!loading) setSheetOpen(false) }}
+        onConfirm={handleConfirm}
+        loading={loading}
+        isGoogleUser={isGoogleUser}
+        username={user?.username}
+        password={password}
+        setPassword={setPassword}
+        confirmUsername={confirmUsername}
+        setConfirmUsername={setConfirmUsername}
+        error={error}
+      />
+    </>
+  )
+}
+
 export default function Settings() {
   return (
     <div className="min-h-screen px-4 py-12 flex flex-col items-center">
@@ -85,6 +175,8 @@ export default function Settings() {
         {SETTING_GROUPS.map((group) => (
           <SettingGroup key={group.id} group={group} />
         ))}
+
+        <DangerZoneSection />
       </div>
     </div>
   )

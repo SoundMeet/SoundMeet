@@ -114,6 +114,19 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const deleteAccount = async ({ password, confirmUsername }) => {
+    const body = password
+      ? { password }
+      : { confirm_username: confirmUsername };
+    await apiFetch("api/account/delete/", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    removeToken();
+    setIsLoggedIn(false);
+    setUser(null);
+  };
+
   const updateProfile = async (data) => {
     const form = new FormData();
     if (data.display_name !== undefined)        form.append("display_name", data.display_name);
@@ -177,6 +190,7 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         register,
         logout,
+        deleteAccount,
         fetchProfile,
         updateProfile,
       }}
