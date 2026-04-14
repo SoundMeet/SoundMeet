@@ -64,7 +64,6 @@ function JamStatusPill({ item }) {
 }
 
 const MAX_SNIPPETS = 5;
-const DRAG_DELETE_THRESHOLD = 140;
 
 // ── Card color palette ────────────────────────────────────────────────────────
 // Each swatch has a bg (card background), a border tint, and a glow color.
@@ -306,7 +305,6 @@ const Profile = () => {
   const [tagsLoading, setTagsLoading] = useState(false);
 
   const PILL_COLORS = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
-  const MAX_PILLS = 9;
 
   // Toggle a tag in the picker.
   // setPills is called OUTSIDE the setSelectedTagIds updater to avoid a stale
@@ -450,7 +448,6 @@ const Profile = () => {
   });
 
   const [playingIndex, setPlayingIndex] = useState(null);
-  const [pulse, setPulse] = useState({});
 
   // ── Unified crop state — one CropperThings modal handles all image uploaders
   const [cropState, setCropState] = useState({ open: false, variant: "square", rawImage: null });
@@ -465,15 +462,8 @@ const Profile = () => {
     setCropState({ open: false, variant: "square", rawImage: null });
   };
 
-  const [dragging, setDragging] = useState(null);
-  const [dragX, setDragX] = useState(0);
-
   // ── Posts state ───────────────────────────────────────────────────────────
   const audioRef = useRef(null);
-
-  const dragStartXRef = useRef(0);
-  const lastDragXRef = useRef(0);
-  const movedRef = useRef(false);
 
   // ── Jams state — fetched from jamService, capped at 9, local-only removal ──
   const [jams, setJams] = useState([]);
@@ -618,11 +608,7 @@ const Profile = () => {
     }
   };
 
-  const triggerPulse = (index) => {
-    setPulse((prev) => ({ ...prev, [index]: Date.now() }));
-  };
-
-  const playSnippet = (snippet, index) => {
+const playSnippet = (snippet, index) => {
     if (playingIndex === index) {
       stopPlayback();
       return;
@@ -637,7 +623,6 @@ const Profile = () => {
       // play() is called synchronously within the click handler —
       // no awaits before this point so the browser gesture trust window is intact.
       const playPromise = audio.play();
-      triggerPulse(index);
       setPlayingIndex(index);
 
       if (playPromise !== undefined) {
@@ -658,70 +643,6 @@ const Profile = () => {
     }
   };
 
-  const getClientX = (event) => {
-    if (event.touches && event.touches[0]) return event.touches[0].clientX;
-    if (event.changedTouches && event.changedTouches[0]) {
-      return event.changedTouches[0].clientX;
-    }
-    return event.clientX;
-  };
-
-  const handleDragStart = (index, event) => {
-    dragStartXRef.current = getClientX(event);
-    lastDragXRef.current = 0;
-    movedRef.current = false;
-    setDragging(index);
-    setDragX(0);
-  };
-
-  const handleDragMove = (event) => {
-    if (dragging === null) return;
-
-    const currentX = getClientX(event);
-    const distance = currentX - dragStartXRef.current;
-
-    if (Math.abs(distance) > 6) {
-      movedRef.current = true;
-    }
-
-    lastDragXRef.current = distance;
-    setDragX(distance);
-  };
-
-  const handleDragEnd = () => {
-    if (dragging === null) return;
-
-    const draggedIndex = dragging;
-    const finalDistance = lastDragXRef.current;
-
-    setDragging(null);
-    setDragX(0);
-
-    if (Math.abs(finalDistance) >= DRAG_DELETE_THRESHOLD) {
-      deleteSnippet(draggedIndex);
-    }
-  };
-
-  useEffect(() => {
-    if (dragging === null) return;
-
-    const onMouseMove = (event) => handleDragMove(event);
-    const onMouseUp = () => handleDragEnd();
-    const onTouchMove = (event) => handleDragMove(event);
-    const onTouchEnd = () => handleDragEnd();
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    window.addEventListener("touchend", onTouchEnd);
-
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-    };
-  }, [dragging]);
 
   useEffect(() => {
     return () => {
@@ -1217,10 +1138,15 @@ const Profile = () => {
                       {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
                         <button
                           onClick={() => setSnippetModalOpen(true)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-black text-lg transition hover:scale-110"
-                          style={{ background: "linear-gradient(135deg, #D33280, #EA65C2)", boxShadow: "0 4px 16px rgba(220,46,115,0.4)" }}
+                          className="flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+                          style={{
+                            background: dark ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)",
+                            border: `1px solid ${dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)"}`,
+                          }}
                         >
-                          +
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M6 1v10M1 6h10" stroke={dark ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)"} strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
                         </button>
                       )}
                     </div>
@@ -1247,38 +1173,21 @@ const Profile = () => {
                         )
                       ) : (
                         snippets.map((snippet, index) => {
-                          const isDragging   = dragging === index;
-                          const offsetX      = isDragging ? dragX : 0;
-                          const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
-                          const isPlaying    = playingIndex === index;
+                          const isPlaying = playingIndex === index;
                           return (
                             <div key={index} className="relative group/snip">
-                              {!isDragging && !isPlaying && (
+                              {!isPlaying && (
                                 <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 z-30
                                   opacity-0 group-hover/snip:opacity-100 transition-opacity duration-200
                                   bg-neutral-800 text-white text-[11px] px-3 py-1 whitespace-nowrap"
                                   style={{ borderRadius: "40px", boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
-                                  Click to play · Drag to delete
-                                </div>
-                              )}
-                              {isPlaying && pulse[index] && (
-                                <div key={pulse[index]} className="animate-ping pointer-events-none absolute inset-0 rounded-2xl border border-[#DC2E73]/40 z-20" />
-                              )}
-                              {isDragging && <div className="pointer-events-none absolute inset-0 rounded-2xl bg-red-500/10 z-0" />}
-                              {isDragging && dragProgress > 0.45 && (
-                                <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-4 z-10">
-                                  <span className="text-xs font-medium text-red-300">Release to delete</span>
+                                  Click to play
                                 </div>
                               )}
                               <div
-                                onMouseDown={(e) => handleDragStart(index, e)}
-                                onTouchStart={(e) => handleDragStart(index, e)}
-                                onClick={() => { if (!movedRef.current) playSnippet(snippet, index); movedRef.current = false; }}
-                                className="relative z-10 flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 transition-colors"
+                                onClick={() => playSnippet(snippet, index)}
+                                className={`relative z-10 flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 transition-colors${isPlaying ? " snip-playing-glow" : ""}`}
                                 style={{
-                                  transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
-                                  opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : 1,
-                                  transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
                                   background: isPlaying ? "rgba(220,46,115,0.12)" : (dark ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.05)"),
                                   border: isPlaying ? "1px solid rgba(220,46,115,0.30)" : `1px solid ${dark ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)"}`,
                                   backgroundImage: snippet.background
@@ -1331,9 +1240,27 @@ const Profile = () => {
                                     ))}
                                   </div>
                                 </div>
-                                {/* Playing dot indicator */}
-                                <div className="shrink-0 h-2 w-2 rounded-full transition-colors duration-200"
-                                  style={{ background: isPlaying ? "#DC2E73" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)") }} />
+                                {/* Delete button (own profile) or playing dot */}
+                                {isOwnProfile ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteSnippet(index); }}
+                                    className="shrink-0 flex items-center justify-center rounded-full transition-all duration-200 opacity-0 group-hover/snip:opacity-100 hover:!opacity-100"
+                                    style={{
+                                      width: "24px", height: "24px",
+                                      background: "rgba(220,46,115,0.00)",
+                                      color: dark ? "rgba(0,0,0,0.30)" : "rgba(255,255,255,0.25)",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.color = "#DC2E73"; e.currentTarget.style.background = "rgba(220,46,115,0.12)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.color = dark ? "rgba(0,0,0,0.30)" : "rgba(255,255,255,0.25)"; e.currentTarget.style.background = "rgba(220,46,115,0.00)"; }}
+                                  >
+                                    <svg width="12" height="13" viewBox="0 0 12 13" fill="none">
+                                      <path d="M1 3h10M4 3V2h4v1M5 6v4M7 6v4M2 3l.6 8a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9L10 3H2Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <div className="shrink-0 h-2 w-2 rounded-full transition-colors duration-200"
+                                    style={{ background: isPlaying ? "#DC2E73" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)") }} />
+                                )}
                               </div>
                             </div>
                           );
@@ -1481,7 +1408,7 @@ const Profile = () => {
                           <div key={jam.id} className="relative">
                             <div
                               onClick={() => setSelectedJam(jam)}
-                              className="group relative z-10 w-full rounded-2xl p-4 text-left cursor-pointer select-none overflow-hidden"
+                              className="group relative z-10 w-full rounded-2xl p-4 text-left cursor-pointer select-none overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:brightness-[1.15]"
                               style={{
                                 background: jam.canEdit
                                   ? "linear-gradient(135deg, rgba(220,46,115,0.08), rgba(220,46,115,0.03))"
@@ -1743,7 +1670,7 @@ const Profile = () => {
                 className="text-xs px-2.5 py-1 rounded-full"
                 style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}
               >
-                {selectedTagIds.size} selected
+                {allTags.length > 0 ? allTags.filter(t => selectedTagIds.has(t.uid)).length : selectedTagIds.size} selected
               </span>
             </div>
 
@@ -1761,9 +1688,8 @@ const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       {allTags.filter(t => t.uid.startsWith("g_")).map((tag) => {
                         const selected = selectedTagIds.has(tag.uid);
-                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
                         const color = PILL_COLORS[tag.id % PILL_COLORS.length];
-                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={false} color={color} onToggle={() => toggleTag(tag)} />;
                       })}
                     </div>
                   </div>
@@ -1776,9 +1702,8 @@ const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       {allTags.filter(t => t.uid.startsWith("i_")).map((tag) => {
                         const selected = selectedTagIds.has(tag.uid);
-                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
                         const color = PILL_COLORS[tag.id % PILL_COLORS.length];
-                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={false} color={color} onToggle={() => toggleTag(tag)} />;
                       })}
                     </div>
                   </div>
@@ -1791,9 +1716,8 @@ const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       {allTags.filter(t => t.uid.startsWith("v_")).map((tag) => {
                         const selected = selectedTagIds.has(tag.uid);
-                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
                         const color = PILL_COLORS[tag.id % PILL_COLORS.length];
-                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={false} color={color} onToggle={() => toggleTag(tag)} />;
                       })}
                     </div>
                   </div>
