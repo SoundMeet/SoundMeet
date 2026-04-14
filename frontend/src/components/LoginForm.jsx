@@ -8,6 +8,7 @@ import { FaGoogle } from 'react-icons/fa'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
+import GoogleSetupStep from './GoogleSetupStep'
 
 const ACCENT_GRAD     = 'linear-gradient(135deg, #DC2E73 0%, #FB4040 100%)'
 const ACCENT_GRAD_DIM = 'linear-gradient(135deg, rgba(220,46,115,0.5) 0%, rgba(251,64,64,0.5) 100%)'
@@ -22,9 +23,12 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [googleSetup, setGoogleSetup] = useState(null) // { suggestedUsername } when new Google user
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
+    setError(null)
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -49,8 +53,12 @@ export default function LoginForm() {
       setGoogleLoading(true)
       setError(null)
       try {
-        await loginWithGoogle(tokenResponse.access_token)
-        closeModal()
+        const { created, suggestedUsername } = await loginWithGoogle(tokenResponse.access_token)
+        if (created) {
+          setGoogleSetup({ suggestedUsername: suggestedUsername || '' })
+        } else {
+          closeModal()
+        }
       } catch (err) {
         setError(err?.error || 'Google login failed. Please try again.')
       } finally {
@@ -59,6 +67,10 @@ export default function LoginForm() {
     },
     onError: () => setError('Google login failed. Please try again.'),
   })
+
+  if (googleSetup) return (
+    <GoogleSetupStep suggestedUsername={googleSetup.suggestedUsername} />
+  )
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

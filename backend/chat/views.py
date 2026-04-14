@@ -2,6 +2,8 @@ import random
 import requests as http_requests
 from django.core.mail import send_mail
 from django.utils import timezone
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from .models import EmailVerification
 from django.shortcuts import render, get_object_or_404
 import json
@@ -757,6 +759,7 @@ def google_auth(request):
             username = f"{base}{counter}"
             counter += 1
         user.username = username
+        user.set_unusable_password()
         user.save()
 
         Profile.objects.get_or_create(
@@ -772,6 +775,79 @@ def google_auth(request):
         'username': user.username,
         'created': created,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def finalize_google_signup(request):
+    user = request.user
+    username = request.data.get('username', '').strip()
+    password = request.data.get('password', '').strip()
+    age = request.data.get('age')
+    country = request.data.get('country', '').strip()
+    city = request.data.get('city', '').strip()
+    gender = request.data.get('gender', '').strip()
+
+    if not username:
+        return Response({'error': 'Username is required.'}, status=400)
+
+    if User.objects.filter(username=username).exclude(pk=user.pk).exists():
+        return Response({'error': 'Username already taken.'}, status=400)
+
+    user.username = username
+    if password:
+        user.set_password(password)
+    user.save()
+
+    profile, _ = Profile.objects.get_or_create(user=user)
+    if country:
+        profile.country = country
+    if city:
+        profile.city = city
+    if gender:
+        profile.gender = gender
+    if age:
+        try:
+            profile.age = int(age)
+        except (ValueError, TypeError):
+            pass
+    profile.save()
+
+    return Response({'username': user.username})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    user = request.user
+    new_password = request.data.get('new_password', '')
+    confirm_new_password = request.data.get('confirm_new_password', '')
+
+    if not new_password or not confirm_new_password:
+        return Response({'error': 'New password and confirmation are required.'}, status=400)
+
+    if new_password != confirm_new_password:
+        return Response({'error': 'Passwords do not match.'}, status=400)
+
+    if user.has_usable_password():
+        current_password = request.data.get('current_password', '')
+        if not current_password:
+            return Response({'error': 'Current password is required.'}, status=400)
+        if not user.check_password(current_password):
+            return Response({'error': 'Current password is incorrect.'}, status=403)
+
+    try:
+        validate_password(new_password, user)
+    except ValidationError as e:
+        return Response({'error': e.messages[0]}, status=400)
+
+    user.set_password(new_password)
+    user.save()
+
+    Token.objects.filter(user=user).delete()
+    new_token = Token.objects.create(user=user)
+
+    return Response({'token': new_token.key})
 
 
 @api_view(['POST'])

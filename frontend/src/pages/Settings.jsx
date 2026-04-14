@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FaBell, FaLock, FaPalette, FaUser } from 'react-icons/fa'
 import { useAuth } from '../injectables/Auth'
 import { DeleteAccountSheet } from '../components/ui/DeleteAccountSheet'
+import { ChangePasswordSheet } from '../components/ui/ChangePasswordSheet'
 
 const SETTING_GROUPS = [
   {
@@ -15,7 +16,7 @@ const SETTING_GROUPS = [
     id: 'privacy',
     label: 'Privacy & Security',
     icon: FaLock,
-    items: ['Profile visibility', 'Block list', 'Change password', 'Two-factor auth'],
+    items: ['Profile visibility', 'Block list', 'Two-factor auth'],
   },
   {
     id: 'notifications',
@@ -31,11 +32,25 @@ const SETTING_GROUPS = [
   },
 ]
 
-function SettingRow({ label }) {
+function SettingRow({ label, onClick }) {
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-150 w-full text-left hover:bg-white/[0.04]"
+      >
+        <span className="text-sm text-white/70" style={{ fontFamily: 'Sora, sans-serif' }}>
+          {label}
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+    )
+  }
+
   return (
-    <div
-      className="flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-150 cursor-pointer hover:bg-white/[0.04]"
-    >
+    <div className="flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-150 cursor-pointer hover:bg-white/[0.04]">
       <span className="text-sm text-white/70" style={{ fontFamily: 'Sora, sans-serif' }}>
         {label}
       </span>
@@ -47,7 +62,7 @@ function SettingRow({ label }) {
   )
 }
 
-function SettingGroup({ group }) {
+function SettingGroup({ group, children }) {
   const Icon = group.icon
   return (
     <div
@@ -69,8 +84,48 @@ function SettingGroup({ group }) {
         {group.items.map((item) => (
           <SettingRow key={item} label={item} />
         ))}
+        {children}
       </div>
     </div>
+  )
+}
+
+function ChangePasswordSection() {
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState('')
+  const { changePassword, user }  = useAuth()
+
+  const hasUsablePassword = user?.has_usable_password ?? true
+
+  const handleConfirm = async (currentPassword, newPassword, confirmNewPassword) => {
+    setError('')
+    setLoading(true)
+    try {
+      await changePassword({ currentPassword, newPassword, confirmNewPassword })
+      setSheetOpen(false)
+    } catch (err) {
+      setError(err?.error || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <SettingRow
+        label={hasUsablePassword ? 'Change password' : 'Set a password'}
+        onClick={() => { setError(''); setSheetOpen(true) }}
+      />
+      <ChangePasswordSheet
+        open={sheetOpen}
+        onClose={() => { if (!loading) setSheetOpen(false) }}
+        onConfirm={handleConfirm}
+        loading={loading}
+        hasUsablePassword={hasUsablePassword}
+        error={error}
+      />
+    </>
   )
 }
 
@@ -173,7 +228,9 @@ export default function Settings() {
         </p>
 
         {SETTING_GROUPS.map((group) => (
-          <SettingGroup key={group.id} group={group} />
+          <SettingGroup key={group.id} group={group}>
+            {group.id === 'privacy' && <ChangePasswordSection />}
+          </SettingGroup>
         ))}
 
         <DangerZoneSection />
