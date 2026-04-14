@@ -178,6 +178,7 @@ export default function SoundMeetDiscovery() {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [friends, setFriends] = useState([]);
   const [lastSwipeDirection, setLastSwipeDirection] = useState(null);
+  const [activeFilterTab, setActiveFilterTab] = useState("instruments");
   const [filters, setFilters] = useState({
     genres: [],
     instruments: [],
@@ -284,11 +285,11 @@ export default function SoundMeetDiscovery() {
   };
 
   const FilterSection = ({ title, items, storageKey }) => (
-    <div className="mb-6">
-      <h4 className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-3">
+    <div className="flex flex-col h-full">
+      <h4 className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4">
         {title}
       </h4>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 overflow-y-auto scrollbar-hide max-h-[300px] pb-4">
         {items.map((item) => (
           <button
             key={item}
@@ -302,7 +303,7 @@ export default function SoundMeetDiscovery() {
             {item}
           </button>
         ))}
-        {items.length === 0 && <span className="text-[10px] text-white/10 italic">Loading...</span>}
+        {items.length === 0 && <span className="text-[10px] text-white/10 italic">Loading options...</span>}
       </div>
     </div>
   );
@@ -410,41 +411,62 @@ export default function SoundMeetDiscovery() {
             </Dialog.Trigger>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100]" />
-              <Dialog.Content className="fixed right-0 top-0 h-full w-full max-w-[320px] bg-[#1C1B1B] p-6 z-[101] flex flex-col focus:outline-none shadow-2xl overflow-y-auto scrollbar-hide">
-                <div className="flex justify-between items-center mb-8">
-                  <Dialog.Title className="text-[18px] font-bold text-white tracking-tight">
-                    Filters
+              <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[480px] bg-[#141414]/95 backdrop-blur-[32px] rounded-[1.5rem] p-8 z-[101] flex flex-col focus:outline-none shadow-[0_0_60px_rgba(220,46,115,0.1)]">
+                <div className="flex justify-between items-center mb-6">
+                  <Dialog.Title className="text-[20px] font-bold text-white tracking-tight">
+                    Discovery Filters
                   </Dialog.Title>
-                  <Dialog.Description className="sr-only">
-                    Adjust your discovery preferences by instrument, role, and genre.
-                  </Dialog.Description>
                   <Dialog.Close asChild>
-                    <button className="text-white/20 hover:text-white">
+                    <button className="text-white/20 hover:text-white transition-colors">
                       <X size={20} />
                     </button>
                   </Dialog.Close>
                 </div>
 
-                <FilterSection
-                  title="Instruments"
-                  items={options.instruments}
-                  storageKey="instruments"
-                />
-                <FilterSection
-                  title="Roles"
-                  items={options.roles}
-                  storageKey="roles"
-                />
-                <FilterSection
-                  title="Genres"
-                  items={options.genres}
-                  storageKey="genres"
-                />
+                <div className="flex gap-2 mb-8 bg-[#1C1B1B] p-1 rounded-full border border-white/5">
+                  {['instruments', 'roles', 'genres'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveFilterTab(tab)}
+                      className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                        activeFilterTab === tab 
+                        ? "bg-[#2A2A2A] text-[#DC2E73] shadow-[0_0_15px_rgba(220,46,115,0.15)]" 
+                        : "text-white/40 hover:text-white/60"
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
 
-                <div className="mt-auto pt-6">
+                <div className="min-h-[220px]">
+                  {activeFilterTab === "instruments" && (
+                    <FilterSection
+                      title="Select Instruments"
+                      items={options.instruments}
+                      storageKey="instruments"
+                    />
+                  )}
+                  {activeFilterTab === "roles" && (
+                    <FilterSection
+                      title="Project Roles"
+                      items={options.roles}
+                      storageKey="roles"
+                    />
+                  )}
+                  {activeFilterTab === "genres" && (
+                    <FilterSection
+                      title="Music Genres"
+                      items={options.genres}
+                      storageKey="genres"
+                    />
+                  )}
+                </div>
+
+                <div className="mt-8">
                   <Dialog.Close asChild>
-                    <button className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#DC2E73] to-[#FB4040] text-white font-black text-[11px] uppercase tracking-widest shadow-lg active:scale-[0.98] transition-transform">
-                      Apply
+                    <button className="w-full py-4 rounded-full bg-gradient-to-r from-[#DC2E73] to-[#FB4040] text-white font-black text-[11px] uppercase tracking-widest shadow-[0_0_20px_rgba(220,46,115,0.3)] active:scale-[0.98] transition-transform">
+                      Apply Filters
                     </button>
                   </Dialog.Close>
                 </div>
