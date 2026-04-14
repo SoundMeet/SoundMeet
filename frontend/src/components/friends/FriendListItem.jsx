@@ -65,6 +65,7 @@ export function FriendListItem({ friend }) {
       state: {
         openDmWith: {
           id: friend.id,
+          profileId: friend.profileId,
           username: friend.username,
           displayName: friend.displayName,
           avatarUrl: friend.avatarUrl,

@@ -82,7 +82,7 @@ export const chatService = {
     const { data, error } = await supabase
       .from('chat_profile')
       .select(`
-        user_id, display_name, pfp,
+        id, user_id, display_name, pfp,
         instruments_liked:chat_profile_instruments_liked (
           instrument:chat_instrument (name)
         )
@@ -93,6 +93,7 @@ export const chatService = {
 
     return (data ?? []).map((p) => ({
       ...p,
+      profileId: p.id,
       mainInstrument: p.instruments_liked?.[0]?.instrument?.name ?? null,
     }));
   },

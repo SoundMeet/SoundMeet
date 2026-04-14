@@ -1,6 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFriends } from '../../context/FriendsContext'
+import { ProfilesRUS } from '../../services/ProfilesRUS'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ function ActionBtn({ label, accent = false, onClick }) {
 // ─── Result row ───────────────────────────────────────────────────────────────
 
 export function UserSearchResult({ user, activeQuery }) {
-  const { id, displayName, username, avatarUrl, instruments, genres, vibes, relationshipStatus } = user
+  const { id, profileId, displayName, username, avatarUrl, instruments, genres, vibes, relationshipStatus } = user
   const navigate = useNavigate()
 
   const lq = (activeQuery || '').toLowerCase().trim()
@@ -160,41 +161,45 @@ export function UserSearchResult({ user, activeQuery }) {
 
   return (
     <div
-      className="flex items-center gap-3 cursor-default transition-colors duration-100"
+      className="flex items-center gap-3 transition-colors duration-100"
       style={{ padding: '9px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      {/* Avatar */}
-      <div className="flex-shrink-0">
-        <Avatar src={avatarUrl} name={displayName} size={36} />
-      </div>
-
-      {/* Name + tags */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[13px] font-medium text-white leading-none truncate">{displayName}</span>
-          {username && (
-            <span className="text-[11px] flex-shrink-0" style={{ color: 'rgba(229,226,225,0.28)' }}>
-              @{username}
-            </span>
+      {/* Avatar + name — clickable to open profile */}
+      <button
+        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        onClick={() => profileId && ProfilesRUS(navigate, profileId)}
+        style={{ cursor: profileId ? 'pointer' : 'default', background: 'none', border: 'none', padding: 0 }}
+      >
+        <div className="flex-shrink-0">
+          <Avatar src={avatarUrl} name={displayName} size={36} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[13px] font-medium text-white leading-none truncate">{displayName}</span>
+            {username && (
+              <span className="text-[11px] flex-shrink-0" style={{ color: 'rgba(229,226,225,0.28)' }}>
+                @{username}
+              </span>
+            )}
+          </div>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {tags.map(({ label, key }) => (
+                <Tag key={key} label={label} highlighted={isMatch(label)} />
+              ))}
+            </div>
           )}
         </div>
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {tags.map(({ label, key }) => (
-              <Tag key={key} label={label} highlighted={isMatch(label)} />
-            ))}
-          </div>
-        )}
-      </div>
+      </button>
 
       {/* Actions — right side */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <RelationshipButton status={relationshipStatus} userId={id} />
         {relationshipStatus === 'friends' && (
           <button
-            onClick={() => navigate('/chat', { state: { openDmWith: { id, username, displayName, avatarUrl } } })}
+            onClick={() => navigate('/chat', { state: { openDmWith: { id, profileId, username, displayName, avatarUrl } } })}
             className="flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
             style={{ width: 28, height: 28, color: 'rgba(229,226,225,0.38)', background: 'rgba(255,255,255,0.05)' }}
             aria-label="Message"

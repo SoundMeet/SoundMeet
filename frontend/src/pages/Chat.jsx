@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Menu } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ChatSidebar from '../components/chat/ChatSidebar'
 import ChatHeader from '../components/chat/ChatHeader'
 import MessageList from '../components/chat/MessageList'
@@ -14,6 +14,7 @@ import { chatService } from '../injectables/chatService'
 import { supabase } from '../injectables/supaBaseClient'
 import { jamService } from '../injectables/jamService'
 import { useToast } from '../context/ToastContext'
+import { ProfilesRUS } from '../services/ProfilesRUS'
 
 
 const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
@@ -52,6 +53,7 @@ const Chat = () => {
   const { openModal } = useAuthModal()
   const { showToast } = useToast()
   const location = useLocation()
+  const navigate = useNavigate()
 
   // ─── State ────────────────────────────────────────────────────────────────
   const [dmThreads, setDmThreads]           = useState([])
@@ -69,6 +71,7 @@ const Chat = () => {
   const [hideDMTarget,   setHideDMTarget]     = useState(null)
   const [hidingDM,       setHidingDM]         = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth < 1024)
+  const [dmProfileCard, setDmProfileCard] = useState(null) // { name, avatar, profileId }
 
   // Open sidebar by default on mobile, close it when resizing to desktop
   useEffect(() => {
@@ -210,6 +213,7 @@ const Chat = () => {
                 id: uid,
                 name: profile.display_name || `User #${uid}`,
                 avatar: formatAvatarUrl(profile.pfp),
+                profileId: profile.id ?? null,
               }
             })
           } catch (err) {
@@ -385,6 +389,7 @@ const Chat = () => {
       id: String(target.id),
       name: target.displayName || target.display_name || target.username || `User #${target.id}`,
       avatar: formatAvatarUrl(target.avatarUrl ?? target.pfp ?? null),
+      profileId: target.profileId ?? null,
     }
     pendingDmTargetRef.current = targetProfile
 
@@ -609,6 +614,13 @@ const Chat = () => {
     } finally {
       setHidingDM(false)
     }
+  }
+
+  const handleDmHeaderClick = () => {
+    if (!activeThread || activeThread.type !== 'dm') return
+    const other = chatUsers.find(u => u.id === activeThread.participantId)
+    if (!other) return
+    setDmProfileCard({ name: other.name, avatar: other.avatar, profileId: other.profileId ?? null })
   }
 
   // ─── Handlers ────────────────────────────────────────────────────────────
@@ -882,6 +894,7 @@ const Chat = () => {
               onHeaderClick={handleHeaderClick}
               onMembersClick={activeThread.type === 'jam' ? handleHeaderClick : undefined}
               onHideDM={activeThread.type === 'dm' ? handleHideDM : undefined}
+              onDmHeaderClick={activeThread.type === 'dm' ? handleDmHeaderClick : undefined}
             />
 
             {isLoadingMsgs ? (
@@ -962,6 +975,78 @@ const Chat = () => {
         body="This will remove the conversation from your list. The other person won't be affected."
         confirmLabel="Delete"
       />
+
+      {/* ── DM profile mini-card ─────────────────────────────────────────── */}
+      {dmProfileCard && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[60]"
+            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+            onClick={() => setDmProfileCard(null)}
+          />
+          {/* Card */}
+          <div
+            className="fixed z-[61] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 rounded-2xl flex flex-col items-center gap-4 px-6 py-7"
+            style={{
+              background: 'rgba(22,22,24,0.98)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
+            }}
+          >
+            {/* Close */}
+            <button
+              onClick={() => setDmProfileCard(null)}
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full transition-colors hover:bg-white/10"
+              style={{ color: 'rgba(229,226,225,0.35)' }}
+              aria-label="Close"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            {/* Avatar */}
+            {dmProfileCard.avatar ? (
+              <img
+                src={dmProfileCard.avatar}
+                alt={dmProfileCard.name}
+                className="rounded-full object-cover"
+                style={{ width: 72, height: 72, border: '2px solid rgba(255,255,255,0.1)' }}
+              />
+            ) : (
+              <div
+                className="rounded-full flex items-center justify-center select-none"
+                style={{
+                  width: 72, height: 72,
+                  background: '#C2185B',
+                  fontSize: 26, fontWeight: 700, color: '#fff',
+                }}
+              >
+                {(dmProfileCard.name || '?').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase()}
+              </div>
+            )}
+
+            {/* Name */}
+            <p className="text-[15px] font-semibold text-white text-center leading-tight">
+              {dmProfileCard.name}
+            </p>
+
+            {/* View Profile button */}
+            <button
+              onClick={() => {
+                setDmProfileCard(null)
+                if (dmProfileCard.profileId) ProfilesRUS(navigate, dmProfileCard.profileId)
+              }}
+              disabled={!dmProfileCard.profileId}
+              className="w-full py-2.5 rounded-xl text-[13px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
+              style={{ background: 'linear-gradient(135deg, #DC2E73, #fb4040)', color: '#fff' }}
+            >
+              View Profile
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

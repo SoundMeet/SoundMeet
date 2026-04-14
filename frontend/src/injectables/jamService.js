@@ -546,7 +546,7 @@ export const jamService = {
     // 2. Fetch profiles for those users
     const { data: profiles, error: profErr } = await supabase
       .from('chat_profile')
-      .select('user_id, display_name, pfp')
+      .select('id, user_id, display_name, pfp')
       .in('user_id', userIds);
     if (profErr) throw profErr;
 
@@ -559,6 +559,7 @@ export const jamService = {
       const sel = selectionMap[String(uid)] ?? { instruments: [], roles: [], gear: [] };
       return {
         userId:               String(uid),
+        profileId:            p?.id ?? null,
         displayName:          p?.display_name ?? `User #${uid}`,
         pfp:                  p?.pfp ?? null,
         instrumentsBringing:  sel.instruments,
