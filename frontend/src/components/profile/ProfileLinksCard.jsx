@@ -291,10 +291,10 @@ export function HeroLinks({ links = {} }) {
     >
       {/* Section label */}
       <span
-        className="text-[9px] font-bold uppercase tracking-[0.14em] mb-1 select-none"
-        style={{ color: "rgba(255,255,255,0.22)" }}
+        className="text-[10px] font-bold uppercase tracking-[0.10em] mb-1.5 select-none"
+        style={{ color: "rgba(255,255,255,0.25)" }}
       >
-        Find me on
+        Links
       </span>
 
       {active.map((platform) => {

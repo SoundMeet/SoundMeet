@@ -40,7 +40,7 @@ function JamStatusPill({ item }) {
   const isAttendee = item?.isAttendee;
   if (isLive) return (
     <span
-      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
       style={{ color: "#FB4040", background: "rgba(251,64,64,0.12)" }}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-[#FB4040] animate-pulse inline-block" />
@@ -49,14 +49,14 @@ function JamStatusPill({ item }) {
   );
   if (isCreator) return (
     <span
-      className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+      className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
       style={{ color: "#DC2E73", background: "rgba(220,46,115,0.10)" }}
     >
       Hosting
     </span>
   );
   if (isAttendee) return (
-    <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full text-neutral-400 bg-neutral-800">
+    <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full text-neutral-400 bg-neutral-800">
       Going
     </span>
   );
@@ -697,19 +697,11 @@ const playSnippet = (snippet, index) => {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="relative w-full overflow-hidden rounded-b-2xl group/banner"
           style={{
-            height: "180px",
+            height: "160px",
             background: banner
               ? `url(${banner}) center/cover no-repeat`
               : "linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 40%, #16213e 70%, #0f3460 100%)",
-            boxShadow: (() => {
-              const allGlows = [cardColors.aboutMe.glow, cardColors.musicSnips.glow, cardColors.jams.glow, cardColors.posts.glow, cardColors.interests.glow];
-              const colored = allGlows.filter(g => !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0"));
-              const freq = {};
-              colored.forEach(g => { freq[g] = (freq[g] || 0) + 1; });
-              const dominant = colored.sort((a, b) => (freq[b] || 0) - (freq[a] || 0))[0] ?? "rgba(220,46,115,0.4)";
-              return `0 0 24px ${dominant}, 0 10px 40px rgba(0,0,0,0.8)`;
-            })(),
-            transition: "box-shadow 0.4s ease",
+            boxShadow: "0 4px 32px rgba(0,0,0,0.55)",
           }}
         >
           {banner && (
@@ -749,8 +741,8 @@ const playSnippet = (snippet, index) => {
               onClick={isOwnProfile ? () => { setEditOpen(true); setActiveSection("Profile Picture"); } : undefined}
               style={{
                 background: "linear-gradient(135deg, #DC2E73 0%, #7C3AED 100%)",
-                border: "3px solid #0E0E0E",
-                boxShadow: "0 0 0 2.5px rgba(220,46,115,0.35), 0 8px 24px rgba(0,0,0,0.7)",
+                border: "3px solid #111",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.65)",
               }}
             >
               {(() => {
@@ -835,19 +827,6 @@ const playSnippet = (snippet, index) => {
                 <span className="text-sm text-white/30 font-medium">@{user.username}</span>
               )}
             </div>
-            {/* Musical identity summary line — derived from top genre · instrument · vibe */}
-            {(() => {
-              const topInst  = pills.find(p => typeof p.id === "string" && p.id.startsWith("i_"));
-              const topGenre = pills.find(p => typeof p.id === "string" && p.id.startsWith("g_"));
-              const topVibe  = pills.find(p => typeof p.id === "string" && p.id.startsWith("v_"));
-              const parts = [topGenre?.text, topInst?.text, topVibe?.text].filter(Boolean);
-              if (parts.length === 0) return null;
-              return (
-                <p className="text-sm text-white/40 mt-1 font-medium tracking-wide">
-                  {parts.join(" · ")}
-                </p>
-              );
-            })()}
             {location && (
               <div className="flex items-center gap-1.5 mt-1.5">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-40">
@@ -867,17 +846,17 @@ const playSnippet = (snippet, index) => {
                   {chips.map(chip => (
                     <span
                       key={chip.id}
-                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold"
-                      style={{ background: chip.color + "20", border: `1px solid ${chip.color}45`, color: chip.color }}
+                      className="flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium"
+                      style={{ background: chip.color + "18", border: `1px solid ${chip.color}38`, color: chip.color }}
                     >
-                      <span style={{ fontSize: "12px" }}>{getPillEmoji(chip.text)}</span>
+                      <span style={{ fontSize: "11px" }}>{getPillEmoji(chip.text)}</span>
                       {chip.text}
                     </span>
                   ))}
                   {user?.skill_level && (
-                    <span className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold"
-                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)" }}>
-                      ⭐ {user.skill_level}
+                    <span className="flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.38)" }}>
+                      {user.skill_level}
                     </span>
                   )}
                 </div>
@@ -889,7 +868,7 @@ const playSnippet = (snippet, index) => {
                 <div className="mt-4 flex items-center gap-2">
                   <button
                     onClick={() => { setEditOpen(true); setActiveSection("Name & Location"); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 hover:scale-105 hover:border-white/25"
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 hover:brightness-110"
                     style={{
                       background: "rgba(255,255,255,0.05)",
                       border: "1px solid rgba(255,255,255,0.13)",
@@ -972,7 +951,10 @@ const playSnippet = (snippet, index) => {
                   {/* Member since */}
                   {memberSince && (
                     <div className="flex items-center gap-2 pt-1 border-t border-white/[0.06]">
-                      <span style={{ fontSize: "12px" }}>🗓️</span>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-35">
+                        <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                        <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
                       <span className="text-xs text-white/40">Member since {memberSince}</span>
                     </div>
                   )}
@@ -1008,7 +990,7 @@ const playSnippet = (snippet, index) => {
                   style={{
                     background: cardColors.interests.bg,
                     border: `1px solid ${cardColors.interests.border}`,
-                    boxShadow: `0 0 30px ${cardColors.interests.glow}`,
+                    boxShadow: `0 2px 16px ${cardColors.interests.glow}`,
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
@@ -1112,7 +1094,7 @@ const playSnippet = (snippet, index) => {
               style={{
                 background: cardColors.musicSnips.bg,
                 border: `1px solid ${cardColors.musicSnips.border}`,
-                boxShadow: `0 0 40px ${cardColors.musicSnips.glow}`,
+                boxShadow: `0 2px 20px ${cardColors.musicSnips.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
@@ -1123,14 +1105,12 @@ const playSnippet = (snippet, index) => {
                 return (
                   <>
                     <div className="flex items-center justify-between shrink-0">
-                      <div className="flex items-center gap-2">
-                        <span style={{ fontSize: "15px" }}>🎵</span>
-                        <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>
+                      <div className="flex items-center gap-2.5">
+                        <h2 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: dark ? "rgba(0,0,0,0.40)" : "rgba(255,255,255,0.40)", transition: "color 0.4s ease" }}>
                           Music Clips
                         </h2>
                         {snippets.length > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
-                            style={{ background: "rgba(220,46,115,0.15)", color: "#DC2E73" }}>
+                          <span className="text-[10px] font-medium" style={{ color: dark ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)" }}>
                             {snippets.length}/{MAX_SNIPPETS}
                           </span>
                         )}
@@ -1138,14 +1118,13 @@ const playSnippet = (snippet, index) => {
                       {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
                         <button
                           onClick={() => setSnippetModalOpen(true)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+                          className="flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-200 hover:brightness-125"
                           style={{
-                            background: dark ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)",
-                            border: `1px solid ${dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)"}`,
+                            background: dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.09)",
                           }}
                         >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M6 1v10M1 6h10" stroke={dark ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)"} strokeWidth="1.5" strokeLinecap="round"/>
+                          <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                            <path d="M6 1v10M1 6h10" stroke={dark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)"} strokeWidth="1.6" strokeLinecap="round"/>
                           </svg>
                         </button>
                       )}
@@ -1283,7 +1262,7 @@ const playSnippet = (snippet, index) => {
               style={{
                 background: cardColors.aboutMe.bg,
                 border: `1px solid ${cardColors.aboutMe.border}`,
-                boxShadow: `0 0 40px ${cardColors.aboutMe.glow}`,
+                boxShadow: `0 2px 20px ${cardColors.aboutMe.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
@@ -1363,9 +1342,7 @@ const playSnippet = (snippet, index) => {
 
             {/* ── JAMS ───────────────────────────────────────────────────────── */}
             {(() => {
-              const dark          = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
-              const textPrimary   = dark ? "#111" : "#fff";
-              const textSecondary = dark ? "#555" : "#d4d4d4";
+              const dark = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
               return (
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
@@ -1375,15 +1352,14 @@ const playSnippet = (snippet, index) => {
                   style={{
                     background: cardColors.jams.bg,
                     border: `1px solid ${cardColors.jams.border}`,
-                    boxShadow: `0 0 40px ${cardColors.jams.glow}`,
+                    boxShadow: `0 2px 20px ${cardColors.jams.glow}`,
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Jams</h2>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: dark ? "rgba(0,0,0,0.40)" : "rgba(255,255,255,0.40)", transition: "color 0.4s ease" }}>Jams</h2>
                     {jams.length > 0 && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
-                        style={{ background: dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)", color: textSecondary }}>
+                      <span className="text-[10px] font-medium" style={{ color: dark ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)" }}>
                         {jams.length}
                       </span>
                     )}
@@ -1394,7 +1370,11 @@ const playSnippet = (snippet, index) => {
                     </div>
                   ) : jams.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 py-6">
-                      <span style={{ fontSize: "22px", opacity: 0.25 }}>🎸</span>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.2 }}>
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6"/>
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6"/>
+                      </svg>
                       <p className="text-sm" style={{ color: dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)" }}>No jams yet</p>
                     </div>
                   ) : (
@@ -1461,7 +1441,7 @@ const playSnippet = (snippet, index) => {
               style={{
                 background: cardColors.posts.bg,
                 border: `1px solid ${cardColors.posts.border}`,
-                boxShadow: `0 0 40px ${cardColors.posts.glow}`,
+                boxShadow: `0 2px 20px ${cardColors.posts.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
@@ -1474,7 +1454,7 @@ const playSnippet = (snippet, index) => {
                 return (
                   <>
                     <div className="flex items-center justify-between shrink-0">
-                      <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Posts</h2>
+                      <h2 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: dark ? "rgba(0,0,0,0.40)" : "rgba(255,255,255,0.40)", transition: "color 0.4s ease" }}>Posts</h2>
                       <Link to="/feed" className="text-xs font-medium transition-opacity hover:opacity-70" style={{ color: textMid }}>
                         Feed →
                       </Link>
