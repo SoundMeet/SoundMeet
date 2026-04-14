@@ -109,6 +109,7 @@ export function AuthProvider({ children }) {
     if (data.tiktok !== undefined)              form.append("tiktok", data.tiktok);
 
     if (data.profile_banner instanceof Blob) form.append("profile_banner", data.profile_banner, "banner.jpg");
+    else if (data.clear_profile_banner) form.append("clear_profile_banner", "true");
 
     // ── BACKEND NEEDED: ImageField "about_photo" on the profile model ─────────
     // Uncomment once the backend field exists.

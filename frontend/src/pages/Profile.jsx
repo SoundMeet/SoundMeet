@@ -40,7 +40,7 @@ function JamStatusPill({ item }) {
   const isAttendee = item?.isAttendee;
   if (isLive) return (
     <span
-      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
       style={{ color: "#FB4040", background: "rgba(251,64,64,0.12)" }}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-[#FB4040] animate-pulse inline-block" />
@@ -49,14 +49,14 @@ function JamStatusPill({ item }) {
   );
   if (isCreator) return (
     <span
-      className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+      className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
       style={{ color: "#DC2E73", background: "rgba(220,46,115,0.10)" }}
     >
       Hosting
     </span>
   );
   if (isAttendee) return (
-    <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full text-neutral-400 bg-neutral-800">
+    <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full text-neutral-400 bg-neutral-800">
       Going
     </span>
   );
@@ -64,7 +64,6 @@ function JamStatusPill({ item }) {
 }
 
 const MAX_SNIPPETS = 5;
-const DRAG_DELETE_THRESHOLD = 140;
 
 // ── Card color palette ────────────────────────────────────────────────────────
 // Each swatch has a bg (card background), a border tint, and a glow color.
@@ -263,8 +262,9 @@ const Profile = () => {
   const [selectedJam, setSelectedJam] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
 
-  const [profilePic, setProfilePic] = useState(null);
-  const [banner,     setBanner]     = useState(null);
+  const [profilePic,    setProfilePic]    = useState(null);
+  const [banner,        setBanner]        = useState(null);
+  const [bannerCleared, setBannerCleared] = useState(false);
   const [about,      setAbout]      = useState("");
   const [aboutPhoto, setAboutPhoto] = useState(null);
   const [name,       setName]       = useState("");
@@ -306,7 +306,6 @@ const Profile = () => {
   const [tagsLoading, setTagsLoading] = useState(false);
 
   const PILL_COLORS = ["#DC2E73", "#7C3AED", "#0891B2", "#EA580C", "#16A34A", "#CA8A04"];
-  const MAX_PILLS = 9;
 
   // Toggle a tag in the picker.
   // setPills is called OUTSIDE the setSelectedTagIds updater to avoid a stale
@@ -342,6 +341,7 @@ const Profile = () => {
     setAbout(u.about || "");
     setProfilePic(u.pfp ? formatAvatarUrl(u.pfp) : null);
     setBanner(u.profile_banner ? formatAvatarUrl(u.profile_banner) : null);
+    setBannerCleared(false);
     setLinks({
       spotify:    u.spotify    || "",
       soundcloud: u.soundcloud || "",
@@ -450,7 +450,6 @@ const Profile = () => {
   });
 
   const [playingIndex, setPlayingIndex] = useState(null);
-  const [pulse, setPulse] = useState({});
 
   // ── Unified crop state — one CropperThings modal handles all image uploaders
   const [cropState, setCropState] = useState({ open: false, variant: "square", rawImage: null });
@@ -465,15 +464,8 @@ const Profile = () => {
     setCropState({ open: false, variant: "square", rawImage: null });
   };
 
-  const [dragging, setDragging] = useState(null);
-  const [dragX, setDragX] = useState(0);
-
   // ── Posts state ───────────────────────────────────────────────────────────
   const audioRef = useRef(null);
-
-  const dragStartXRef = useRef(0);
-  const lastDragXRef = useRef(0);
-  const movedRef = useRef(false);
 
   // ── Jams state — fetched from jamService, capped at 9, local-only removal ──
   const [jams, setJams] = useState([]);
@@ -618,11 +610,7 @@ const Profile = () => {
     }
   };
 
-  const triggerPulse = (index) => {
-    setPulse((prev) => ({ ...prev, [index]: Date.now() }));
-  };
-
-  const playSnippet = (snippet, index) => {
+const playSnippet = (snippet, index) => {
     if (playingIndex === index) {
       stopPlayback();
       return;
@@ -637,7 +625,6 @@ const Profile = () => {
       // play() is called synchronously within the click handler —
       // no awaits before this point so the browser gesture trust window is intact.
       const playPromise = audio.play();
-      triggerPulse(index);
       setPlayingIndex(index);
 
       if (playPromise !== undefined) {
@@ -658,70 +645,6 @@ const Profile = () => {
     }
   };
 
-  const getClientX = (event) => {
-    if (event.touches && event.touches[0]) return event.touches[0].clientX;
-    if (event.changedTouches && event.changedTouches[0]) {
-      return event.changedTouches[0].clientX;
-    }
-    return event.clientX;
-  };
-
-  const handleDragStart = (index, event) => {
-    dragStartXRef.current = getClientX(event);
-    lastDragXRef.current = 0;
-    movedRef.current = false;
-    setDragging(index);
-    setDragX(0);
-  };
-
-  const handleDragMove = (event) => {
-    if (dragging === null) return;
-
-    const currentX = getClientX(event);
-    const distance = currentX - dragStartXRef.current;
-
-    if (Math.abs(distance) > 6) {
-      movedRef.current = true;
-    }
-
-    lastDragXRef.current = distance;
-    setDragX(distance);
-  };
-
-  const handleDragEnd = () => {
-    if (dragging === null) return;
-
-    const draggedIndex = dragging;
-    const finalDistance = lastDragXRef.current;
-
-    setDragging(null);
-    setDragX(0);
-
-    if (Math.abs(finalDistance) >= DRAG_DELETE_THRESHOLD) {
-      deleteSnippet(draggedIndex);
-    }
-  };
-
-  useEffect(() => {
-    if (dragging === null) return;
-
-    const onMouseMove = (event) => handleDragMove(event);
-    const onMouseUp = () => handleDragEnd();
-    const onTouchMove = (event) => handleDragMove(event);
-    const onTouchEnd = () => handleDragEnd();
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    window.addEventListener("touchend", onTouchEnd);
-
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-    };
-  }, [dragging]);
 
   useEffect(() => {
     return () => {
@@ -776,19 +699,11 @@ const Profile = () => {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="relative w-full overflow-hidden rounded-b-2xl group/banner"
           style={{
-            height: "180px",
+            height: "160px",
             background: banner
               ? `url(${banner}) center/cover no-repeat`
               : "linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 40%, #16213e 70%, #0f3460 100%)",
-            boxShadow: (() => {
-              const allGlows = [cardColors.aboutMe.glow, cardColors.musicSnips.glow, cardColors.jams.glow, cardColors.posts.glow, cardColors.interests.glow];
-              const colored = allGlows.filter(g => !g.startsWith("rgba(0,0,0") && !g.startsWith("rgba(0, 0, 0"));
-              const freq = {};
-              colored.forEach(g => { freq[g] = (freq[g] || 0) + 1; });
-              const dominant = colored.sort((a, b) => (freq[b] || 0) - (freq[a] || 0))[0] ?? "rgba(220,46,115,0.4)";
-              return `0 0 24px ${dominant}, 0 10px 40px rgba(0,0,0,0.8)`;
-            })(),
-            transition: "box-shadow 0.4s ease",
+            boxShadow: "0 4px 32px rgba(0,0,0,0.55)",
           }}
         >
           {banner && (
@@ -828,8 +743,8 @@ const Profile = () => {
               onClick={isOwnProfile ? () => { setEditOpen(true); setActiveSection("Profile Picture"); } : undefined}
               style={{
                 background: "linear-gradient(135deg, #DC2E73 0%, #7C3AED 100%)",
-                border: "3px solid #0E0E0E",
-                boxShadow: "0 0 0 2.5px rgba(220,46,115,0.35), 0 8px 24px rgba(0,0,0,0.7)",
+                border: "3px solid #111",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.65)",
               }}
             >
               {(() => {
@@ -914,19 +829,6 @@ const Profile = () => {
                 <span className="text-sm text-white/30 font-medium">@{user.username}</span>
               )}
             </div>
-            {/* Musical identity summary line — derived from top genre · instrument · vibe */}
-            {(() => {
-              const topInst  = pills.find(p => typeof p.id === "string" && p.id.startsWith("i_"));
-              const topGenre = pills.find(p => typeof p.id === "string" && p.id.startsWith("g_"));
-              const topVibe  = pills.find(p => typeof p.id === "string" && p.id.startsWith("v_"));
-              const parts = [topGenre?.text, topInst?.text, topVibe?.text].filter(Boolean);
-              if (parts.length === 0) return null;
-              return (
-                <p className="text-sm text-white/40 mt-1 font-medium tracking-wide">
-                  {parts.join(" · ")}
-                </p>
-              );
-            })()}
             {location && (
               <div className="flex items-center gap-1.5 mt-1.5">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-40">
@@ -946,17 +848,17 @@ const Profile = () => {
                   {chips.map(chip => (
                     <span
                       key={chip.id}
-                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold"
-                      style={{ background: chip.color + "20", border: `1px solid ${chip.color}45`, color: chip.color }}
+                      className="flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium"
+                      style={{ background: chip.color + "18", border: `1px solid ${chip.color}38`, color: chip.color }}
                     >
-                      <span style={{ fontSize: "12px" }}>{getPillEmoji(chip.text)}</span>
+                      <span style={{ fontSize: "11px" }}>{getPillEmoji(chip.text)}</span>
                       {chip.text}
                     </span>
                   ))}
                   {user?.skill_level && (
-                    <span className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold"
-                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)" }}>
-                      ⭐ {user.skill_level}
+                    <span className="flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.38)" }}>
+                      {user.skill_level}
                     </span>
                   )}
                 </div>
@@ -968,7 +870,7 @@ const Profile = () => {
                 <div className="mt-4 flex items-center gap-2">
                   <button
                     onClick={() => { setEditOpen(true); setActiveSection("Name & Location"); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 hover:scale-105 hover:border-white/25"
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 hover:brightness-110"
                     style={{
                       background: "rgba(255,255,255,0.05)",
                       border: "1px solid rgba(255,255,255,0.13)",
@@ -1051,7 +953,10 @@ const Profile = () => {
                   {/* Member since */}
                   {memberSince && (
                     <div className="flex items-center gap-2 pt-1 border-t border-white/[0.06]">
-                      <span style={{ fontSize: "12px" }}>🗓️</span>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-35">
+                        <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                        <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
                       <span className="text-xs text-white/40">Member since {memberSince}</span>
                     </div>
                   )}
@@ -1087,7 +992,7 @@ const Profile = () => {
                   style={{
                     background: cardColors.interests.bg,
                     border: `1px solid ${cardColors.interests.border}`,
-                    boxShadow: `0 0 30px ${cardColors.interests.glow}`,
+                    boxShadow: `0 2px 16px ${cardColors.interests.glow}`,
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
@@ -1191,7 +1096,7 @@ const Profile = () => {
               style={{
                 background: cardColors.musicSnips.bg,
                 border: `1px solid ${cardColors.musicSnips.border}`,
-                boxShadow: `0 0 40px ${cardColors.musicSnips.glow}`,
+                boxShadow: `0 2px 20px ${cardColors.musicSnips.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
@@ -1202,14 +1107,12 @@ const Profile = () => {
                 return (
                   <>
                     <div className="flex items-center justify-between shrink-0">
-                      <div className="flex items-center gap-2">
-                        <span style={{ fontSize: "15px" }}>🎵</span>
-                        <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>
+                      <div className="flex items-center gap-2.5">
+                        <h2 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: dark ? "rgba(0,0,0,0.40)" : "rgba(255,255,255,0.40)", transition: "color 0.4s ease" }}>
                           Music Clips
                         </h2>
                         {snippets.length > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
-                            style={{ background: "rgba(220,46,115,0.15)", color: "#DC2E73" }}>
+                          <span className="text-[10px] font-medium" style={{ color: dark ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)" }}>
                             {snippets.length}/{MAX_SNIPPETS}
                           </span>
                         )}
@@ -1217,10 +1120,14 @@ const Profile = () => {
                       {isOwnProfile && snippets.length > 0 && snippets.length < MAX_SNIPPETS && (
                         <button
                           onClick={() => setSnippetModalOpen(true)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-black text-lg transition hover:scale-110"
-                          style={{ background: "linear-gradient(135deg, #D33280, #EA65C2)", boxShadow: "0 4px 16px rgba(220,46,115,0.4)" }}
+                          className="flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-200 hover:brightness-125"
+                          style={{
+                            background: dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.09)",
+                          }}
                         >
-                          +
+                          <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                            <path d="M6 1v10M1 6h10" stroke={dark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)"} strokeWidth="1.6" strokeLinecap="round"/>
+                          </svg>
                         </button>
                       )}
                     </div>
@@ -1247,38 +1154,21 @@ const Profile = () => {
                         )
                       ) : (
                         snippets.map((snippet, index) => {
-                          const isDragging   = dragging === index;
-                          const offsetX      = isDragging ? dragX : 0;
-                          const dragProgress = Math.min(Math.abs(offsetX) / DRAG_DELETE_THRESHOLD, 1);
-                          const isPlaying    = playingIndex === index;
+                          const isPlaying = playingIndex === index;
                           return (
                             <div key={index} className="relative group/snip">
-                              {!isDragging && !isPlaying && (
+                              {!isPlaying && (
                                 <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 z-30
                                   opacity-0 group-hover/snip:opacity-100 transition-opacity duration-200
                                   bg-neutral-800 text-white text-[11px] px-3 py-1 whitespace-nowrap"
                                   style={{ borderRadius: "40px", boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
-                                  Click to play · Drag to delete
-                                </div>
-                              )}
-                              {isPlaying && pulse[index] && (
-                                <div key={pulse[index]} className="animate-ping pointer-events-none absolute inset-0 rounded-2xl border border-[#DC2E73]/40 z-20" />
-                              )}
-                              {isDragging && <div className="pointer-events-none absolute inset-0 rounded-2xl bg-red-500/10 z-0" />}
-                              {isDragging && dragProgress > 0.45 && (
-                                <div className="pointer-events-none absolute inset-0 flex items-center justify-end pr-4 z-10">
-                                  <span className="text-xs font-medium text-red-300">Release to delete</span>
+                                  Click to play
                                 </div>
                               )}
                               <div
-                                onMouseDown={(e) => handleDragStart(index, e)}
-                                onTouchStart={(e) => handleDragStart(index, e)}
-                                onClick={() => { if (!movedRef.current) playSnippet(snippet, index); movedRef.current = false; }}
-                                className="relative z-10 flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 transition-colors"
+                                onClick={() => playSnippet(snippet, index)}
+                                className={`relative z-10 flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 transition-colors${isPlaying ? " snip-playing-glow" : ""}`}
                                 style={{
-                                  transform: `translateX(${offsetX}px) rotate(${offsetX * 0.02}deg)`,
-                                  opacity: isDragging ? 1 - Math.abs(offsetX) / 320 : 1,
-                                  transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease",
                                   background: isPlaying ? "rgba(220,46,115,0.12)" : (dark ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.05)"),
                                   border: isPlaying ? "1px solid rgba(220,46,115,0.30)" : `1px solid ${dark ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)"}`,
                                   backgroundImage: snippet.background
@@ -1331,9 +1221,27 @@ const Profile = () => {
                                     ))}
                                   </div>
                                 </div>
-                                {/* Playing dot indicator */}
-                                <div className="shrink-0 h-2 w-2 rounded-full transition-colors duration-200"
-                                  style={{ background: isPlaying ? "#DC2E73" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)") }} />
+                                {/* Delete button (own profile) or playing dot */}
+                                {isOwnProfile ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteSnippet(index); }}
+                                    className="shrink-0 flex items-center justify-center rounded-full transition-all duration-200 opacity-0 group-hover/snip:opacity-100 hover:!opacity-100"
+                                    style={{
+                                      width: "24px", height: "24px",
+                                      background: "rgba(220,46,115,0.00)",
+                                      color: dark ? "rgba(0,0,0,0.30)" : "rgba(255,255,255,0.25)",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.color = "#DC2E73"; e.currentTarget.style.background = "rgba(220,46,115,0.12)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.color = dark ? "rgba(0,0,0,0.30)" : "rgba(255,255,255,0.25)"; e.currentTarget.style.background = "rgba(220,46,115,0.00)"; }}
+                                  >
+                                    <svg width="12" height="13" viewBox="0 0 12 13" fill="none">
+                                      <path d="M1 3h10M4 3V2h4v1M5 6v4M7 6v4M2 3l.6 8a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9L10 3H2Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <div className="shrink-0 h-2 w-2 rounded-full transition-colors duration-200"
+                                    style={{ background: isPlaying ? "#DC2E73" : (dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)") }} />
+                                )}
                               </div>
                             </div>
                           );
@@ -1356,7 +1264,7 @@ const Profile = () => {
               style={{
                 background: cardColors.aboutMe.bg,
                 border: `1px solid ${cardColors.aboutMe.border}`,
-                boxShadow: `0 0 40px ${cardColors.aboutMe.glow}`,
+                boxShadow: `0 2px 20px ${cardColors.aboutMe.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
@@ -1436,9 +1344,7 @@ const Profile = () => {
 
             {/* ── JAMS ───────────────────────────────────────────────────────── */}
             {(() => {
-              const dark          = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
-              const textPrimary   = dark ? "#111" : "#fff";
-              const textSecondary = dark ? "#555" : "#d4d4d4";
+              const dark = needsDarkText(cardColors.jams.bg, cardTextOverrides.jams);
               return (
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
@@ -1448,15 +1354,14 @@ const Profile = () => {
                   style={{
                     background: cardColors.jams.bg,
                     border: `1px solid ${cardColors.jams.border}`,
-                    boxShadow: `0 0 40px ${cardColors.jams.glow}`,
+                    boxShadow: `0 2px 20px ${cardColors.jams.glow}`,
                     transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
                   }}
                 >
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Jams</h2>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: dark ? "rgba(0,0,0,0.40)" : "rgba(255,255,255,0.40)", transition: "color 0.4s ease" }}>Jams</h2>
                     {jams.length > 0 && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
-                        style={{ background: dark ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)", color: textSecondary }}>
+                      <span className="text-[10px] font-medium" style={{ color: dark ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)" }}>
                         {jams.length}
                       </span>
                     )}
@@ -1467,7 +1372,11 @@ const Profile = () => {
                     </div>
                   ) : jams.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 py-6">
-                      <span style={{ fontSize: "22px", opacity: 0.25 }}>🎸</span>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.2 }}>
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6"/>
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6"/>
+                      </svg>
                       <p className="text-sm" style={{ color: dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)" }}>No jams yet</p>
                     </div>
                   ) : (
@@ -1481,7 +1390,7 @@ const Profile = () => {
                           <div key={jam.id} className="relative">
                             <div
                               onClick={() => setSelectedJam(jam)}
-                              className="group relative z-10 w-full rounded-2xl p-4 text-left cursor-pointer select-none overflow-hidden"
+                              className="group relative z-10 w-full rounded-2xl p-4 text-left cursor-pointer select-none overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:brightness-[1.15]"
                               style={{
                                 background: jam.canEdit
                                   ? "linear-gradient(135deg, rgba(220,46,115,0.08), rgba(220,46,115,0.03))"
@@ -1534,7 +1443,7 @@ const Profile = () => {
               style={{
                 background: cardColors.posts.bg,
                 border: `1px solid ${cardColors.posts.border}`,
-                boxShadow: `0 0 40px ${cardColors.posts.glow}`,
+                boxShadow: `0 2px 20px ${cardColors.posts.glow}`,
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
@@ -1547,7 +1456,7 @@ const Profile = () => {
                 return (
                   <>
                     <div className="flex items-center justify-between shrink-0">
-                      <h2 className="text-lg font-bold" style={{ color: textPrimary, transition: "color 0.4s ease" }}>Posts</h2>
+                      <h2 className="text-[10px] font-bold uppercase tracking-widest" style={{ color: dark ? "rgba(0,0,0,0.40)" : "rgba(255,255,255,0.40)", transition: "color 0.4s ease" }}>Posts</h2>
                       <Link to="/feed" className="text-xs font-medium transition-opacity hover:opacity-70" style={{ color: textMid }}>
                         Feed →
                       </Link>
@@ -1743,7 +1652,7 @@ const Profile = () => {
                 className="text-xs px-2.5 py-1 rounded-full"
                 style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}
               >
-                {selectedTagIds.size} selected
+                {allTags.length > 0 ? allTags.filter(t => selectedTagIds.has(t.uid)).length : selectedTagIds.size} selected
               </span>
             </div>
 
@@ -1761,9 +1670,8 @@ const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       {allTags.filter(t => t.uid.startsWith("g_")).map((tag) => {
                         const selected = selectedTagIds.has(tag.uid);
-                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
                         const color = PILL_COLORS[tag.id % PILL_COLORS.length];
-                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={false} color={color} onToggle={() => toggleTag(tag)} />;
                       })}
                     </div>
                   </div>
@@ -1776,9 +1684,8 @@ const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       {allTags.filter(t => t.uid.startsWith("i_")).map((tag) => {
                         const selected = selectedTagIds.has(tag.uid);
-                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
                         const color = PILL_COLORS[tag.id % PILL_COLORS.length];
-                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={false} color={color} onToggle={() => toggleTag(tag)} />;
                       })}
                     </div>
                   </div>
@@ -1791,9 +1698,8 @@ const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       {allTags.filter(t => t.uid.startsWith("v_")).map((tag) => {
                         const selected = selectedTagIds.has(tag.uid);
-                        const atMax = selectedTagIds.size >= MAX_PILLS && !selected;
                         const color = PILL_COLORS[tag.id % PILL_COLORS.length];
-                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={atMax} color={color} onToggle={() => toggleTag(tag)} />;
+                        return <PillToggleButton key={tag.uid} tag={tag} selected={selected} atMax={false} color={color} onToggle={() => toggleTag(tag)} />;
                       })}
                     </div>
                   </div>
@@ -2008,12 +1914,36 @@ const Profile = () => {
                     <span className="text-sm font-medium">Upload Banner</span>
                   </label>
                   <p className="text-center text-xs text-neutral-500">Wide image recommended (16:5 ratio)</p>
-                  {banner && (
-                    <div
-                      className="h-16 w-full rounded-xl border border-white/10 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${banner})` }}
-                    />
-                  )}
+                  {banner ? (
+                    <>
+                      <div
+                        className="h-16 w-full rounded-xl border border-white/10 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${banner})` }}
+                      />
+                      <button
+                        onClick={() => { revokeObjectUrl(banner); setBanner(null); setBannerCleared(true); }}
+                        className="w-full rounded-xl border border-white/10 bg-neutral-800 px-4 py-2.5 text-sm text-neutral-400 transition-all duration-200 hover:border-red-500/40 hover:text-red-400"
+                      >
+                        Use default banner
+                      </button>
+                    </>
+                  ) : bannerCleared ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-800/60 px-4 py-2.5">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-amber-400">
+                        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="text-xs text-neutral-400">Banner will be removed on save</span>
+                      <button
+                        onClick={() => {
+                          setBannerCleared(false);
+                          setBanner(user?.profile_banner ? formatAvatarUrl(user.profile_banner) : null);
+                        }}
+                        className="ml-auto text-xs text-neutral-500 hover:text-white transition-colors"
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -2283,7 +2213,8 @@ const Profile = () => {
                       genres_liked:       orderedGenreIds,
                       instruments_liked:  orderedInstrumentIds,
                       vibes_liked:        orderedVibeIds,
-                      profile_banner:     toBlob(banner),
+                      profile_banner:     bannerCleared ? undefined : toBlob(banner),
+                      clear_profile_banner: bannerCleared,
                       // about_photo:     toBlob(aboutPhoto),
                       ...links,
                     });
@@ -2409,6 +2340,7 @@ const Profile = () => {
             } else if (cropState.variant === "banner") {
               revokeObjectUrl(banner);
               setBanner(dataURL);
+              setBannerCleared(false);
             } else if (cropState.variant === "square") {
               if (aboutPhoto) URL.revokeObjectURL(aboutPhoto);
               setAboutPhoto(dataURL);

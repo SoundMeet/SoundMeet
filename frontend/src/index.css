@@ -94,6 +94,15 @@
     50%       { transform: scaleY(1.0);  }
   }
 
+  /* Soft glow breathe — playing state for music snip rows */
+  @keyframes snip-glow {
+    0%, 100% { box-shadow: 0 0 0px 0px rgba(220, 46, 115, 0); }
+    50%       { box-shadow: 0 0 14px 3px rgba(220, 46, 115, 0.22); }
+  }
+  .snip-playing-glow {
+    animation: snip-glow 2.2s ease-in-out infinite;
+  }
+
   /* Edit drawer — slides in from the right */
   @keyframes drawerSlideIn {
     from { transform: translateX(100%); }

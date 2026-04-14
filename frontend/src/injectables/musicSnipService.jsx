@@ -72,9 +72,8 @@ export const musicSnipService = {
   async deleteSnip(snipId) {
     if (!snipId) throw new Error("snipId is required");
 
-    return await apiFetch('api/music-snips/', {
+    return await apiFetch(`api/music-snips/?snip_id=${snipId}`, {
       method: 'DELETE',
-      body: JSON.stringify({ snip_id: snipId }), 
     });
   }
 };
