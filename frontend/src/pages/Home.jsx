@@ -84,6 +84,7 @@ const Home = () => {
   const [findBandmateModalOpen, setFindBandmateModalOpen] = useState(false);
   const [joinJamModal, setJoinJamModal] = useState({ open: false, jam: null });
   const [rsvpShowModal, setRsvpShowModal] = useState({ open: false, show: null });
+  const [nearYouCollapsed, setNearYouCollapsed] = useState(true);
 
   // ── Discovery interaction state ────────────────────────────────────────────
   const [hoveredDiscoveryId, setHoveredDiscoveryId] = useState(null);
@@ -626,12 +627,15 @@ const Home = () => {
           {/* Near You panel */}
           <div
             ref={nearYouRef}
-            className="w-[380px] max-w-[calc(100vw-2rem)] shrink-0 pt-2 pr-6 pointer-events-auto"
+            className="w-full md:w-[380px] md:max-w-[calc(100vw-2rem)] shrink-0 md:pt-2 md:pr-6 pointer-events-auto fixed md:relative bottom-[60px] md:bottom-auto left-0 right-0 md:left-auto md:right-auto z-30 md:z-auto px-3 md:px-0 pb-2 md:pb-0"
           >
             <div className="rounded-[28px] bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.55)] p-5">
 
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
+              {/* Header — tappable on mobile to collapse/expand */}
+              <div
+                className="flex items-center justify-between mb-0 md:mb-4 cursor-pointer md:cursor-default"
+                onClick={() => setNearYouCollapsed(prev => !prev)}
+              >
                 <div className="flex items-center gap-2">
                   <h2 className="text-white font-medium text-xl">
                     {activeCategories.length === 1
@@ -643,187 +647,195 @@ const Home = () => {
                   )}
                 </div>
                 <div className="flex gap-2.5 items-center">
-                  <SortMenu value={sort} onChange={setSort} />
-                  <GlowSwitch
-                    value={isOn}
-                    size="sm"
-                    onChange={setIsOn}
-                    className="text-sm"
-                  />
-                  <div className="relative" ref={dropdownRef}>
-                    <div
-                      onClick={() => setDropdownOpen((v) => !v)}
-                      className="w-8 h-8 cursor-pointer bg-neutral-800 hover:bg-neutral-700 active:scale-95 flex items-center justify-center rounded-xl select-none transition-all duration-150"
-                    >
-                      <span className="text-white text-lg leading-none">+</span>
-                    </div>
-                    <AnimatePresence>
-                      {dropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.9, y: -6 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9, y: -6 }}
-                          transition={{ duration: 0.15, ease: "easeOut" }}
-                          className="absolute right-0 top-9 z-50 w-52 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.25),0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden"
-                        >
-                          {/* Session actions */}
-                          {[
-                            {
-                              label: "Create Jam",
-                              icon: (
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="2"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                                </svg>
-                              ),
-                              onClick: () => { setCreateJamModalOpen(true); setDropdownOpen(false); },
-                              accent: true,
-                            },
-                            {
-                              label: "Post Update",
-                              icon: (
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                </svg>
-                              ),
-                              onClick: () => setDropdownOpen(false),
-                            },
-                          ].map(({ label, icon, onClick, accent }) => (
-                            <button
-                              key={label}
-                              onClick={onClick}
-                              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-white/[0.07] hover:text-white ${accent ? "text-[#f07aaa]" : "text-gray-300"}`}
-                            >
-                              <span className="shrink-0 opacity-70">{icon}</span>
-                              {label}
-                            </button>
-                          ))}
-
-                          {/* Divider */}
-                          <div className="mx-4 h-px bg-white/[0.07]" />
-
-                          {/* Social/discovery actions */}
-                          <button
-                            onClick={() => { setPromoteShowModalOpen(true); setDropdownOpen(false); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
+                  {/* Mobile chevron */}
+                  <svg
+                    className="md:hidden"
+                    width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                    style={{
+                      color: 'rgba(255,255,255,0.4)',
+                      transform: nearYouCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease',
+                    }}
+                  >
+                    <path d="M19 9l-7 7-7-7" />
+                  </svg>
+                  {/* Desktop controls — always visible, click won't trigger collapse */}
+                  <div
+                    className="hidden md:flex gap-2.5 items-center"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <SortMenu value={sort} onChange={setSort} />
+                    <GlowSwitch
+                      value={isOn}
+                      size="sm"
+                      onChange={setIsOn}
+                      className="text-sm"
+                    />
+                    <div className="relative" ref={dropdownRef}>
+                      <div
+                        onClick={() => setDropdownOpen((v) => !v)}
+                        className="w-8 h-8 cursor-pointer bg-neutral-800 hover:bg-neutral-700 active:scale-95 flex items-center justify-center rounded-xl select-none transition-all duration-150"
+                      >
+                        <span className="text-white text-lg leading-none">+</span>
+                      </div>
+                      <AnimatePresence>
+                        {dropdownOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: -6 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -6 }}
+                            transition={{ duration: 0.15, ease: "easeOut" }}
+                            className="absolute right-0 top-9 z-50 w-52 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.25),0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden"
                           >
-                            <span className="shrink-0 opacity-70">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12z"/><path d="M8 12l2 2 4-4"/>
-                              </svg>
-                            </span>
-                            Promote Show
-                          </button>
-
-                          {/* Divider */}
-                          <div className="mx-4 h-px bg-white/[0.07]" />
-
-                          {/* Band — expandable inline submenu */}
-                          <button
-                            onClick={() => setBandSubmenuOpen((v) => !v)}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
-                          >
-                            <span className="shrink-0 opacity-70">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                              </svg>
-                            </span>
-                            <span className="flex-1 text-left">Band</span>
-                            <svg
-                              className={`w-3 h-3 opacity-50 transition-transform duration-200 ${bandSubmenuOpen ? "rotate-180" : ""}`}
-                              fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          <AnimatePresence>
-                            {bandSubmenuOpen && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.18, ease: "easeOut" }}
-                                className="overflow-hidden"
+                            {[
+                              {
+                                label: "Create Jam",
+                                icon: (
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="2" /><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                                  </svg>
+                                ),
+                                onClick: () => { setCreateJamModalOpen(true); setDropdownOpen(false); },
+                                accent: true,
+                              },
+                              {
+                                label: "Post Update",
+                                icon: (
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                ),
+                                onClick: () => setDropdownOpen(false),
+                              },
+                            ].map(({ label, icon, onClick, accent }) => (
+                              <button
+                                key={label}
+                                onClick={onClick}
+                                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-white/[0.07] hover:text-white ${accent ? "text-[#f07aaa]" : "text-gray-300"}`}
                               >
-                                <div className="bg-white/[0.03] border-t border-white/[0.06]">
-                                  {[
-                                    {
-                                      label: "Join a Band",
-                                      icon: (
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-                                        </svg>
-                                      ),
-                                      onClick: () => { setJoinBandModalOpen(true); setDropdownOpen(false); },
-                                    },
-                                    {
-                                      label: "Find a Bandmate",
-                                      icon: (
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-                                        </svg>
-                                      ),
-                                      onClick: () => { setFindBandmateModalOpen(true); setDropdownOpen(false); },
-                                    },
-                                  ].map(({ label, icon, onClick }) => (
-                                    <button
-                                      key={label}
-                                      onClick={onClick}
-                                      className="w-full flex items-center gap-3 pl-9 pr-4 py-2.5 text-[13px] font-medium text-gray-400 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
-                                    >
-                                      <span className="shrink-0 opacity-60">{icon}</span>
-                                      {label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                                <span className="shrink-0 opacity-70">{icon}</span>
+                                {label}
+                              </button>
+                            ))}
+                            <div className="mx-4 h-px bg-white/[0.07]" />
+                            <button
+                              onClick={() => { setPromoteShowModalOpen(true); setDropdownOpen(false); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
+                            >
+                              <span className="shrink-0 opacity-70">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12z" /><path d="M8 12l2 2 4-4" />
+                                </svg>
+                              </span>
+                              Promote Show
+                            </button>
+                            <div className="mx-4 h-px bg-white/[0.07]" />
+                            <button
+                              onClick={() => setBandSubmenuOpen((v) => !v)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
+                            >
+                              <span className="shrink-0 opacity-70">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                              </span>
+                              <span className="flex-1 text-left">Band</span>
+                              <svg
+                                className={`w-3 h-3 opacity-50 transition-transform duration-200 ${bandSubmenuOpen ? "rotate-180" : ""}`}
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            <AnimatePresence>
+                              {bandSubmenuOpen && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.18, ease: "easeOut" }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="bg-white/[0.03] border-t border-white/[0.06]">
+                                    {[
+                                      {
+                                        label: "Join a Band",
+                                        icon: (
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
+                                          </svg>
+                                        ),
+                                        onClick: () => { setJoinBandModalOpen(true); setDropdownOpen(false); },
+                                      },
+                                      {
+                                        label: "Find a Bandmate",
+                                        icon: (
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+                                          </svg>
+                                        ),
+                                        onClick: () => { setFindBandmateModalOpen(true); setDropdownOpen(false); },
+                                      },
+                                    ].map(({ label, icon, onClick }) => (
+                                      <button
+                                        key={label}
+                                        onClick={onClick}
+                                        className="w-full flex items-center gap-3 pl-9 pr-4 py-2.5 text-[13px] font-medium text-gray-400 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
+                                      >
+                                        <span className="shrink-0 opacity-60">{icon}</span>
+                                        {label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="h-px bg-gray-800 rounded-full mb-4" />
-
-              {/* Cards — scrollable */}
-              {feedLoading ? (
-                <div className="flex items-center justify-center py-10">
-                  <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
-                </div>
-              ) : filteredItems.length > 0 ? (
-                <div className="flex flex-col gap-3 overflow-y-auto max-h-[480px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {filteredItems.map((item) => (
-                    <div key={item.id} ref={(el) => { cardRefs.current[item.id] = el; }}>
-                      <DiscoveryCard
-                        item={item}
-                        participationState={getParticipationState(item)}
-                        // isActive is suppressed when something is locked —
-                        // hover should never visually compete with a selection.
-                        isActive={!selectedDiscoveryId && hoveredDiscoveryId === item.id}
-                        isSelected={selectedDiscoveryId === item.id}
-                        onClick={() => handleItemClick(item.id)}
-                        onDoubleClick={() => handleItemDoubleClick(item.id)}
-                        onAction={() => handleItemAction(item.id)}
-                        onMouseEnter={() => handleItemHover(item.id)}
-                        onMouseLeave={handleItemLeave}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-10 gap-2">
-                  <span className="text-2xl">🎵</span>
-                  <p className="text-sm text-neutral-400 text-center">
-                    No jams found near you yet.
-                  </p>
-                  <p className="text-xs text-neutral-600 text-center">
-                    Create one or try expanding your radius.
-                  </p>
-                </div>
-              )}
+              {/* Cards — always visible on desktop, hidden on mobile when collapsed */}
+              <div className={`md:block ${nearYouCollapsed ? 'hidden' : 'block'}`}>
+                <div className="h-px bg-gray-800 rounded-full mb-4 mt-4" />
+                {feedLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
+                  </div>
+                ) : filteredItems.length > 0 ? (
+                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[480px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {filteredItems.map((item) => (
+                      <div key={item.id} ref={(el) => { cardRefs.current[item.id] = el; }}>
+                        <DiscoveryCard
+                          item={item}
+                          participationState={getParticipationState(item)}
+                          isActive={!selectedDiscoveryId && hoveredDiscoveryId === item.id}
+                          isSelected={selectedDiscoveryId === item.id}
+                          onClick={() => handleItemClick(item.id)}
+                          onDoubleClick={() => handleItemDoubleClick(item.id)}
+                          onAction={() => handleItemAction(item.id)}
+                          onMouseEnter={() => handleItemHover(item.id)}
+                          onMouseLeave={handleItemLeave}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <span className="text-2xl">🎵</span>
+                    <p className="text-sm text-neutral-400 text-center">
+                      No jams found near you yet.
+                    </p>
+                    <p className="text-xs text-neutral-600 text-center">
+                      Create one or try expanding your radius.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -870,9 +882,8 @@ const Home = () => {
         <FindBandmateModal open={findBandmateModalOpen} onOpenChange={setFindBandmateModalOpen} />
       </div>
 
-      {/* Map controls — upper-left, below filter rows, above preview zone.
-          Outside the z-20 UI layer so they form their own stacking context. */}
-      <div className="fixed top-[220px] left-8 z-40 pointer-events-auto">
+      {/* Map controls — desktop only, touch devices use pinch-to-zoom */}
+      <div className="hidden md:block fixed top-[220px] left-8 z-10 pointer-events-auto">
         <MapFloatingControls
           onRecenter={handleRecenter}
           onReset={handleReset}

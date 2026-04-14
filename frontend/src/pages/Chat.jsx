@@ -68,7 +68,19 @@ const Chat = () => {
   const [hideDMConfirm,  setHideDMConfirm]    = useState(false)
   const [hideDMTarget,   setHideDMTarget]     = useState(null)
   const [hidingDM,       setHidingDM]         = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen]     = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth < 1024)
+
+  // Open sidebar by default on mobile, close it when resizing to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsSidebarOpen(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // { [jamId]: { adminId: string|null, attendees: JamAttendee[] } }
   const [jamAttendeeCache, setJamAttendeeCache] = useState({})
   // Conversation ID we intend to open — set as soon as getOrCreateDMChat resolves,

@@ -24,7 +24,7 @@ const DiscoverToolbar = ({
   moreFilters,
   onMoreFiltersChange,
 }) => (
-  <div className="flex items-center gap-2 flex-wrap">
+  <div className="flex items-center gap-2 flex-wrap relative z-[10]">
     <RadiusFilter value={radius} onChange={onRadiusChange} onOpenChange={onRadiusOpenChange} />
     <TimeFilter value={time} onChange={onTimeChange} />
     <MoreFiltersPopover value={moreFilters} onChange={onMoreFiltersChange} />

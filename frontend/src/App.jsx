@@ -11,6 +11,7 @@ import Feed from './pages/Feed.jsx'
 import Navbar from './components/Navbar.jsx'
 import GuestLocationGuard from './components/GuestLocationGuard.jsx'
 import AuthModal from './components/AuthModal.jsx'
+import BottomNav from './components/BottomNav.jsx'
 import { AuthModalProvider, useAuthModal } from './context/AuthModalContext.jsx'
 import { NotificationsProvider } from './context/NotificationsContext.jsx'
 import { FriendsProvider } from './context/FriendsContext.jsx'
@@ -65,6 +66,8 @@ const App = () => {
             <div className="sticky top-0 z-50">
               <Navbar />
             </div>
+          <div className="pb-[60px] md:pb-0">
+
             <Routes>
               <Route path="/" element={<OnboardingGuard><GuestLocationGuard><Home /></GuestLocationGuard></OnboardingGuard>} />
               <Route path="/meet" element={<OnboardingGuard><Meet /></OnboardingGuard>} />
@@ -77,9 +80,11 @@ const App = () => {
               <Route path="/show/:id" element={<EventDetailPage type="show" />} />
               <Route path="*" element={<NotFound />} />
               <Route path="/onboarding" element={<Onboarding />} />
-      </Routes>
+            </Routes>
+          </div>
             {/* Auth modal rendered at app root so it can be triggered from anywhere */}
             <AuthModal />
+            <BottomNav />
           </div>
         </AuthModalProvider>
       </NotificationsProvider>

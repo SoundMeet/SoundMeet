@@ -319,8 +319,7 @@ export function NotificationsDropdown() {
             animate={{ opacity: 1, scale: 1,    y:  0 }}
             exit={{ opacity: 0, scale: 0.97, y: -6 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
-            className="absolute right-0 top-full mt-3 z-[200] w-[380px] max-w-[calc(100vw-16px)] flex flex-col rounded-2xl overflow-hidden"
-            style={{
+            className="fixed md:absolute right-2 md:right-0 top-[60px] md:top-full md:mt-3 z-[200] w-[380px] max-w-[calc(100vw-16px)] md:max-w-[380px] flex flex-col rounded-2xl overflow-hidden" style={{
               background:           'rgba(13,13,13,0.98)',
               backdropFilter:       'blur(28px)',
               WebkitBackdropFilter: 'blur(28px)',

@@ -111,7 +111,7 @@ const SearchResultsDropdown = ({
                  bg-neutral-950/98 backdrop-blur-2xl
                  border border-white/[0.08]
                  shadow-[0_12px_48px_rgba(0,0,0,0.75),0_0_24px_rgba(220,46,115,0.12)]
-                 overflow-hidden z-[60] pb-2"
+                 overflow-hidden z-[200] pb-2"
     >
       {hasPins && (
         <>
