@@ -28,8 +28,7 @@ export default function Profile() {
     : null
 
   return (
-    <div className="min-h-screen px-4 py-16 flex flex-col items-center">
-      {/* Avatar */}
+      <div className="min-h-screen px-4 pt-8 pb-24 md:py-16 flex flex-col items-center overflow-x-hidden">      {/* Avatar */}
       <div
         className="w-24 h-24 rounded-full flex items-center justify-center mb-6 overflow-hidden"
         style={{

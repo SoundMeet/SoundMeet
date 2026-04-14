@@ -55,7 +55,7 @@ const DiscoverControls = ({
   const isAllActive = activeCategories.length === 0;
 
   return (
-    <div className="px-6 pt-5 pb-2 pointer-events-auto flex flex-col gap-1.5">
+    <div className="px-6 pt-5 pb-2 pointer-events-auto flex flex-col gap-1.5 relative z-200">
 
       {/* ── Row 1: Search + category chips ─────────────────────────────────── */}
       {/*
@@ -69,7 +69,7 @@ const DiscoverControls = ({
                       px-3 py-2
                       border border-white/[0.09]
                       shadow-[0_0_10px_rgba(220,46,115,0.22)]
-                      w-fit max-w-full">
+                      w-fit max-w-full overflow-visible relative z-[100]">
 
         {/* Search input with live dropdown */}
         <DiscoverSearchBar

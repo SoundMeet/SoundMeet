@@ -325,7 +325,7 @@ export default function SoundMeetDiscovery() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden">
+    <div className="flex flex-col bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden h-[calc(100dvh-4rem-60px)] md:h-[calc(100dvh-4rem)]">
       <header className="h-20 flex items-center justify-center px-8 shrink-0 z-10">
         <div className="flex items-center gap-4 w-full max-w-[450px]" ref={searchContainerRef}>
           <div className="relative flex-1 group">
