@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Sora:wght@100..800&display=swap');
 @import "tailwindcss";
-
+ 
 @theme {
     --color-dark: #141414;
     --color-light: #ffffff;
@@ -88,6 +88,18 @@
   100% { background-position: -200% center; }
 }
 
+  /* Waveform bar bounce — used by Music Clips player in Profile */
+  @keyframes waveform-bounce {
+    0%, 100% { transform: scaleY(0.35); }
+    50%       { transform: scaleY(1.0);  }
+  }
+
+  /* Edit drawer — slides in from the right */
+  @keyframes drawerSlideIn {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
+  }
+
   .glow-pink:hover {
     box-shadow: 
       0 0 8px rgba(236, 72, 153, 0.6),
@@ -149,9 +161,181 @@
         background-color: var(--color-dark);
         color: var(--color-light);
       }
-
+ 
       h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-sora);
         @apply font-bold;
       }
   }
+ 
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+ 
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  border: 2px solid rgba(255,255,255,0.7);
+  animation: pulseOut 1.2s ease-out forwards;
+}
+ 
+@keyframes pulseOut {
+  0%   { transform: scale(1);    opacity: 0.8; }
+  100% { transform: scale(1.25); opacity: 0;   }
+}
+ 
+.snippet-enter {
+  animation: snippetIn 0.35s ease-out;
+}
+ 
+.cropper-crop-box,
+.cropper-view-box {
+  border-radius: 50% !important;
+}
+.cropper-crop-box {
+  opacity: 0 !important;
+}
+.cropper-point,
+.cropper-line {
+  display: none !important;
+}
+ 
+/* ── Shared keyframes ────────────────────────────────────────────────────────
+ * Both fill animations do the same thing (width sweep) — the difference is
+ * only duration, set on the element via animation-duration in each rule.
+ * One keyframe reused twice is cleaner than two identical keyframes.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@keyframes fillSweep {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+ 
+/* Stub detail overlay — slides in from the left edge of its container */
+@keyframes stubSlideIn {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0%);    opacity: 1; }
+}
+ 
+/* ── Hide scrollbar visually while keeping scroll functionality ──────────────
+ * Works across all browsers:
+ * - Firefox uses scrollbar-width: none
+ * - WebKit (Chrome, Safari) uses ::-webkit-scrollbar { display: none }
+ * The element still scrolls — the bar is just invisible.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+ 
+/* ── Thin white scrollbar — posts strip ──────────────────────────────────────
+ * Slim, white/translucent scrollbar for horizontal scroll areas.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.white-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
+}
+.white-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+.white-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.white-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.25);
+  border-radius: 99px;
+}
+.white-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.45);
+}
+
+/* ── Pill strip on the banner ─────────────────────────────────────────────────
+ * .pill-track animates left by 50% (half the doubled pill array) then back.
+ * Pausing on hover lets users read the pills without them running away.
+ * .pill-fade uses a mask-image to fade the edges so pills appear/disappear
+ * smoothly rather than hard-clipping at the container boundary.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@keyframes pill-scroll {
+  0%,  2%  { transform: translateX(0); }
+  48%, 50% { transform: translateX(-50%); }
+  98%, 100%{ transform: translateX(0); }
+}
+ 
+.pill-track {
+  display: flex;
+  width: max-content;
+}
+.pill-track:hover {
+  animation-play-state: paused;
+}
+.pill-fade {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+ 
+@layer utilities {
+ 
+  /* ── Empty-state jam button: 15s pink sweep ─────────────────────────────── */
+  .jam-empty-btn {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .jam-empty-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: #DC2E73;
+    width: 0%;
+    z-index: -1;
+  }
+  .jam-empty-btn:hover::before {
+    animation: fillSweep 15s linear forwards;
+  }
+ 
+  /* ── JamCard hover fill: 7s, color from --jam-fill CSS variable ──────────
+   *
+   * How CSS custom properties work with pseudo-elements:
+   * A ::before pseudo-element inherits CSS variables from its "owner" element
+   * (the element it's attached to). So if the <button> has
+   *   style={{ "--jam-fill": "#F7C10D99" }}
+   * then .jam-card-hover::before can read var(--jam-fill) directly.
+   * This is purely CSS — no JS involved in the color lookup at render time.
+   *
+   * Why border-radius: inherit?
+   * ::before is an absolutely-positioned box inside the card. Without
+   * border-radius: inherit it would be a sharp rectangle bleeding through
+   * the card's rounded corners.
+   *
+   * Why z-index: 0 on ::before and z-index: 1 on > * ?
+   * The fill needs to sit above the card's background (z: auto) but below
+   * the text content. z-index only works on positioned elements, so we use
+   * position: relative on > * to establish a stacking context for them.
+   * ─────────────────────────────────────────────────────────────────────────── */
+  .jam-card-hover {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .jam-card-hover::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: var(--jam-fill);
+    width: 0%;
+    z-index: 0;
+    border-radius: inherit;
+  }
+  .jam-card-hover > * {
+    position: relative;
+    z-index: 1;
+  }
+  .jam-card-hover:hover::before {
+    animation: fillSweep 7s linear forwards;
+  }
+}

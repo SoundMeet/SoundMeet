@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdMoreHoriz, MdEditNote, MdDeleteOutline } from 'react-icons/md'
+import { useNavigate } from 'react-router-dom'
 import { PostLocationTag } from './PostLocationTag'
+import { ProfilesRUS } from '../../services/ProfilesRUS'
 
 const TYPE_BADGE = {
   jam:    { label: 'Jam',    color: '#DC2E73', bg: 'rgba(220,46,115,0.12)'  },
@@ -62,6 +64,9 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
   const { label, full } = formatTimestamp(createdAt)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const navigate = useNavigate()
+
+  const goToProfile = () => ProfilesRUS(navigate, author.profileId)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -80,11 +85,13 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
           <img
             src={author.avatarUrl}
             alt={author.displayName}
+            onClick={goToProfile}
             className="w-10 h-10 rounded-full object-cover flex-shrink-0 transition-transform duration-150 hover:scale-105 cursor-pointer"
             style={{ background: '#222' }}
           />
         ) : (
           <div
+            onClick={goToProfile}
             className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white transition-transform duration-150 hover:scale-105 cursor-pointer select-none"
             style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.5), rgba(251,64,64,0.3))' }}
           >
@@ -96,7 +103,10 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
         <div className="min-w-0">
           {/* Name + type badge on same line */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-[14px] font-semibold text-white leading-tight cursor-pointer hover:underline decoration-white/30 underline-offset-2 transition-all duration-150">
+            <p
+              onClick={goToProfile}
+              className="text-[14px] font-semibold text-white leading-tight cursor-pointer hover:underline decoration-white/30 underline-offset-2 transition-all duration-150"
+            >
               {author.displayName}
             </p>
             {badge && (

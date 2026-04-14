@@ -16,6 +16,8 @@ function toFeedPost(row, currentUserId) {
     id:        row.id ?? `unknown-${Math.random()}`,
     author: {
       id:          row.author?.id ?? null,
+      // profileId is chat_profile.id — the sequential integer used by ProfilesRUS
+      profileId:   profile.id ?? null,
       displayName: profile.display_name ?? row.author?.username ?? 'Unknown',
       username:    row.author?.username ? `@${row.author.username}` : '',
       avatarUrl:   formatAvatarUrl(profile.pfp) ?? null,
@@ -66,7 +68,7 @@ export const postService = {
         author:author_id (
           id,
           username,
-          chat_profile ( display_name, pfp )
+          chat_profile ( id, display_name, pfp )
         ),
         likes:chat_post_likes ( user_id ),
         comments:chat_comment (
@@ -108,5 +110,34 @@ export const postService = {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
-  }
+  },
+
+  async getPostsByUser(authorId, currentUserId, limit = 3) {
+    const { data, error } = await supabase
+      .from('chat_post')
+      .select(`
+        id,
+        content,
+        image,
+        created_at,
+        author:author_id (
+          id,
+          username,
+          chat_profile ( id, display_name, pfp )
+        ),
+        likes:chat_post_likes ( user_id ),
+        comments:chat_comment (
+          id,
+          content,
+          created_at,
+          author:author_id ( id, username )
+        )
+      `)
+      .eq('author_id', authorId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data.map((row) => toFeedPost(row, currentUserId));
+  },
 };

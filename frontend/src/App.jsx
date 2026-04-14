@@ -17,6 +17,8 @@ import { NotificationsProvider } from './context/NotificationsContext.jsx'
 import { FriendsProvider } from './context/FriendsContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { useAuth } from './injectables/Auth.jsx'
+import Onboarding from "./pages/Onboarding"
+import EventDetailPage from "./pages/EventDetailPage"
 
 /** Redirects unauthenticated users to / and opens the login modal. */
 const PrivateRoute = ({ children }) => {
@@ -30,10 +32,6 @@ const PrivateRoute = ({ children }) => {
   if (!user) return <Navigate to="/" replace />
   return children
 }
-import Onboarding from "./pages/Onboarding";
-import EventDetailPage from "./pages/EventDetailPage";
-
-
 
 const OnboardingGuard = ({ children }) => {
   const { isLoggedIn, user, isLoading } = useAuth()
@@ -75,6 +73,7 @@ const App = () => {
               <Route path="/chat" element={<OnboardingGuard><Chat /></OnboardingGuard>} />
               <Route path="/feed" element={<OnboardingGuard><PrivateRoute><Feed /></PrivateRoute></OnboardingGuard>} />
               <Route path="/profile" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
+              <Route path="/profile/:username" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
               <Route path="/settings" element={<OnboardingGuard><Settings /></OnboardingGuard>} />
               <Route path="/jam/:id"  element={<EventDetailPage type="jam" />} />
               <Route path="/show/:id" element={<EventDetailPage type="show" />} />

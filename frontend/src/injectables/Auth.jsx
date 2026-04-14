@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(!!getToken());
 
   const fetchProfile = useCallback(async () => {
-    const profile = await apiFetch("api/profiles/me/");
+    const profile = await apiFetch("api/profiles/me/", { cache: "no-store" });
     setUser(profile);
     return profile;
   }, []);
@@ -87,7 +87,7 @@ export function AuthProvider({ children }) {
   const updateProfile = async (data) => {
     const form = new FormData();
     if (data.display_name !== undefined)        form.append("display_name", data.display_name);
-    if (data.pfp instanceof File)               form.append("pfp", data.pfp);
+    if (data.pfp instanceof File || data.pfp instanceof Blob) form.append("pfp", data.pfp, "pfp.jpg");
     if (data.about !== undefined)               form.append("about", data.about);
     if (data.age !== undefined)                 form.append("age", String(data.age));
     if (data.gender !== undefined)              form.append("gender", data.gender);
@@ -96,6 +96,10 @@ export function AuthProvider({ children }) {
     if (data.city !== undefined)                form.append("city", data.city);
     if (data.state !== undefined)               form.append("state", data.state);
     if (data.onboarding_complete !== undefined) form.append("onboarding_complete", String(data.onboarding_complete));
+    if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
+    if (data.headline !== undefined)            form.append("headline", data.headline);
+    if (data.available_to_jam !== undefined)    form.append("available_to_jam", String(data.available_to_jam));
+    if (data.profile_theme !== undefined)       form.append("profile_theme", data.profile_theme);
     // Music links
     if (data.spotify !== undefined)             form.append("spotify", data.spotify);
     if (data.soundcloud !== undefined)          form.append("soundcloud", data.soundcloud);
@@ -104,11 +108,18 @@ export function AuthProvider({ children }) {
     if (data.instagram !== undefined)           form.append("instagram", data.instagram);
     if (data.tiktok !== undefined)              form.append("tiktok", data.tiktok);
 
+    if (data.profile_banner instanceof Blob) form.append("profile_banner", data.profile_banner, "banner.jpg");
+
+    // ── BACKEND NEEDED: ImageField "about_photo" on the profile model ─────────
+    // Uncomment once the backend field exists.
+    // if (data.about_photo instanceof Blob) form.append("about_photo", data.about_photo, "about_photo.jpg");
+    //I'm letting the ai write this to let anyone else know some of the backend variables that still need to be put, like banner. we can just uncomment this after it's applied. 
     data.instruments_liked?.forEach((id) => form.append("instruments_liked", String(id)));
     data.genres_liked?.forEach((id)      => form.append("genres_liked", String(id)));
     data.vibes_liked?.forEach((id)       => form.append("vibes_liked", String(id)));
     data.artists_liked?.forEach((id)     => form.append("artists_liked", String(id)));
 
+   //This is the patch request for updating the profile. I think it's alright, but tell me if anything breaks - GL 
     const updated = await apiFetch("api/profiles/me/", {
       method: "PATCH",
       body: form,

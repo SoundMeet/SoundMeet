@@ -79,6 +79,8 @@ function buildFromUser(rawUser) {
   const profile = Array.isArray(rawProfile) ? (rawProfile[0] ?? null) : rawProfile
   return {
     id: rawUser.id,
+    // profileId is the sequential chat_profile.id used by ProfilesRUS to navigate
+    profileId: profile?.id ?? null,
     username: rawUser.username || '',
     displayName: profile?.display_name || rawUser.username || 'Someone',
     avatarUrl: formatAvatarUrl(profile?.pfp) || null,

@@ -27,6 +27,7 @@ function normalizeFriend(rawUser) {
     : rawUser.chat_profile
   return {
     id: rawUser.id,
+    profileId: profile?.id ?? null,
     username: rawUser.username || '',
     displayName: profile?.display_name || rawUser.username || 'Unknown',
     avatarUrl: formatAvatarUrl(profile?.pfp) || null,

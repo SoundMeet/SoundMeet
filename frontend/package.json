@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
-    "@supabase/supabase-js": "^2.100.1",
+    "@supabase/supabase-js": "^2.101.1",
+    "@tailwindcss/line-clamp": "^0.4.4",
     "@tailwindcss/vite": "^4.2.1",
+    "cropperjs": "^1.6.2",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.6.0",
     "maplibre-gl": "^5.22.0",
