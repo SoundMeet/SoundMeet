@@ -190,6 +190,9 @@ def get_profile(request):
         
         if 'profile_banner' in request.FILES:
             profile.profile_banner = request.FILES['profile_banner']
+        elif data.get('clear_profile_banner') == 'true':
+            profile.profile_banner.delete(save=False)
+            profile.profile_banner = None
 
         profile.save()
 

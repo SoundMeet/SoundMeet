@@ -262,8 +262,9 @@ const Profile = () => {
   const [selectedJam, setSelectedJam] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
 
-  const [profilePic, setProfilePic] = useState(null);
-  const [banner,     setBanner]     = useState(null);
+  const [profilePic,    setProfilePic]    = useState(null);
+  const [banner,        setBanner]        = useState(null);
+  const [bannerCleared, setBannerCleared] = useState(false);
   const [about,      setAbout]      = useState("");
   const [aboutPhoto, setAboutPhoto] = useState(null);
   const [name,       setName]       = useState("");
@@ -340,6 +341,7 @@ const Profile = () => {
     setAbout(u.about || "");
     setProfilePic(u.pfp ? formatAvatarUrl(u.pfp) : null);
     setBanner(u.profile_banner ? formatAvatarUrl(u.profile_banner) : null);
+    setBannerCleared(false);
     setLinks({
       spotify:    u.spotify    || "",
       soundcloud: u.soundcloud || "",
@@ -1912,12 +1914,36 @@ const playSnippet = (snippet, index) => {
                     <span className="text-sm font-medium">Upload Banner</span>
                   </label>
                   <p className="text-center text-xs text-neutral-500">Wide image recommended (16:5 ratio)</p>
-                  {banner && (
-                    <div
-                      className="h-16 w-full rounded-xl border border-white/10 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${banner})` }}
-                    />
-                  )}
+                  {banner ? (
+                    <>
+                      <div
+                        className="h-16 w-full rounded-xl border border-white/10 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${banner})` }}
+                      />
+                      <button
+                        onClick={() => { revokeObjectUrl(banner); setBanner(null); setBannerCleared(true); }}
+                        className="w-full rounded-xl border border-white/10 bg-neutral-800 px-4 py-2.5 text-sm text-neutral-400 transition-all duration-200 hover:border-red-500/40 hover:text-red-400"
+                      >
+                        Use default banner
+                      </button>
+                    </>
+                  ) : bannerCleared ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-800/60 px-4 py-2.5">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-amber-400">
+                        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="text-xs text-neutral-400">Banner will be removed on save</span>
+                      <button
+                        onClick={() => {
+                          setBannerCleared(false);
+                          setBanner(user?.profile_banner ? formatAvatarUrl(user.profile_banner) : null);
+                        }}
+                        className="ml-auto text-xs text-neutral-500 hover:text-white transition-colors"
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -2187,7 +2213,8 @@ const playSnippet = (snippet, index) => {
                       genres_liked:       orderedGenreIds,
                       instruments_liked:  orderedInstrumentIds,
                       vibes_liked:        orderedVibeIds,
-                      profile_banner:     toBlob(banner),
+                      profile_banner:     bannerCleared ? undefined : toBlob(banner),
+                      clear_profile_banner: bannerCleared,
                       // about_photo:     toBlob(aboutPhoto),
                       ...links,
                     });
@@ -2313,6 +2340,7 @@ const playSnippet = (snippet, index) => {
             } else if (cropState.variant === "banner") {
               revokeObjectUrl(banner);
               setBanner(dataURL);
+              setBannerCleared(false);
             } else if (cropState.variant === "square") {
               if (aboutPhoto) URL.revokeObjectURL(aboutPhoto);
               setAboutPhoto(dataURL);
