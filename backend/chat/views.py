@@ -11,6 +11,8 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from .models import (
     Profile, Post, Comment, FriendRequest, Notification,
     BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation,
@@ -718,3 +720,60 @@ def verify_code(request):
     verification.save()
 
     return Response({'status': 'verified'})
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def google_auth(request):
+    token = request.data.get('token')
+    if not token:
+        return Response({'error': 'Token is required'}, status=400)
+
+    try:
+        # Verify the token with Google
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            os.environ.get('GOOGLE_CLIENT_ID')
+        )
+
+        email = idinfo.get('email')
+        name = idinfo.get('name', '')
+        picture = idinfo.get('picture', '')
+
+        if not email:
+            return Response({'error': 'No email from Google'}, status=400)
+
+        # Check if user exists, create if not
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': email.split('@')[0][:15],
+            }
+        )
+
+        # If username taken, make it unique
+        if created:
+            base = email.split('@')[0][:12]
+            username = base
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base}{counter}"
+                counter += 1
+            user.username = username
+            user.save()
+
+            Profile.objects.get_or_create(
+                user=user,
+                defaults={'display_name': name[:15] or username}
+            )
+
+        token, _ = Token.objects.get_or_create(user=user)
+
+        return Response({
+            'token': token.key,
+            'user_id': user.id,
+            'username': user.username,
+            'created': created,
+        })
+
+    except ValueError as e:
+        return Response({'error': 'Invalid Google token'}, status=400)

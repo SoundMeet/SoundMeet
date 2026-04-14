@@ -29,4 +29,5 @@ urlpatterns = [
     path('api/bandmates/<int:listing_id>/apply/', views.apply_for_bandmate, name='apply_for_bandmate'),
     path('api/send-verification-code/', views.send_verification_code, name='send_verification_code'),
     path('api/verify-code/', views.verify_code, name='verify_code'),
+    path('api/auth/google/', views.google_auth, name='google_auth'),
 ]

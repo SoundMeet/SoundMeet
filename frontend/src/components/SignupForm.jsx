@@ -1,11 +1,12 @@
 /**
  * SignupForm
- * Step 1: Enter email → send verification code
+ * Step 1: Enter email → send verification code (or Continue with Google)
  * Step 2: Enter 6-digit code → verify
- * Step 3: Fill out the rest of the signup form (CR1SI's redesign)
+ * Step 3: Fill out the rest of the signup form
  */
 import { useState, useRef, useEffect } from 'react'
 import { FaGoogle } from 'react-icons/fa'
+import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 
@@ -89,43 +90,26 @@ function CountryDropdown({ value, onChange }) {
         type="button"
         onClick={() => setOpen(v => !v)}
         className="auth-input auth-input-compact"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          cursor: 'pointer', textAlign: 'left', width: '100%',
-        }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', width: '100%' }}
       >
         <span style={{ color: value ? '#f0f0f0' : 'rgba(240,240,240,0.26)', fontSize: '13px' }}>
           {value || 'Country'}
         </span>
-        <svg
-          width="10" height="10" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2.5"
-          style={{
-            opacity: 0.35, flexShrink: 0, marginLeft: 6,
-            transform: open ? 'rotate(180deg)' : 'none',
-            transition: 'transform 0.2s',
-          }}
-        >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          style={{ opacity: 0.35, flexShrink: 0, marginLeft: 6, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
-      {/* Dropdown — opens upward */}
       {open && (
-        <div style={{
-          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
-          background: '#141418', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '12px', zIndex: 9999, overflow: 'hidden',
-          boxShadow: '0 -12px 40px rgba(0,0,0,0.6)',
-        }}>
+        <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0, background: '#141418', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', zIndex: 9999, overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.6)' }}>
           <div style={{ padding: '7px 7px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ position: 'relative' }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                 style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', opacity: 0.3, pointerEvents: 'none' }}>
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
-              <input ref={searchRef} type="text" placeholder="Search country…" value={search}
-                onChange={e => setSearch(e.target.value)}
+              <input ref={searchRef} type="text" placeholder="Search country…" value={search} onChange={e => setSearch(e.target.value)}
                 style={{ width: '100%', padding: '6px 10px 6px 28px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#f0f0f0', fontSize: '12px', fontFamily: 'Sora, sans-serif', outline: 'none' }}
               />
             </div>
@@ -150,7 +134,7 @@ function CountryDropdown({ value, onChange }) {
 }
 
 export default function SignupForm() {
-  const { register } = useAuth()
+  const { register, loginWithGoogle } = useAuth()
   const { closeModal, switchView } = useAuthModal()
 
   const [step, setStep] = useState('email')
@@ -160,6 +144,7 @@ export default function SignupForm() {
   const [form, setForm] = useState({ username: '', password: '', age: '', country: '', city: '', gender: '' })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
@@ -169,6 +154,22 @@ export default function SignupForm() {
   }, [resendTimer])
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true)
+      setError(null)
+      try {
+        await loginWithGoogle(tokenResponse.access_token)
+        closeModal()
+      } catch (err) {
+        setError(err?.error || 'Google sign up failed. Please try again.')
+      } finally {
+        setGoogleLoading(false)
+      }
+    },
+    onError: () => setError('Google sign up failed. Please try again.'),
+  })
 
   const handleSendCode = async (e) => {
     e.preventDefault()
@@ -244,19 +245,22 @@ export default function SignupForm() {
   // ── Step 1: Email ──────────────────────────────────────────────────────────
   if (step === 'email') return (
     <form onSubmit={handleSendCode} style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-      <button type="button"
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Sora, sans-serif', fontWeight: 500, cursor: 'pointer', transition: 'background 0.15s' }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+      {/* Google button */}
+      <button type="button" onClick={() => googleLogin()} disabled={googleLoading}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Sora, sans-serif', fontWeight: 500, cursor: googleLoading ? 'not-allowed' : 'pointer', opacity: googleLoading ? 0.6 : 1, transition: 'background 0.15s' }}
+        onMouseEnter={(e) => { if (!googleLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
       >
         <FaGoogle style={{ fontSize: '12px', opacity: 0.65 }} />
-        Continue with Google
+        {googleLoading ? 'Signing up…' : 'Continue with Google'}
       </button>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
         <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.22)', fontFamily: 'Sora, sans-serif' }}>or</span>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
       </div>
+
       {errorBox}
       <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', fontFamily: 'Sora, sans-serif', textAlign: 'center', margin: 0 }}>Enter your email to get started</p>
       <input className="auth-input auth-input-compact" type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />

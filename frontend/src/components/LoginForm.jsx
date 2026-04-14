@@ -1,12 +1,11 @@
 /**
  * LoginForm
- *
- * Calls login(credentials) from the real AuthProvider.
- * Fields match the backend endpoint: POST /api-token-auth/
- *   Body: { username, password }
+ * - Username/password login
+ * - Google OAuth login
  */
 import { useState } from 'react'
 import { FaGoogle } from 'react-icons/fa'
+import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 
@@ -15,12 +14,13 @@ const ACCENT_GRAD_DIM = 'linear-gradient(135deg, rgba(220,46,115,0.5) 0%, rgba(2
 const ACCENT_GLOW     = 'rgba(220,46,115,0.22)'
 
 export default function LoginForm() {
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
   const { closeModal, switchView } = useAuthModal()
 
   const [form, setForm] = useState({ username: '', password: '' })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
   const handleChange = (e) =>
@@ -44,32 +44,48 @@ export default function LoginForm() {
     }
   }
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true)
+      setError(null)
+      try {
+        await loginWithGoogle(tokenResponse.access_token)
+        closeModal()
+      } catch (err) {
+        setError(err?.error || 'Google login failed. Please try again.')
+      } finally {
+        setGoogleLoading(false)
+      }
+    },
+    onError: () => setError('Google login failed. Please try again.'),
+  })
+
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
       {/* Google button */}
       <button
         type="button"
+        onClick={() => googleLogin()}
+        disabled={googleLoading}
         style={{
           width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '10px',
-          padding: '11px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '10px', padding: '11px',
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '12px',
           color: 'rgba(255,255,255,0.6)',
-          fontSize: '13.5px',
-          fontFamily: 'Sora, sans-serif',
-          fontWeight: 500,
-          cursor: 'pointer',
+          fontSize: '13.5px', fontFamily: 'Sora, sans-serif', fontWeight: 500,
+          cursor: googleLoading ? 'not-allowed' : 'pointer',
+          opacity: googleLoading ? 0.6 : 1,
           transition: 'background 0.15s, border-color 0.15s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+          if (!googleLoading) {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+          }
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
@@ -77,32 +93,19 @@ export default function LoginForm() {
         }}
       >
         <FaGoogle style={{ fontSize: '13px', opacity: 0.65 }} />
-        Continue with Google
+        {googleLoading ? 'Signing in…' : 'Continue with Google'}
       </button>
 
       {/* Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
-        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.24)', fontFamily: 'Sora, sans-serif', letterSpacing: '0.04em' }}>
-          or
-        </span>
+        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.24)', fontFamily: 'Sora, sans-serif', letterSpacing: '0.04em' }}>or</span>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
       </div>
 
       {/* Error */}
       {error && (
-        <p
-          style={{
-            fontSize: '12px',
-            padding: '10px 14px',
-            borderRadius: '10px',
-            background: 'rgba(251,64,64,0.08)',
-            border: '1px solid rgba(251,64,64,0.18)',
-            color: '#fb6060',
-            fontFamily: 'Sora, sans-serif',
-            margin: 0,
-          }}
-        >
+        <p style={{ fontSize: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(251,64,64,0.08)', border: '1px solid rgba(251,64,64,0.18)', color: '#fb6060', fontFamily: 'Sora, sans-serif', margin: 0 }}>
           {error}
         </p>
       )}
@@ -110,14 +113,9 @@ export default function LoginForm() {
       {/* Username */}
       <input
         className="auth-input"
-        type="text"
-        name="username"
-        placeholder="Username"
-        value={form.username}
-        onChange={handleChange}
-        required
-        autoComplete="username"
-        aria-label="Username"
+        type="text" name="username" placeholder="Username"
+        value={form.username} onChange={handleChange}
+        required autoComplete="username" aria-label="Username"
       />
 
       {/* Password */}
@@ -125,13 +123,9 @@ export default function LoginForm() {
         <input
           className="auth-input"
           type={showPassword ? 'text' : 'password'}
-          name="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          required
-          autoComplete="current-password"
-          aria-label="Password"
+          name="password" placeholder="Password"
+          value={form.password} onChange={handleChange}
+          required autoComplete="current-password" aria-label="Password"
           style={{ paddingRight: '2.75rem' }}
         />
         <button
@@ -139,17 +133,14 @@ export default function LoginForm() {
           onClick={() => setShowPassword((v) => !v)}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
           style={{
-            position: 'absolute',
-            right: '12px', top: '50%', transform: 'translateY(-50%)',
+            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'none', border: 'none', cursor: 'pointer',
             color: showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)',
             transition: 'color 0.15s', padding: 0, outline: 'none',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.72)' }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)'
-          }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)' }}
         >
           {showPassword ? (
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -170,58 +161,34 @@ export default function LoginForm() {
         type="submit"
         disabled={loading}
         style={{
-          width: '100%',
-          padding: '12px',
-          marginTop: '2px',
+          width: '100%', padding: '12px', marginTop: '2px',
           background: loading ? ACCENT_GRAD_DIM : ACCENT_GRAD,
-          border: 'none',
-          borderRadius: '12px',
-          color: '#fff',
-          fontSize: '14px',
-          fontFamily: 'Sora, sans-serif',
-          fontWeight: 600,
+          border: 'none', borderRadius: '12px',
+          color: '#fff', fontSize: '14px',
+          fontFamily: 'Sora, sans-serif', fontWeight: 600,
           cursor: loading ? 'not-allowed' : 'pointer',
           opacity: loading ? 0.7 : 1,
           boxShadow: loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}`,
           transition: 'box-shadow 0.2s ease',
           letterSpacing: '0.01em',
         }}
-        onMouseEnter={(e) => {
-          if (!loading) e.currentTarget.style.boxShadow = '0 4px 28px rgba(220,46,115,0.32)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}`
-        }}
+        onMouseEnter={(e) => { if (!loading) e.currentTarget.style.boxShadow = '0 4px 28px rgba(220,46,115,0.32)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}` }}
       >
         {loading ? 'Signing in…' : 'Log in'}
       </button>
 
       {/* Switch to sign up */}
-      <p
-        style={{
-          textAlign: 'center',
-          fontSize: '12px',
-          color: 'rgba(255,255,255,0.28)',
-          fontFamily: 'Sora, sans-serif',
-          margin: '2px 0 0',
-        }}
-      >
+      <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0' }}>
         No account?{' '}
         <button
           type="button"
           onClick={() => switchView('signup')}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: '#FB4040', fontWeight: 600,
-            fontSize: '12px', fontFamily: 'Sora, sans-serif',
-            textDecoration: 'underline', textUnderlineOffset: '2px',
-            padding: 0,
-          }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FB4040', fontWeight: 600, fontSize: '12px', fontFamily: 'Sora, sans-serif', textDecoration: 'underline', textUnderlineOffset: '2px', padding: 0 }}
         >
           Sign up
         </button>
       </p>
-
     </form>
   )
 }

@@ -68,6 +68,36 @@ export function AuthProvider({ children }) {
     return profile;
   };
 
+  const loginWithGoogle = async (accessToken) => {
+    // Get user info from Google
+    const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const userInfo = await userInfoRes.json();
+
+    // Send to our backend
+    const res = await fetch(`${API_URL}api/auth/google/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: accessToken,
+        email: userInfo.email,
+        name: userInfo.name,
+        picture: userInfo.picture,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Google login failed" }));
+      throw err;
+    }
+
+    const data = await res.json();
+    setSession(data.token);
+    const profile = await fetchProfile();
+    return profile;
+  };
+
   const register = async (userData) => {
     const res = await apiFetch("api/register/", {
       method: "POST",
@@ -96,6 +126,7 @@ export function AuthProvider({ children }) {
     if (data.city !== undefined)                form.append("city", data.city);
     if (data.state !== undefined)               form.append("state", data.state);
     if (data.onboarding_complete !== undefined) form.append("onboarding_complete", String(data.onboarding_complete));
+    if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
     if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
     if (data.headline !== undefined)            form.append("headline", data.headline);
     if (data.available_to_jam !== undefined)    form.append("available_to_jam", String(data.available_to_jam));
@@ -143,6 +174,7 @@ export function AuthProvider({ children }) {
         isLoggedIn,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         fetchProfile,
