@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Sora:wght@100..800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -96,6 +96,41 @@
     transform: scale(1.05);
   }
 }
+
+  /* ── Auth modal inputs ─────────────────────────────────────────── */
+  .auth-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 12px;
+    padding: 11px 14px;
+    font-size: 13.5px;
+    color: #f0f0f0;
+    font-family: 'Sora', sans-serif;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    color-scheme: dark;
+  }
+  .auth-input::placeholder {
+    color: rgba(240, 240, 240, 0.26);
+  }
+  .auth-input:focus {
+    border-color: rgba(220, 46, 115, 0.45);
+    background: rgba(220, 46, 115, 0.03);
+  }
+  .auth-input[type="number"]::-webkit-inner-spin-button,
+  .auth-input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+  .auth-input[type="number"] {
+    -moz-appearance: textfield;
+  }
+  .auth-input-compact {
+    padding: 8.5px 12px;
+    font-size: 13px;
+  }
 
   /* MapLibre popup overrides */
   .maplibregl-popup-content {
