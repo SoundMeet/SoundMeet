@@ -223,6 +223,7 @@ def get_profile(request):
     return Response({
         'id': request.user.id,
         'username': request.user.username,
+        'email': request.user.email,
         'display_name': profile.display_name,
         'about': profile.about,
         'spectator': profile.spectator,

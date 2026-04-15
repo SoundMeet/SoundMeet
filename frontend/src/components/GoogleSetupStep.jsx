@@ -14,8 +14,8 @@ const ACCENT_GRAD_DIM = 'linear-gradient(135deg, rgba(220,46,115,0.5) 0%, rgba(2
 const ACCENT_GLOW     = 'rgba(220,46,115,0.22)'
 
 const GENDER_OPTIONS = [
-  { value: 'MAN',               label: 'Man' },
-  { value: 'WOMAN',             label: 'Woman' },
+  { value: 'MAN',               label: 'Male' },
+  { value: 'WOMAN',             label: 'Female' },
   { value: 'NON-BINARY',        label: 'Non-binary' },
   { value: 'PREFER NOT TO SAY', label: 'Prefer not to say' },
 ]
@@ -53,15 +53,18 @@ const COUNTRIES = [
 function CountryDropdown({ value, onChange }) {
   const [open, setOpen]       = useState(false)
   const [search, setSearch]   = useState('')
-  const [dropPos, setDropPos] = useState({ left: 0, bottom: 0, width: 0 })
+  const [dropPos, setDropPos] = useState({ left: 0, top: null, bottom: null, width: 0 })
   const wrapRef               = useRef(null)
+  const dropRef               = useRef(null)
   const searchRef             = useRef(null)
 
   const filtered = COUNTRIES.filter(c => c.toLowerCase().includes(search.toLowerCase()))
 
   useEffect(() => {
     const handler = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+      const inTrigger = wrapRef.current?.contains(e.target)
+      const inDrop = dropRef.current?.contains(e.target)
+      if (!inTrigger && !inDrop) {
         setOpen(false)
         setSearch('')
       }
@@ -77,10 +80,14 @@ function CountryDropdown({ value, onChange }) {
   const handleOpen = () => {
     if (!open && wrapRef.current) {
       const rect = wrapRef.current.getBoundingClientRect()
+      const dropdownHeight = 220
+      const spaceBelow = window.innerHeight - rect.bottom
+      const openUpward = spaceBelow < dropdownHeight && rect.top > dropdownHeight
       setDropPos({
         left: rect.left,
         width: rect.width,
-        bottom: window.innerHeight - rect.top + 6,
+        top: openUpward ? null : rect.bottom + 6,
+        bottom: openUpward ? window.innerHeight - rect.top + 6 : null,
       })
     }
     setOpen(v => !v)
@@ -93,7 +100,7 @@ function CountryDropdown({ value, onChange }) {
   }
 
   const dropdown = open && createPortal(
-    <div style={{ position: 'fixed', bottom: dropPos.bottom, left: dropPos.left, width: dropPos.width, background: '#141418', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', zIndex: 99999, overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.6)' }}>
+    <div ref={dropRef} style={{ position: 'fixed', top: dropPos.top ?? undefined, bottom: dropPos.bottom ?? undefined, left: dropPos.left, width: dropPos.width, background: '#141418', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', zIndex: 99999, overflow: 'hidden', boxShadow: dropPos.bottom != null ? '0 -12px 40px rgba(0,0,0,0.6)' : '0 12px 40px rgba(0,0,0,0.6)' }}>
       <div style={{ padding: '7px 7px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ position: 'relative' }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
