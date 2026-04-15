@@ -387,9 +387,14 @@ function ArchiveCard({ item, onOpen }) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <TypeBadge type={item.type} />
-            {item.rating != null && (
-              <span className="text-[11px]" style={{ color }}>
-                {'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}
+            {item.avg_rating != null && item.rating_count > 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: hexToRgba(color, 0.12), color }}
+              >
+                <span style={{ fontSize: 10 }}>★</span>
+                {item.avg_rating}
+                <span className="font-normal opacity-60">· {item.rating_count}</span>
               </span>
             )}
           </div>
@@ -420,6 +425,16 @@ function HostingManageRow({ item, onOpen, onEdit, compact = false }) {
           <div className="flex items-center gap-2 mb-0.5">
             <h3 className="text-sm font-semibold text-white truncate">{item.title}</h3>
             <TypeBadge type={item.type} />
+            {item.avg_rating != null && item.rating_count > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: hexToRgba(color, 0.12), color }}
+              >
+                <span style={{ fontSize: 9 }}>★</span>
+                {item.avg_rating}
+                <span className="font-normal opacity-60 ml-0.5">· {item.rating_count}</span>
+              </span>
+            )}
           </div>
           <p className="text-[11px] text-neutral-500">
             {[item.date, item.locationName ?? item.subtitle].filter(Boolean).join(' · ')}
@@ -915,6 +930,20 @@ const MyJams = () => {
 
   // ── Data loading ────────────────────────────────────────────
 
+  const enrichWithRatings = useCallback(async (items) => {
+    const jamIds = items.filter(i => i.type === 'jam').map(i => i.id)
+    if (!jamIds.length) return items
+    try {
+      const ratingMap = await jamService.getJamRatingsBulk(jamIds)
+      return items.map(i => {
+        const r = ratingMap[String(i.id)]
+        return r ? { ...i, avg_rating: r.avg_rating, rating_count: r.rating_count } : i
+      })
+    } catch {
+      return items
+    }
+  }, [])
+
   const loadTab = useCallback(async (tab) => {
     if (!isLoggedIn || !user?.id) return
     setTabLoading(true)
@@ -928,7 +957,7 @@ const MyJams = () => {
         ])
         setUpcomingItems(up)
         setCreatedItems(cr)
-        setPastItems(pa)
+        setPastItems(await enrichWithRatings(pa))
       } else if (tab === 'Events') {
         // Load attending + created so the "Hosting" chip works without a second fetch
         const [up, cr] = await Promise.all([
@@ -939,10 +968,10 @@ const MyJams = () => {
         setCreatedItems(cr)
       } else if (tab === 'Past') {
         const items = await jamService.getMyPastJams(user.id)
-        setPastItems(items)
+        setPastItems(await enrichWithRatings(items))
       } else if (tab === 'Hosting') {
         const items = await jamService.getMyCreatedJams(user.id)
-        setCreatedItems(items)
+        setCreatedItems(await enrichWithRatings(items))
       }
       // Opportunities: no backend calls yet
     } catch (err) {
@@ -950,7 +979,7 @@ const MyJams = () => {
     } finally {
       setTabLoading(false)
     }
-  }, [isLoggedIn, user?.id])
+  }, [isLoggedIn, user?.id, enrichWithRatings])
 
   useEffect(() => {
     setChipFilter('all')
@@ -1353,8 +1382,10 @@ const MyJams = () => {
                 ? { ...prev, item: { ...prev.item, ...patch } }
                 : prev
             )
+            showToast('Rating submitted!', 'success')
           } catch (err) {
             console.error('Failed to submit rating:', err)
+            showToast('Failed to submit rating. Please try again.', 'error')
           }
         }}
       />

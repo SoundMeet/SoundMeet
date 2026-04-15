@@ -325,9 +325,16 @@ class Message(models.Model):
         return f"{self.sender.username}: {self.content[:20]}..."
 
 class Post(models.Model):
+    POST_TYPE_CHOICES = [('text', 'text'), ('photo', 'photo'), ('audio', 'audio'), ('review', 'review')]
+
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
     content = models.TextField(max_length=1000, blank=True, null=True)
     image = models.ImageField(upload_to='post_images/', blank=True, null=True)
+    post_type = models.CharField(max_length=20, choices=POST_TYPE_CHOICES, default='text')
+    jam_rating = models.ForeignKey(
+        'JamRating', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='feed_posts'
+    )
     likes = models.ManyToManyField(User, related_name="liked_posts", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

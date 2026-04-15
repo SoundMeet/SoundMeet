@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/jams/<int:jam_id>/rate/', views.rate_jam, name='rate_jam'),
     path('api/jams/<int:jam_id>/my-rating/', views.my_jam_rating, name='my_jam_rating'),
     path('api/jams/<int:jam_id>/ratings-summary/', views.jam_ratings_summary, name='jam_ratings_summary'),
+    path('api/jams/ratings-bulk/', views.bulk_jam_ratings_summary, name='bulk_jam_ratings_summary'),
     path('api/shows/create/', views.create_show, name='create_show'),
     path('api/shows/<int:show_id>/update/', views.update_show, name='update_show'),
     path('api/shows/<int:show_id>/delete/', views.delete_show, name='delete_show'),

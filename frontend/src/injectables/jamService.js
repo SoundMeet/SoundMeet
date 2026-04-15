@@ -699,4 +699,16 @@ export const jamService = {
   async getJamRatingSummary(jamId) {
     return await apiFetch(`api/jams/${jamId}/ratings-summary/`, { method: 'GET' });
   },
+
+  /**
+   * Fetch aggregate ratings for multiple jams in one request.
+   * Returns { [jamId]: { avg_rating: number|null, rating_count: number } }.
+   */
+  async getJamRatingsBulk(jamIds) {
+    if (!jamIds.length) return {};
+    return await apiFetch('api/jams/ratings-bulk/', {
+      method: 'POST',
+      body: JSON.stringify({ jam_ids: jamIds }),
+    });
+  },
 };

@@ -255,18 +255,69 @@ def get_profile(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def create_post(request):
-    content = request.data.get('content', '')
-    image = request.FILES.get('image', None)
+    content   = request.data.get('content', '')
+    image     = request.FILES.get('image', None)
+    post_type = request.data.get('post_type', 'text')
 
-    if not content and not image:
-        return Response({'error': 'Post must contain text or an image.'}, status=400)
+    if post_type == 'review':
+        jam_id = request.data.get('jam_id')
+        raw_rating = request.data.get('rating')
 
-    post = Post.objects.create(
-        author=request.user,
-        content=content,
-        image=image
-    )
+        if not jam_id or not raw_rating:
+            return Response({'error': 'jam_id and rating are required for review posts.'}, status=400)
+
+        try:
+            rating_value = int(raw_rating)
+            if not (1 <= rating_value <= 5):
+                raise ValueError()
+        except (TypeError, ValueError):
+            return Response({'error': 'rating must be an integer between 1 and 5.'}, status=400)
+
+        jam = get_object_or_404(Jam, id=jam_id)
+
+        if jam.date_time > timezone.now():
+            return Response({'error': 'Cannot review a future jam.'}, status=400)
+
+        attended = jam.users_attending.filter(id=request.user.id).exists()
+        is_admin = jam.admin_id == request.user.id
+        if not attended and not is_admin:
+            return Response({'error': 'You did not attend this jam.'}, status=403)
+
+        comment = (content or '').strip()[:280]
+        jr, _ = JamRating.objects.update_or_create(
+            jam=jam,
+            user=request.user,
+            defaults={'rating': rating_value, 'comment': comment},
+        )
+
+        post = Post.objects.create(
+            author=request.user,
+            content=content,
+            post_type='review',
+            jam_rating=jr,
+        )
+
+        # Notify host (skip self-rating); one notification per rater per jam
+        if jam.admin_id != request.user.id:
+            Notification.objects.create(
+                user=jam.admin,
+                notification_type=Notification.NotificationTypes.JAM_RATED,
+                reference_id=jam.id,
+                message=f"{request.user.profile.display_name} rated your jam {jam.name} {rating_value}★.",
+                metadata={'rater_id': request.user.id, 'rating': rating_value, 'jam_name': jam.name},
+            )
+    else:
+        if not content and not image:
+            return Response({'error': 'Post must contain text or an image.'}, status=400)
+
+        post = Post.objects.create(
+            author=request.user,
+            content=content,
+            image=image,
+            post_type=post_type,
+        )
 
     return Response({
         'id': post.id,
@@ -486,24 +537,26 @@ def rate_jam(request, jam_id):
     except (TypeError, ValueError):
         return Response({'error': 'rating must be an integer between 1 and 5.'}, status=400)
 
-    comment = (request.data.get('comment') or '').strip()[:280]
+    raw_comment = request.data.get('comment')
+    defaults = {'rating': rating_value}
+    if raw_comment is not None:
+        defaults['comment'] = raw_comment.strip()[:280]
 
-    JamRating.objects.update_or_create(
+    jr, _ = JamRating.objects.update_or_create(
         jam=jam,
         user=request.user,
-        defaults={'rating': rating_value, 'comment': comment},
+        defaults=defaults,
     )
+    comment = jr.comment
 
-    # Notify host (skip self-rating)
+    # Notify host (skip self-rating); one notification per rater per jam
     if jam.admin_id != request.user.id:
-        Notification.objects.get_or_create(
+        Notification.objects.create(
             user=jam.admin,
             notification_type=Notification.NotificationTypes.JAM_RATED,
             reference_id=jam.id,
-            defaults={
-                'message': f"{request.user.profile.display_name} rated your jam {jam.name} {rating_value}★.",
-                'metadata': {'rater_id': request.user.id, 'rating': rating_value, 'jam_name': jam.name},
-            },
+            message=f"{request.user.profile.display_name} rated your jam {jam.name} {rating_value}★.",
+            metadata={'rater_id': request.user.id, 'rating': rating_value, 'jam_name': jam.name},
         )
 
     agg = jam.ratings.aggregate(avg=Avg('rating'), count=Count('id'))
@@ -527,6 +580,7 @@ def my_jam_rating(request, jam_id):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def jam_ratings_summary(request, jam_id):
     """Return the aggregate avg rating and count for a jam (public, no auth required)."""
     get_object_or_404(Jam, id=jam_id)
@@ -535,6 +589,40 @@ def jam_ratings_summary(request, jam_id):
         'avg_rating': round(agg['avg'], 1) if agg['avg'] else None,
         'rating_count': agg['count'],
     })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def bulk_jam_ratings_summary(request):
+    """Return aggregate ratings for multiple jams at once.
+
+    Body: { "jam_ids": [1, 2, 3] }
+    Response: { "1": { "avg_rating": 4.2, "rating_count": 5 }, ... }
+    """
+    jam_ids = request.data.get('jam_ids', [])
+    if not isinstance(jam_ids, list):
+        return Response({'error': 'jam_ids must be a list.'}, status=400)
+
+    rows = (
+        JamRating.objects
+        .filter(jam_id__in=jam_ids)
+        .values('jam_id')
+        .annotate(avg=Avg('rating'), count=Count('id'))
+    )
+
+    result = {}
+    for row in rows:
+        result[str(row['jam_id'])] = {
+            'avg_rating': round(row['avg'], 1) if row['avg'] else None,
+            'rating_count': row['count'],
+        }
+
+    # Include jams with no ratings so the caller gets a complete map
+    for jid in jam_ids:
+        if str(jid) not in result:
+            result[str(jid)] = {'avg_rating': None, 'rating_count': 0}
+
+    return Response(result)
 
 
 @api_view(['POST'])

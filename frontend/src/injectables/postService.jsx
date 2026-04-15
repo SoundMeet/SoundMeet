@@ -23,12 +23,16 @@ function toFeedPost(row, currentUserId) {
       avatarUrl:   formatAvatarUrl(profile.pfp) ?? null,
     },
     type:      row.image ? 'photo' : 'text',
-    postType:  'text',
+    postType:  row.post_type ?? 'text',
     content:   row.content ?? '',
     media:     row.image ? { images: [formatAvatarUrl(row.image)] } : null,
-    jamRef:    null,
+    jamRef:    row.jam_rating?.jam
+                 ? { id: row.jam_rating.jam.id, title: row.jam_rating.jam.name,
+                     date: row.jam_rating.jam.date_time,
+                     locationName: row.jam_rating.jam.location_name }
+                 : null,
     showRef:   null,
-    reviewRef: null,
+    reviewRef: row.jam_rating ? { rating: row.jam_rating.rating } : null,
     location:  null,
     likes:     Array.isArray(row.likes) ? row.likes.length : 0,
     comments:  Array.isArray(row.comments) ? row.comments.length : 0,
@@ -46,10 +50,11 @@ function toFeedPost(row, currentUserId) {
 
 export const postService = {
 
-  async createNewPost(content, imageFile) {
+  async createNewPost(content, imageFile, extraFields = {}) {
     const form = new FormData();
     if (content) form.append("content", content);
     if (imageFile) form.append("image", imageFile);
+    Object.entries(extraFields).forEach(([k, v]) => form.append(k, v));
 
     return await apiFetch("api/posts/create/", {
       method: "POST",
@@ -64,11 +69,16 @@ export const postService = {
         id,
         content,
         image,
+        post_type,
         created_at,
         author:author_id (
           id,
           username,
           chat_profile ( id, display_name, pfp )
+        ),
+        jam_rating:jam_rating_id (
+          rating,
+          jam:jam_id ( id, name, date_time, location_name )
         ),
         likes:chat_post_likes ( user_id ),
         comments:chat_comment (
@@ -119,11 +129,16 @@ export const postService = {
         id,
         content,
         image,
+        post_type,
         created_at,
         author:author_id (
           id,
           username,
           chat_profile ( id, display_name, pfp )
+        ),
+        jam_rating:jam_rating_id (
+          rating,
+          jam:jam_id ( id, name, date_time, location_name )
         ),
         likes:chat_post_likes ( user_id ),
         comments:chat_comment (
