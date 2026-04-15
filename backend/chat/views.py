@@ -1,6 +1,7 @@
 import random
+import os
+import resend
 import requests as http_requests
-from django.core.mail import send_mail
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -689,13 +690,13 @@ def send_verification_code(request):
 
     # Send email
     try:
-        send_mail(
-            subject='Your SoundMeet verification code',
-            message=f'Your verification code is: {code}\n\nThis code expires in 10 minutes.',
-            from_email=None,  # uses DEFAULT_FROM_EMAIL
-            recipient_list=[email],
-            fail_silently=False,
-        )
+        resend.api_key = os.environ.get('RESEND_API_KEY')
+        resend.Emails.send({
+            'from': 'SoundMeet <noreply@soundmeet.app>',
+            'to': [email],
+            'subject': 'Your SoundMeet verification code',
+            'text': f'Your verification code is: {code}\n\nThis code expires in 10 minutes.',
+        })
     except Exception as e:
         return Response({'error': 'Failed to send email'}, status=500)
 
