@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
  * DeleteAccountSheet — confirmation sheet for permanent account deletion.
  * Mirrors DestructiveConfirmSheet visually but adds a credential input:
  *   - Password users: password field
- *   - Google OAuth users: username confirmation field
+ *   - Google OAuth users: email confirmation
  *
  * Props:
  *   open             {boolean}
@@ -12,11 +12,11 @@ import { AnimatePresence, motion } from 'framer-motion'
  *   onConfirm        {Function}
  *   loading          {boolean}
  *   isGoogleUser     {boolean}   True when user has no usable password
- *   username         {string}    Current user's username (for Google confirmation)
+ *   email            {string}    Current user's email (for Google email confirmation)
  *   password         {string}
  *   setPassword      {Function}
- *   confirmUsername  {string}
- *   setConfirmUsername {Function}
+ *   confirmEmail     {string}
+ *   setConfirmEmail  {Function}
  *   error            {string?}   Backend or network error to display inline
  */
 export function DeleteAccountSheet({
@@ -25,15 +25,15 @@ export function DeleteAccountSheet({
   onConfirm,
   loading = false,
   isGoogleUser = false,
-  username = '',
-  password,
+  email = '',
+  password = '',
   setPassword,
-  confirmUsername,
-  setConfirmUsername,
+  confirmEmail = '',
+  setConfirmEmail,
   error,
 }) {
   const confirmDisabled = loading || (isGoogleUser
-    ? confirmUsername.trim() !== username
+    ? !email || confirmEmail.trim().toLowerCase() !== email.toLowerCase()
     : !password)
 
   return (
@@ -94,15 +94,16 @@ export function DeleteAccountSheet({
                 {isGoogleUser ? (
                   <>
                     <p className="text-xs mb-2" style={{ color: 'rgba(229,226,225,0.4)', fontFamily: 'Sora, sans-serif' }}>
-                      Type <strong style={{ color: 'rgba(229,226,225,0.65)' }}>{username}</strong> to confirm
+                      Type your email address to confirm
                     </p>
                     <input
-                      type="text"
-                      placeholder={username}
-                      value={confirmUsername}
-                      onChange={(e) => setConfirmUsername(e.target.value)}
+                      type="email"
+                      placeholder="your@email.com"
+                      value={confirmEmail}
+                      onChange={(e) => setConfirmEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !confirmDisabled && onConfirm()}
                       disabled={loading}
-                      autoComplete="username"
+                      autoComplete="off"
                       className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/[0.06] border border-white/10 text-white placeholder-white/25 outline-none focus:border-white/25 transition-colors disabled:opacity-40"
                       style={{ fontFamily: 'Sora, sans-serif' }}
                     />
@@ -117,6 +118,7 @@ export function DeleteAccountSheet({
                       placeholder="Your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !confirmDisabled && onConfirm()}
                       disabled={loading}
                       autoComplete="current-password"
                       className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/[0.06] border border-white/10 text-white placeholder-white/25 outline-none focus:border-white/25 transition-colors disabled:opacity-40"

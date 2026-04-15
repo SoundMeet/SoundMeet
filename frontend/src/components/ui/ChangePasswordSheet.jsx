@@ -12,13 +12,15 @@ import { AnimatePresence, motion } from 'framer-motion'
  *   hasUsablePassword {boolean}   false = Google user setting password for first time
  *   error             {string?}
  */
-export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false, hasUsablePassword = true, error }) {
+export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false, hasUsablePassword = true, error, onClearError }) {
   const [currentPassword,  setCurrentPassword]  = useState('')
   const [newPassword,      setNewPassword]      = useState('')
   const [confirmPassword,  setConfirmPassword]  = useState('')
   const [showCurrent,      setShowCurrent]      = useState(false)
   const [showNew,          setShowNew]          = useState(false)
   const [showConfirm,      setShowConfirm]      = useState(false)
+
+  const withClear = (setter) => (val) => { setter(val); onClearError?.() }
 
   const passwordsMatch = newPassword && confirmPassword && newPassword === confirmPassword
   const confirmDisabled = loading
@@ -145,7 +147,7 @@ export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false,
                   <PasswordField
                     label="Current password"
                     value={currentPassword}
-                    onChange={setCurrentPassword}
+                    onChange={withClear(setCurrentPassword)}
                     show={showCurrent}
                     onToggle={() => setShowCurrent(v => !v)}
                     autoComplete="current-password"
@@ -154,7 +156,7 @@ export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false,
                 <PasswordField
                   label="New password"
                   value={newPassword}
-                  onChange={setNewPassword}
+                  onChange={withClear(setNewPassword)}
                   show={showNew}
                   onToggle={() => setShowNew(v => !v)}
                   autoComplete="new-password"
@@ -163,7 +165,7 @@ export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false,
                   <PasswordField
                     label="Confirm new password"
                     value={confirmPassword}
-                    onChange={setConfirmPassword}
+                    onChange={withClear(setConfirmPassword)}
                     show={showConfirm}
                     onToggle={() => setShowConfirm(v => !v)}
                     autoComplete="new-password"

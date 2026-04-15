@@ -10,11 +10,14 @@ export default function MusicLinksStep({ links, onChange, onRemove }) {
   const availablePlatforms = PLATFORMS.filter(p => !links[p.key]);
   const currentPlatform  = PLATFORMS.find(p => p.key === activePlatform);
 
-  // Auto-focus URL field when a platform is selected
+  // Auto-focus URL field when a platform is selected, and scroll it into view
+  // so the keyboard doesn't obscure the input on mobile
   useEffect(() => {
     if (activePlatform) {
-      // Small delay so the animation has started
-      const t = setTimeout(() => urlRef.current?.focus(), 80);
+      const t = setTimeout(() => {
+        urlRef.current?.focus();
+        urlRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 80);
       return () => clearTimeout(t);
     }
   }, [activePlatform]);

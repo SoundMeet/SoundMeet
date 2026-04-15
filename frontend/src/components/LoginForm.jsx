@@ -80,6 +80,7 @@ export default function LoginForm() {
         type="button"
         onClick={() => googleLogin()}
         disabled={googleLoading}
+        className="auth-btn-primary"
         style={{
           width: '100%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -144,12 +145,15 @@ export default function LoginForm() {
           type="button"
           onClick={() => setShowPassword((v) => !v)}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
+          className="auth-pw-toggle"
           style={{
             position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '28px', height: '28px',
             background: 'none', border: 'none', cursor: 'pointer',
             color: showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)',
             transition: 'color 0.15s', padding: 0, outline: 'none',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.72)' }}
           onMouseLeave={(e) => { e.currentTarget.style.color = showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)' }}
@@ -172,6 +176,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
+        className="auth-btn-primary"
         style={{
           width: '100%', padding: '12px', marginTop: '2px',
           background: loading ? ACCENT_GRAD_DIM : ACCENT_GRAD,
@@ -191,11 +196,12 @@ export default function LoginForm() {
       </button>
 
       {/* Switch to sign up */}
-      <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0' }}>
+      <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
         No account?{' '}
         <button
           type="button"
           onClick={() => switchView('signup')}
+          className="auth-btn-text"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FB4040', fontWeight: 600, fontSize: '12px', fontFamily: 'Sora, sans-serif', textDecoration: 'underline', textUnderlineOffset: '2px', padding: 0 }}
         >
           Sign up
