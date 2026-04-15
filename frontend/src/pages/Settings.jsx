@@ -135,7 +135,7 @@ function DangerZoneSection() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState('')
-  const [confirmEmail, setConfirmEmail] = useState('')
+  const [confirmUsername, setConfirmUsername] = useState('')
   const [error, setError] = useState('')
   const { deleteAccount, user, isLoggedIn } = useAuth()
   const { openModal } = useAuthModal()
@@ -146,12 +146,12 @@ function DangerZoneSection() {
   const isGoogleUser = user && !user.has_usable_password
 
   const handlePasswordChange = (val) => { setPassword(val); setError('') }
-  const handleConfirmEmailChange = (val) => { setConfirmEmail(val); setError('') }
+  const handleConfirmUsernameChange = (val) => { setConfirmUsername(val); setError('') }
 
   const openSheet = () => {
     setError('')
     setPassword('')
-    setConfirmEmail('')
+    setConfirmUsername('')
     setSheetOpen(true)
   }
 
@@ -161,7 +161,7 @@ function DangerZoneSection() {
     try {
       await deleteAccount({
         password: isGoogleUser ? undefined : password,
-        confirmEmail: isGoogleUser ? confirmEmail : undefined,
+        confirmUsername: isGoogleUser ? confirmUsername : undefined,
       })
       openModal('login')
       navigate('/', { replace: true })
@@ -211,11 +211,11 @@ function DangerZoneSection() {
         onConfirm={handleConfirm}
         loading={loading}
         isGoogleUser={isGoogleUser}
-        email={user?.email}
+        username={user?.username}
         password={password}
         setPassword={handlePasswordChange}
-        confirmEmail={confirmEmail}
-        setConfirmEmail={handleConfirmEmailChange}
+        confirmUsername={confirmUsername}
+        setConfirmUsername={handleConfirmUsernameChange}
         error={error}
       />
     </>

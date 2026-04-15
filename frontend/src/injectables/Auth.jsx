@@ -125,10 +125,10 @@ export function AuthProvider({ children }) {
     await fetchProfile()
   }
 
-  const deleteAccount = async ({ password, confirmEmail }) => {
+  const deleteAccount = async ({ password, confirmUsername }) => {
     const body = password
       ? { password }
-      : { confirm_email: confirmEmail };
+      : { confirm_username: confirmUsername };
     await apiFetch("api/account/delete/", {
       method: "POST",
       body: JSON.stringify(body),

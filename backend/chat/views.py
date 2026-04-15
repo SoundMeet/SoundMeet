@@ -868,9 +868,9 @@ def delete_account(request):
         if not user.check_password(password):
             return Response({'error': 'Incorrect password.'}, status=403)
     else:
-        confirm_email = request.data.get('confirm_email', '')
-        if confirm_email.strip().lower() != user.email.lower():
-            return Response({'error': 'Email confirmation does not match.'}, status=403)
+        confirm_username = request.data.get('confirm_username', '')
+        if confirm_username.strip().lower() != user.username.lower():
+            return Response({'error': 'Username confirmation does not match.'}, status=403)
 
     # Collect S3 file paths before deletion so we can clean them up afterward.
     files_to_delete = []

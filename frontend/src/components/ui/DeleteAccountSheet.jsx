@@ -4,20 +4,20 @@ import { AnimatePresence, motion } from 'framer-motion'
  * DeleteAccountSheet — confirmation sheet for permanent account deletion.
  * Mirrors DestructiveConfirmSheet visually but adds a credential input:
  *   - Password users: password field
- *   - Google OAuth users: email confirmation
+ *   - Google OAuth users: username confirmation
  *
  * Props:
- *   open             {boolean}
- *   onClose          {Function}
- *   onConfirm        {Function}
- *   loading          {boolean}
- *   isGoogleUser     {boolean}   True when user has no usable password
- *   email            {string}    Current user's email (for Google email confirmation)
- *   password         {string}
- *   setPassword      {Function}
- *   confirmEmail     {string}
- *   setConfirmEmail  {Function}
- *   error            {string?}   Backend or network error to display inline
+ *   open                {boolean}
+ *   onClose             {Function}
+ *   onConfirm           {Function}
+ *   loading             {boolean}
+ *   isGoogleUser        {boolean}   True when user has no usable password
+ *   username            {string}    Current user's username (for Google username confirmation)
+ *   password            {string}
+ *   setPassword         {Function}
+ *   confirmUsername     {string}
+ *   setConfirmUsername  {Function}
+ *   error               {string?}   Backend or network error to display inline
  */
 export function DeleteAccountSheet({
   open,
@@ -25,15 +25,15 @@ export function DeleteAccountSheet({
   onConfirm,
   loading = false,
   isGoogleUser = false,
-  email = '',
+  username = '',
   password = '',
   setPassword,
-  confirmEmail = '',
-  setConfirmEmail,
+  confirmUsername = '',
+  setConfirmUsername,
   error,
 }) {
   const confirmDisabled = loading || (isGoogleUser
-    ? !email || confirmEmail.trim().toLowerCase() !== email.toLowerCase()
+    ? !username || confirmUsername.trim().toLowerCase() !== username.toLowerCase()
     : !password)
 
   return (
@@ -94,13 +94,13 @@ export function DeleteAccountSheet({
                 {isGoogleUser ? (
                   <>
                     <p className="text-xs mb-2" style={{ color: 'rgba(229,226,225,0.4)', fontFamily: 'Sora, sans-serif' }}>
-                      Type your email address to confirm
+                      Type your username to confirm
                     </p>
                     <input
-                      type="email"
-                      placeholder="your@email.com"
-                      value={confirmEmail}
-                      onChange={(e) => setConfirmEmail(e.target.value)}
+                      type="text"
+                      placeholder={username}
+                      value={confirmUsername}
+                      onChange={(e) => setConfirmUsername(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !confirmDisabled && onConfirm()}
                       disabled={loading}
                       autoComplete="off"
