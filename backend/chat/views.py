@@ -6,6 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .models import EmailVerification
 from django.shortcuts import render, get_object_or_404
+from django.core.files.storage import default_storage
 import json
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -673,6 +674,9 @@ def send_verification_code(request):
     if not email:
         return Response({'error': 'Email is required'}, status=400)
 
+    if User.objects.filter(email__iexact=email).exists():
+        return Response({'error': 'An account with this email already exists.'}, status=400)
+
     # Generate 6-digit code
     code = str(random.randint(100000, 999999))
 
@@ -746,19 +750,18 @@ def google_auth(request):
         return Response({'error': 'No email from Google'}, status=400)
 
     # Find or create the Django user by email
-    user, created = User.objects.get_or_create(
-        email=email,
-        defaults={'username': email.split('@')[0][:15]},
-    )
-
-    if created:
+    try:
+        user = User.objects.get(email__iexact=email)
+        created = False
+    except User.DoesNotExist:
         base = email.split('@')[0][:12]
         username = base
         counter = 1
         while User.objects.filter(username=username).exists():
             username = f"{base}{counter}"
             counter += 1
-        user.username = username
+
+        user = User(username=username, email=email)
         user.set_unusable_password()
         user.save()
 
@@ -766,6 +769,7 @@ def google_auth(request):
             user=user,
             defaults={'display_name': name[:15] or username},
         )
+        created = True
 
     auth_token, _ = Token.objects.get_or_create(user=user)
 
@@ -863,11 +867,58 @@ def delete_account(request):
         if not user.check_password(password):
             return Response({'error': 'Incorrect password.'}, status=403)
     else:
-        confirm_username = request.data.get('confirm_username', '')
-        if confirm_username.strip() != user.username:
-            return Response({'error': 'Username confirmation does not match.'}, status=403)
+        confirm_email = request.data.get('confirm_email', '')
+        if confirm_email.strip().lower() != user.email.lower():
+            return Response({'error': 'Email confirmation does not match.'}, status=403)
 
-    Token.objects.filter(user=user).delete()
+    # Collect S3 file paths before deletion so we can clean them up afterward.
+    files_to_delete = []
+    try:
+        profile = user.profile
+        if profile.pfp:
+            files_to_delete.append(profile.pfp.name)
+        if profile.profile_banner:
+            files_to_delete.append(profile.profile_banner.name)
+        for snip in profile.audio_snips.all():
+            if snip.musicFile:
+                files_to_delete.append(snip.musicFile.name)
+    except Profile.DoesNotExist:
+        pass
+
+    for jam in user.admin_jams.all():
+        if jam.cover_image:
+            files_to_delete.append(jam.cover_image.name)
+    for show in user.admin_shows.all():
+        if show.cover_image:
+            files_to_delete.append(show.cover_image.name)
+    for post in user.posts.all():
+        if post.image:
+            files_to_delete.append(post.image.name)
+
+    # DM conversations have no FK to User so CASCADE won't reach them.
+    # Delete them explicitly before user.delete() so their messages go too.
+    dm_conv_ids = list(
+        user.conversation_memberships
+            .filter(
+                conversation__jam__isnull=True,
+                conversation__band__isnull=True,
+                conversation__show__isnull=True,
+            )
+            .values_list('conversation_id', flat=True)
+    )
+    if dm_conv_ids:
+        Conversation.objects.filter(id__in=dm_conv_ids).delete()
+
     user.delete()
+
+    # Delete S3 files after the DB rows are gone. Failures are non-fatal.
+    def _delete_files():
+        for name in files_to_delete:
+            try:
+                default_storage.delete(name)
+            except Exception:
+                pass
+
+    transaction.on_commit(_delete_files)
 
     return Response({'status': 'Account deleted.'}, status=200)

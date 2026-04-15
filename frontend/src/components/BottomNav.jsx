@@ -4,6 +4,8 @@ import { navItems } from '../constants'
 const BottomNav = () => {
     const location = useLocation()
 
+    if (location.pathname === '/onboarding') return null
+
     return (
         <nav
             className="bottom-nav-mobile fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-white/10"

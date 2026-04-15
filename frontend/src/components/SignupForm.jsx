@@ -5,6 +5,7 @@
  * Step 3: Fill out the rest of the signup form
  */
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { FaGoogle } from 'react-icons/fa'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth, API_URL } from '../injectables/Auth'
@@ -55,6 +56,7 @@ const COUNTRIES = [
 function CountryDropdown({ value, onChange }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [dropPos, setDropPos] = useState({ left: 0, bottom: 0, width: 0 })
   const wrapRef = useRef(null)
   const searchRef = useRef(null)
 
@@ -69,13 +71,25 @@ function CountryDropdown({ value, onChange }) {
         setSearch('')
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
   }, [])
 
   useEffect(() => {
     if (open) setTimeout(() => searchRef.current?.focus(), 50)
   }, [open])
+
+  const handleOpen = () => {
+    if (!open && wrapRef.current) {
+      const rect = wrapRef.current.getBoundingClientRect()
+      setDropPos({
+        left: rect.left,
+        width: rect.width,
+        bottom: window.innerHeight - rect.top + 6,
+      })
+    }
+    setOpen(v => !v)
+  }
 
   const handleSelect = (country) => {
     onChange(country)
@@ -83,11 +97,41 @@ function CountryDropdown({ value, onChange }) {
     setSearch('')
   }
 
+  const dropdown = open && createPortal(
+    <div style={{ position: 'fixed', bottom: dropPos.bottom, left: dropPos.left, width: dropPos.width, background: '#141418', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', zIndex: 99999, overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.6)' }}>
+      <div style={{ padding: '7px 7px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ position: 'relative' }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', opacity: 0.3, pointerEvents: 'none' }}>
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input ref={searchRef} type="text" placeholder="Search country…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', padding: '6px 10px 6px 28px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#f0f0f0', fontSize: '16px', fontFamily: 'Sora, sans-serif', outline: 'none' }}
+          />
+        </div>
+      </div>
+      <div style={{ maxHeight: '160px', overflowY: 'auto', scrollbarWidth: 'none' }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: '10px', textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif' }}>No results</div>
+        ) : (
+          filtered.map(country => (
+            <button key={country} type="button" onClick={() => handleSelect(country)}
+              style={{ width: '100%', textAlign: 'left', padding: '11px 14px', fontSize: '13px', fontFamily: 'Sora, sans-serif', background: value === country ? 'rgba(251,64,64,0.12)' : 'transparent', color: value === country ? '#FB4040' : 'rgba(255,255,255,0.72)', border: 'none', cursor: 'pointer', transition: 'background 0.12s' }}
+              onMouseEnter={e => { if (value !== country) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { if (value !== country) e.currentTarget.style.background = 'transparent' }}
+            >{country}</button>
+          ))
+        )}
+      </div>
+    </div>,
+    document.body
+  )
+
   return (
     <div ref={wrapRef} style={{ position: 'relative', flex: 1 }}>
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={handleOpen}
         className="auth-input auth-input-compact"
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', width: '100%' }}
       >
@@ -99,35 +143,7 @@ function CountryDropdown({ value, onChange }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-
-      {open && (
-        <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0, background: '#141418', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', zIndex: 9999, overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.6)' }}>
-          <div style={{ padding: '7px 7px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ position: 'relative' }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', opacity: 0.3, pointerEvents: 'none' }}>
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input ref={searchRef} type="text" placeholder="Search country…" value={search} onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', padding: '6px 10px 6px 28px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#f0f0f0', fontSize: '12px', fontFamily: 'Sora, sans-serif', outline: 'none' }}
-              />
-            </div>
-          </div>
-          <div style={{ maxHeight: '160px', overflowY: 'auto', scrollbarWidth: 'none' }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: '10px', textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif' }}>No results</div>
-            ) : (
-              filtered.map(country => (
-                <button key={country} type="button" onClick={() => handleSelect(country)}
-                  style={{ width: '100%', textAlign: 'left', padding: '8px 14px', fontSize: '12px', fontFamily: 'Sora, sans-serif', background: value === country ? 'rgba(251,64,64,0.12)' : 'transparent', color: value === country ? '#FB4040' : 'rgba(255,255,255,0.72)', border: 'none', cursor: 'pointer', transition: 'background 0.12s' }}
-                  onMouseEnter={e => { if (value !== country) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-                  onMouseLeave={e => { if (value !== country) e.currentTarget.style.background = 'transparent' }}
-                >{country}</button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {dropdown}
     </div>
   )
 }
@@ -228,6 +244,7 @@ export default function SignupForm() {
 
   const submitBtn = (label, loadingLabel, disabled = false) => (
     <button type="submit" disabled={loading || disabled}
+      className="auth-btn-primary"
       style={{ width: '100%', padding: '11px', marginTop: '2px', background: loading ? ACCENT_GRAD_DIM : ACCENT_GRAD, border: 'none', borderRadius: '12px', color: '#fff', fontSize: '13.5px', fontFamily: 'Sora, sans-serif', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, boxShadow: loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}`, transition: 'box-shadow 0.2s ease', letterSpacing: '0.01em' }}
       onMouseEnter={(e) => { if (!loading) e.currentTarget.style.boxShadow = '0 4px 28px rgba(220,46,115,0.32)' }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = loading ? 'none' : `0 4px 22px ${ACCENT_GLOW}` }}
@@ -241,9 +258,10 @@ export default function SignupForm() {
   )
 
   const loginSwitch = (
-    <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0' }}>
+    <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
       Already have an account?{' '}
       <button type="button" onClick={() => switchView('login')}
+        className="auth-btn-text"
         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FB4040', fontWeight: 600, fontSize: '12px', fontFamily: 'Sora, sans-serif', textDecoration: 'underline', textUnderlineOffset: '2px', padding: 0 }}>
         Log in
       </button>
@@ -260,6 +278,7 @@ export default function SignupForm() {
     <form onSubmit={handleSendCode} style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
       {/* Google button */}
       <button type="button" onClick={() => googleLogin()} disabled={googleLoading}
+        className="auth-btn-primary"
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Sora, sans-serif', fontWeight: 500, cursor: googleLoading ? 'not-allowed' : 'pointer', opacity: googleLoading ? 0.6 : 1, transition: 'background 0.15s' }}
         onMouseEnter={(e) => { if (!googleLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
@@ -292,7 +311,7 @@ export default function SignupForm() {
       </p>
       <input className="auth-input auth-input-compact"
         style={{ textAlign: 'center', fontSize: '22px', letterSpacing: '0.3em', fontWeight: 700 }}
-        type="text" placeholder="000000" value={code}
+        type="text" inputMode="numeric" pattern="[0-9]*" placeholder="000000" value={code}
         onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
         maxLength={6} required autoComplete="one-time-code"
       />
@@ -311,12 +330,14 @@ export default function SignupForm() {
                 if (!res.ok) { setResendTimer(0); setError('Failed to resend code. Please try again.') }
               } catch { setResendTimer(0); setError('Failed to resend code. Please try again.') }
             }}
+            className="auth-btn-text"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FB4040', fontWeight: 600, fontSize: '12px', fontFamily: 'Sora, sans-serif', textDecoration: 'underline', padding: 0 }}
           >Resend code</button>
         )}
       </p>
       <button type="button" onClick={() => { setStep('email'); setCode(''); setError(null) }}
-        style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.22)', fontFamily: 'Sora, sans-serif', background: 'none', border: 'none', cursor: 'pointer' }}>
+        className="auth-btn-text"
+        style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.22)', fontFamily: 'Sora, sans-serif', background: 'none', border: 'none', cursor: 'pointer', alignSelf: 'center' }}>
         ← Change email
       </button>
     </form>
@@ -333,7 +354,8 @@ export default function SignupForm() {
       <div style={{ position: 'relative' }}>
         <input className="auth-input auth-input-compact" type={showPassword ? 'text' : 'password'} name="password" placeholder="Password" value={form.password} onChange={handleChange} required autoComplete="new-password" style={{ paddingRight: '2.75rem' }} />
         <button type="button" onClick={() => setShowPassword(v => !v)}
-          style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)', padding: 0, outline: 'none' }}
+          className="auth-pw-toggle"
+          style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', background: 'none', border: 'none', cursor: 'pointer', color: showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)', padding: 0, outline: 'none', touchAction: 'manipulation' }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.72)' }}
           onMouseLeave={(e) => { e.currentTarget.style.color = showPassword ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)' }}
         >

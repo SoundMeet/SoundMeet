@@ -125,10 +125,10 @@ export function AuthProvider({ children }) {
     await fetchProfile()
   }
 
-  const deleteAccount = async ({ password, confirmUsername }) => {
+  const deleteAccount = async ({ password, confirmEmail }) => {
     const body = password
       ? { password }
-      : { confirm_username: confirmUsername };
+      : { confirm_email: confirmEmail };
     await apiFetch("api/account/delete/", {
       method: "POST",
       body: JSON.stringify(body),
@@ -150,7 +150,6 @@ export function AuthProvider({ children }) {
     if (data.city !== undefined)                form.append("city", data.city);
     if (data.state !== undefined)               form.append("state", data.state);
     if (data.onboarding_complete !== undefined) form.append("onboarding_complete", String(data.onboarding_complete));
-    if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
     if (data.skill_level !== undefined)         form.append("skill_level", data.skill_level);
     if (data.headline !== undefined)            form.append("headline", data.headline);
     if (data.available_to_jam !== undefined)    form.append("available_to_jam", String(data.available_to_jam));

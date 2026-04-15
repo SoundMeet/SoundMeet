@@ -20,6 +20,7 @@ function ModeDot({ label, active, onClick }) {
       aria-selected={active}
       aria-label={label}
       onClick={onClick}
+      className="auth-modal-dot-btn"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -30,6 +31,7 @@ function ModeDot({ label, active, onClick }) {
         cursor: 'pointer',
         padding: '5px 10px',
         outline: 'none',
+        touchAction: 'manipulation',
       }}
     >
       <div
@@ -84,7 +86,7 @@ export default function AuthModal() {
       {isOpen && (
         <motion.div
           key="auth-backdrop"
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 auth-modal-backdrop"
           style={{
             background: 'rgba(0,0,0,0.84)',
             backdropFilter: 'blur(10px)',
@@ -100,10 +102,10 @@ export default function AuthModal() {
           <div
             aria-hidden="true"
             style={{
-              position: 'absolute',
+              position: 'fixed',
               top: '50%', left: '50%',
               transform: 'translate(-50%, -60%)',
-              width: '600px', height: '380px',
+              width: 'min(600px, 100vw)', height: '380px',
               background: 'radial-gradient(ellipse at center, rgba(251,64,64,0.13) 0%, transparent 66%)',
               pointerEvents: 'none',
             }}
@@ -114,6 +116,7 @@ export default function AuthModal() {
             role="dialog"
             aria-modal="true"
             aria-label={view === 'login' ? 'Log in to SoundMeet' : 'Create a SoundMeet account'}
+            className="auth-modal-panel"
             style={{
               position: 'relative',
               width: '100%',
@@ -143,11 +146,12 @@ export default function AuthModal() {
               }}
             />
 
-            {/* Close button */}
+            {/* Close button — 44×44 touch target on mobile, 28×28 on desktop */}
             <button
               type="button"
               onClick={closeModal}
               aria-label="Close"
+              className="auth-modal-close"
               style={{
                 position: 'absolute',
                 top: '18px', right: '20px',
@@ -175,6 +179,7 @@ export default function AuthModal() {
 
             {/* Header zone */}
             <div
+              className="auth-modal-header"
               style={{
                 padding: '32px 32px 0',
                 display: 'flex',
@@ -273,7 +278,7 @@ export default function AuthModal() {
             </div>
 
             {/* Form area */}
-            <div style={{ padding: '20px 32px 36px', overflow: 'hidden' }}>
+            <div className="auth-modal-body" style={{ padding: '20px 32px 36px', overflow: 'hidden' }}>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={view}

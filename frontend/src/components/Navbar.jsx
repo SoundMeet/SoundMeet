@@ -1,6 +1,5 @@
 import { useState } from "react";
 import LogowText from "../assets/LogowText.svg";
-import LogoOnly from "../assets/Logo.svg";
 import { navItems } from "../constants";
 import { Link, useLocation } from "react-router-dom";
 import ProfileDropdown from "./ProfileDropdown";
@@ -11,8 +10,10 @@ const Navbar = () => {
   const location = useLocation();
   const activePage = navItems.findIndex((item) => item.path === location.pathname);
 
+  const isOnboarding = location.pathname === '/onboarding'
+
   return (
-    <div className="w-full bg-none text-white px-4 md:px-8 h-16 flex items-center justify-between relative">
+    <div className={`w-full bg-none text-white px-4 md:px-8 h-16 items-center justify-between relative ${isOnboarding ? 'hidden md:flex' : 'flex'}`}>
 
       {/* LEFT: LOGO — routes to home */}
       <Link to="/" className="flex items-center">

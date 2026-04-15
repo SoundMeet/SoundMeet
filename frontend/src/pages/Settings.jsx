@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FaBell, FaLock, FaPalette, FaUser } from 'react-icons/fa'
 import { useAuth } from '../injectables/Auth'
+import { useAuthModal } from '../context/AuthModalContext'
 import { DeleteAccountSheet } from '../components/ui/DeleteAccountSheet'
 import { ChangePasswordSheet } from '../components/ui/ChangePasswordSheet'
 
@@ -124,6 +125,7 @@ function ChangePasswordSection() {
         loading={loading}
         hasUsablePassword={hasUsablePassword}
         error={error}
+        onClearError={() => setError('')}
       />
     </>
   )
@@ -133,19 +135,23 @@ function DangerZoneSection() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState('')
-  const [confirmUsername, setConfirmUsername] = useState('')
+  const [confirmEmail, setConfirmEmail] = useState('')
   const [error, setError] = useState('')
   const { deleteAccount, user, isLoggedIn } = useAuth()
+  const { openModal } = useAuthModal()
   const navigate = useNavigate()
 
   if (!isLoggedIn) return null
 
   const isGoogleUser = user && !user.has_usable_password
 
+  const handlePasswordChange = (val) => { setPassword(val); setError('') }
+  const handleConfirmEmailChange = (val) => { setConfirmEmail(val); setError('') }
+
   const openSheet = () => {
     setError('')
     setPassword('')
-    setConfirmUsername('')
+    setConfirmEmail('')
     setSheetOpen(true)
   }
 
@@ -155,8 +161,9 @@ function DangerZoneSection() {
     try {
       await deleteAccount({
         password: isGoogleUser ? undefined : password,
-        confirmUsername: isGoogleUser ? confirmUsername : undefined,
+        confirmEmail: isGoogleUser ? confirmEmail : undefined,
       })
+      openModal('login')
       navigate('/', { replace: true })
     } catch (err) {
       setError(err?.error || 'Something went wrong. Please try again.')
@@ -204,11 +211,11 @@ function DangerZoneSection() {
         onConfirm={handleConfirm}
         loading={loading}
         isGoogleUser={isGoogleUser}
-        username={user?.username}
+        email={user?.email}
         password={password}
-        setPassword={setPassword}
-        confirmUsername={confirmUsername}
-        setConfirmUsername={setConfirmUsername}
+        setPassword={handlePasswordChange}
+        confirmEmail={confirmEmail}
+        setConfirmEmail={handleConfirmEmailChange}
         error={error}
       />
     </>
