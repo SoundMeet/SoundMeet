@@ -1002,6 +1002,7 @@ export function FeedSection({ feedTab = 'forYou' }) {
         <ReviewComposerBody
           state={composerState.review ?? COMPOSER_CONFIG.review.initState()}
           onChange={(patch) => patchComposerState('review', patch)}
+          currentUserId={user?.id}
         />
       </PostComposerModal>
     </div>

@@ -366,6 +366,9 @@ const EventDetailModal = ({
   const [deleteConfirmOpen,setDeleteConfirmOpen]= useState(false);
   const [actionLoading,    setActionLoading]    = useState(false);
 
+  // ── Ratings summary (avg + count, fetched lazily on open for past jams) ────
+  const [ratingSummary, setRatingSummary] = useState({ avg_rating: null, rating_count: 0 });
+
   // ── Chat membership state (jams only, approved attendees) ─────────────────
   const [jamConvId,     setJamConvId]     = useState(null);
   const [chatLeftAt,    setChatLeftAt]    = useState(null);
@@ -411,6 +414,27 @@ const EventDetailModal = ({
       })
       .catch(() => {}); // non-critical — silently fail
   }, [open, localItem?.id, ctx.isAttendee, ctx.joinState, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Ratings summary fetch (past jams only, public aggregate) ─────────────
+  useEffect(() => {
+    if (!open || !ctx.isPastEvent || localItem?.type !== "jam" || !localItem?.id) return;
+    jamService.getJamRatingSummary(localItem.id)
+      .then((data) => setRatingSummary(data))
+      .catch(() => {}); // non-critical
+  }, [open, localItem?.id, ctx.isPastEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Open rate sheet — pre-fill with existing rating if available ──────────
+  const handleOpenRateSheet = async () => {
+    if (localItem?.rating == null && ctx.isPastEvent && localItem?.id) {
+      try {
+        const data = await jamService.fetchMyJamRating(localItem.id);
+        if (data?.rating) {
+          setLocalItem((prev) => ({ ...prev, rating: data.rating, ratingComment: data.comment }));
+        }
+      } catch (_) {}
+    }
+    setRateSheetOpen(true);
+  };
 
   // ── Rejoin chat ────────────────────────────────────────────────────────────
   const handleRejoinChat = async () => {
@@ -712,6 +736,20 @@ const EventDetailModal = ({
                 />
               )}
 
+              {localItem.type === "jam" && ctx.isPastEvent && ratingSummary.rating_count > 0 && (
+                <div className="px-7 pt-1 pb-3">
+                  <span
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
+                    style={{ background: hexToRgba(accent, 0.12), color: accent }}
+                  >
+                    <span style={{ fontSize: 13 }}>★</span>
+                    {ratingSummary.avg_rating}
+                    <span className="font-normal opacity-60">
+                      · {ratingSummary.rating_count} {ratingSummary.rating_count === 1 ? 'rating' : 'ratings'}
+                    </span>
+                  </span>
+                </div>
+              )}
               {localItem.type === "jam"           && <JamDetailSections item={localItem} accent={accent} />}
               {localItem.type === "promote_show"  && <ShowDetailSections item={localItem} accent={accent} />}
               {localItem.type === "join_band"     && <JoinBandDetailSections item={localItem} />}
@@ -833,7 +871,7 @@ const EventDetailModal = ({
           onLeave={() => setLeaveConfirmOpen(true)}
           onDelete={() => setDeleteConfirmOpen(true)}
           onClose={onClose}
-          onRate={() => setRateSheetOpen(true)}
+          onRate={handleOpenRateSheet}
         />
       )}
     </>

@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
 import random
 import string
@@ -179,6 +180,23 @@ class JamAttendeeBringing(models.Model):
         return f"{self.user.username} @ {self.jam.name}"
 
 
+class JamRating(models.Model):
+    jam = models.ForeignKey(Jam, on_delete=models.CASCADE, related_name="ratings")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="jam_ratings")
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(max_length=280, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('jam', 'user')
+
+    def __str__(self):
+        return f"{self.user.username} rated {self.jam.name}: {self.rating}★"
+
+
 class Show(models.Model):
     name = models.CharField(max_length=150)
     
@@ -356,6 +374,7 @@ class Notification(models.Model):
         POST_LIKE       = 'POST_LIKE'
         POST_COMMENT    = 'POST_COMMENT'
         JAM_INVITE      = 'JAM_INVITE'
+        JAM_RATED       = 'JAM_RATED'
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
     notification_type = models.CharField(max_length=20, choices=NotificationTypes.choices)

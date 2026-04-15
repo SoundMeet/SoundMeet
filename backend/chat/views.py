@@ -16,9 +16,10 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
+from django.db.models import Avg, Count
 from .models import (
     Profile, Post, Comment, FriendRequest, Notification,
-    BandmateListing, BandmateCandidate, Jam, Show, Genre, Band, Conversation,
+    BandmateListing, BandmateCandidate, Jam, JamRating, Show, Genre, Band, Conversation,
     Artist, Instrument, Vibe, MusicSnip
 )
 
@@ -461,6 +462,79 @@ def create_jam(request):
     set_m2m('gear_needed_ids', jam.gear_needed)
 
     return Response({'status': 'Jam created successfully', 'jam_id': jam.id})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def rate_jam(request, jam_id):
+    """Submit or update a star rating (1–5) for a past jam the user attended."""
+    jam = get_object_or_404(Jam, id=jam_id)
+
+    if jam.date_time > timezone.now():
+        return Response({'error': 'Cannot rate a future jam.'}, status=400)
+
+    attended = jam.users_attending.filter(id=request.user.id).exists()
+    is_admin = jam.admin_id == request.user.id
+    if not attended and not is_admin:
+        return Response({'error': 'You did not attend this jam.'}, status=403)
+
+    raw_rating = request.data.get('rating')
+    try:
+        rating_value = int(raw_rating)
+        if not (1 <= rating_value <= 5):
+            raise ValueError()
+    except (TypeError, ValueError):
+        return Response({'error': 'rating must be an integer between 1 and 5.'}, status=400)
+
+    comment = (request.data.get('comment') or '').strip()[:280]
+
+    JamRating.objects.update_or_create(
+        jam=jam,
+        user=request.user,
+        defaults={'rating': rating_value, 'comment': comment},
+    )
+
+    # Notify host (skip self-rating)
+    if jam.admin_id != request.user.id:
+        Notification.objects.get_or_create(
+            user=jam.admin,
+            notification_type=Notification.NotificationTypes.JAM_RATED,
+            reference_id=jam.id,
+            defaults={
+                'message': f"{request.user.profile.display_name} rated your jam {jam.name} {rating_value}★.",
+                'metadata': {'rater_id': request.user.id, 'rating': rating_value, 'jam_name': jam.name},
+            },
+        )
+
+    agg = jam.ratings.aggregate(avg=Avg('rating'), count=Count('id'))
+    return Response({
+        'rating': rating_value,
+        'comment': comment,
+        'avg_rating': round(agg['avg'], 1) if agg['avg'] else rating_value,
+        'rating_count': agg['count'],
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_jam_rating(request, jam_id):
+    """Return the current user's existing rating for a jam, or nulls if not rated."""
+    try:
+        jr = JamRating.objects.get(jam_id=jam_id, user=request.user)
+        return Response({'rating': jr.rating, 'comment': jr.comment})
+    except JamRating.DoesNotExist:
+        return Response({'rating': None, 'comment': ''})
+
+
+@api_view(['GET'])
+def jam_ratings_summary(request, jam_id):
+    """Return the aggregate avg rating and count for a jam (public, no auth required)."""
+    get_object_or_404(Jam, id=jam_id)
+    agg = JamRating.objects.filter(jam_id=jam_id).aggregate(avg=Avg('rating'), count=Count('id'))
+    return Response({
+        'avg_rating': round(agg['avg'], 1) if agg['avg'] else None,
+        'rating_count': agg['count'],
+    })
 
 
 @api_view(['POST'])
