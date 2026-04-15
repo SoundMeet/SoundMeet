@@ -1337,15 +1337,25 @@ const MyJams = () => {
         }}
         onDelete={handleDelete}
         onLeave={handleLeave}
-        onRate={(item, rating) => {
-          setPastItems(prev =>
-            prev.map(p => p.id === item.id ? { ...p, rating } : p)
-          )
-          setDiscoveryModal(prev =>
-            prev.item?.id === item.id
-              ? { ...prev, item: { ...prev.item, rating } }
-              : prev
-          )
+        onRate={async (item, rating, comment) => {
+          try {
+            const result = await jamService.submitJamRating(item.id, rating, comment)
+            const patch = {
+              rating: result.rating,
+              avg_rating: result.avg_rating,
+              rating_count: result.rating_count,
+            }
+            setPastItems(prev =>
+              prev.map(p => p.id === item.id ? { ...p, ...patch } : p)
+            )
+            setDiscoveryModal(prev =>
+              prev.item?.id === item.id
+                ? { ...prev, item: { ...prev.item, ...patch } }
+                : prev
+            )
+          } catch (err) {
+            console.error('Failed to submit rating:', err)
+          }
         }}
       />
 

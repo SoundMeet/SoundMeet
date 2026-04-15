@@ -18,11 +18,11 @@ export function RateJamSheet({ open, onClose, item, onSubmit }) {
   const [selected, setSelected] = useState(0)
   const [comment,  setComment]  = useState('')
 
-  // Sync initial rating when sheet opens
+  // Sync initial rating + comment when sheet opens
   useEffect(() => {
     if (open) {
       setSelected(item?.rating ?? 0)
-      setComment('')
+      setComment(item?.ratingComment ?? '')
       setHovered(0)
     }
   }, [open, item])

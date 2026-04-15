@@ -672,4 +672,31 @@ export const jamService = {
       body: formData,
     });
   },
+
+  /**
+   * Submit or update the current user's rating for a past attended jam.
+   * Returns { rating, comment, avg_rating, rating_count }.
+   */
+  async submitJamRating(jamId, rating, comment = '') {
+    return await apiFetch(`api/jams/${jamId}/rate/`, {
+      method: 'POST',
+      body: JSON.stringify({ rating, comment }),
+    });
+  },
+
+  /**
+   * Fetch the current user's existing rating for a jam (for pre-filling the sheet).
+   * Returns { rating: number|null, comment: string }.
+   */
+  async fetchMyJamRating(jamId) {
+    return await apiFetch(`api/jams/${jamId}/my-rating/`, { method: 'GET' });
+  },
+
+  /**
+   * Fetch the public aggregate rating summary for a jam.
+   * Returns { avg_rating: number|null, rating_count: number }.
+   */
+  async getJamRatingSummary(jamId) {
+    return await apiFetch(`api/jams/${jamId}/ratings-summary/`, { method: 'GET' });
+  },
 };

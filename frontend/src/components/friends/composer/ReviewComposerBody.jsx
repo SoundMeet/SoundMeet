@@ -1,49 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdMusicNote, MdCalendarToday, MdLocationOn, MdCheck } from 'react-icons/md'
 import { hexToRgba } from '../../../utils/discovery'
+import { jamService } from '../../../injectables/jamService'
 
 const ACCENT = '#FB923C'
 const STAR_LABELS = ['Terrible', 'Poor', 'Okay', 'Good', 'Amazing']
-
-// Past jams the user attended — TODO: replace with api.getMyPastJams()
-const MY_PAST_JAMS = [
-  {
-    id: 'pj-1',
-    title: 'Midnight Funk Session',
-    date: '2026-03-15',
-    locationName: 'Wynwood Arts District',
-    genres: ['Funk', 'Soul'],
-  },
-  {
-    id: 'pj-2',
-    title: 'Acoustic Rooftop Sessions',
-    date: '2026-03-08',
-    locationName: 'Brickell',
-    genres: ['Acoustic', 'Folk'],
-  },
-  {
-    id: 'pj-3',
-    title: 'Jazz & Blues Night',
-    date: '2026-02-22',
-    locationName: 'Little Havana',
-    genres: ['Jazz', 'Blues'],
-  },
-  {
-    id: 'pj-4',
-    title: 'Electronic Improv Collective',
-    date: '2026-02-14',
-    locationName: 'Downtown Miami',
-    genres: ['Electronic', 'Experimental'],
-  },
-  {
-    id: 'pj-5',
-    title: 'Sunday Groove Lab',
-    date: '2026-01-26',
-    locationName: 'Coconut Grove',
-    genres: ['R&B', 'Neo Soul'],
-  },
-]
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -55,17 +17,31 @@ function formatDate(iso) {
  * ReviewComposerBody — body for the "Write a Review" composer modal.
  *
  * Props:
- *   state    { caption: string, selectedJam: object|null, rating: number }
- *   onChange (patch) => void
- *
- * Backend note:
- *   MY_PAST_JAMS should be fetched from GET /api/jams/?attendee={userId}&past=true
- *   The selected jam's id maps to posts.jam_ref_id (FK → events.id).
- *   rating maps to a new posts.review_rating INT column (1–5).
+ *   state         { caption: string, selectedJam: object|null, rating: number }
+ *   onChange      (patch) => void
+ *   currentUserId {string|number|undefined}
  */
-export function ReviewComposerBody({ state, onChange }) {
+export function ReviewComposerBody({ state, onChange, currentUserId }) {
   const [hoveredStar, setHoveredStar] = useState(0)
+  const [pastJams, setPastJams] = useState([])
   const activeStars = hoveredStar || state.rating
+
+  useEffect(() => {
+    if (!currentUserId) return
+    jamService.getMyPastJams(currentUserId)
+      .then((jams) => {
+        setPastJams(
+          (jams ?? []).map((j) => ({
+            id: j.id,
+            title: j.title,
+            date: j.dateTimeRaw,
+            locationName: j.locationName,
+            genres: (j.genres ?? []).map((g) => g.name ?? g),
+          }))
+        )
+      })
+      .catch(() => {})
+  }, [currentUserId])
 
   return (
     <div className="space-y-5">
@@ -125,7 +101,7 @@ export function ReviewComposerBody({ state, onChange }) {
           Select a Past Jam
         </p>
         <div className="space-y-2">
-          {MY_PAST_JAMS.map((jam, i) => {
+          {pastJams.map((jam, i) => {
             const selected = state.selectedJam?.id === jam.id
             return (
               <motion.button
