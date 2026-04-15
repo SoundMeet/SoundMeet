@@ -608,8 +608,18 @@ export function FeedSection({ feedTab = 'forYou' }) {
       let content = ''
       let imageFile = null
 
-      if (type === 'clip')   content = state.caption  || ''
-      if (type === 'review') content = state.caption   || ''
+      if (type === 'clip') content = state.caption || ''
+
+      if (type === 'review') {
+        await postService.createNewPost(state.caption || '', null, {
+          post_type: 'review',
+          jam_id:    state.selectedJam.id,
+          rating:    state.rating,
+        })
+        loadPosts()
+        closeComposer()
+        return
+      }
 
       if (type === 'jam') {
         const msg  = (state.message || '').trim()
