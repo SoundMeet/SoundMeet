@@ -20,6 +20,7 @@ const IdentityRow = ({ name, roleLabel, accent, avatarUrl, icon: Icon }) => {
         <img
           src={avatarUrl}
           alt={name}
+          loading="lazy"
           className="h-7 w-7 rounded-lg object-cover shrink-0"
           style={{ border: `1px solid ${hexToRgba(accent, 0.2)}` }}
         />

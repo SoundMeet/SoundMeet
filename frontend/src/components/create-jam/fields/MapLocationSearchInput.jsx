@@ -342,7 +342,7 @@ const MapLocationSearchInput = ({
             type="button"
             onClick={handleClear}
             aria-label="Clear location"
-            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors duration-150"
+            className="flex-shrink-0 w-11 h-11 md:w-6 md:h-6 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors duration-150"
             style={{ color: "rgba(229,226,225,0.4)", fontSize: 11 }}
           >
             ✕

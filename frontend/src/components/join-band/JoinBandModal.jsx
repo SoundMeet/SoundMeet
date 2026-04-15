@@ -53,7 +53,7 @@ const JoinBandModal = ({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           className="w-full md:w-[560px] flex flex-col overflow-hidden
-            rounded-t-[1.5rem] max-h-[92vh]
+            rounded-t-[1.5rem] max-h-[92dvh]
             md:rounded-[1.5rem] md:max-h-[88vh]"
           style={{
             animation: "modalSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -63,6 +63,7 @@ const JoinBandModal = ({
             WebkitBackdropFilter: "blur(32px)",
             boxShadow:
               "0 0 60px rgba(229,226,225,0.03), 0 0 50px rgba(168,85,247,0.1), 0 -1px 0 rgba(168,85,247,0.07)",
+            paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
           {!isLoading && options && (

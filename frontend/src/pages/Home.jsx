@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import MapComponent from "../components/MapComponent";
 import GlowSwitch from "../components/GlowSwitch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,11 +9,14 @@ import RSVPShowModal from "../components/rsvp-show/RSVPShowModal";
 import PromoteShowModal from "../components/promote-show/PromoteShowModal";
 import JoinBandModal from "../components/join-band/JoinBandModal";
 import FindBandmateModal from "../components/find-bandmate/FindBandmateModal";
+import MobileCreateFAB from "../components/MobileCreateFAB";
 import DiscoverPreview from "../components/DiscoverPreview";
 import { useAuth } from "../injectables/Auth.jsx";
 import { useAuthModal } from "../context/AuthModalContext.jsx";
 import { useToast } from "../context/ToastContext.jsx";
+import { useRequireAuth } from "../hooks/useRequireAuth.js";
 import DiscoverControls from "../components/discover/DiscoverControls";
+import MobileFiltersSheet from "../components/discover/MobileFiltersSheet";
 import SortMenu from "../components/discover/SortMenu";
 import MapFloatingControls from "../components/discover/MapControls";
 import {
@@ -46,9 +49,11 @@ const CATEGORY_HEADINGS = {
 
 const Home = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoggedIn, user } = useAuth();
   const { openModal } = useAuthModal();
   const { showToast } = useToast();
+  const requireAuth = useRequireAuth();
 
   // ── Category filter ────────────────────────────────────────────────────────
   // Empty array = "All" (no restriction). Populated = specific categories selected.
@@ -84,7 +89,10 @@ const Home = () => {
   const [findBandmateModalOpen, setFindBandmateModalOpen] = useState(false);
   const [joinJamModal, setJoinJamModal] = useState({ open: false, jam: null });
   const [rsvpShowModal, setRsvpShowModal] = useState({ open: false, show: null });
-  const [nearYouCollapsed, setNearYouCollapsed] = useState(true);
+  const [nearYouCollapsed, setNearYouCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768
+  );
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // ── Discovery interaction state ────────────────────────────────────────────
   const [hoveredDiscoveryId, setHoveredDiscoveryId] = useState(null);
@@ -95,6 +103,10 @@ const Home = () => {
   // ── Map control state ──────────────────────────────────────────────────────
   const [userLocation, setUserLocation] = useState(null);
   const [flyToTarget, setFlyToTarget] = useState(null);
+  const [radiusOpen, setRadiusOpen] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [recenterKey, setRecenterKey] = useState(0);
+  const [recentering, setRecentering] = useState(false);
 
   // ── Welcome preview state ──────────────────────────────────────────────────
   // Shown once per session for unauthenticated users before any jam interaction.
@@ -138,6 +150,7 @@ const Home = () => {
   }, [user?.id]);
 
   useEffect(() => { refreshMyJoinedIds(); }, [refreshMyJoinedIds]);
+  useEffect(() => { if (!isLoggedIn) setIsOn(false); }, [isLoggedIn]);
 
   // ── Real feed from Supabase (jams + shows) ───────────────────────────────
   // Raw rows are stored separately; normalization (incl. distanceMiles) happens
@@ -199,8 +212,15 @@ const Home = () => {
         matchesDiscoveryCategories(item, activeCategories) &&
         matchesDiscoverySearch(item, searchQuery)
     );
-    return applySort(topBarFiltered, sort);
-  }, [discoveryFeed, radius, timeFilter, moreFilters, sort, activeCategories, searchQuery]);
+    const activityFiltered = isOn
+      ? topBarFiltered.filter((item) => {
+          if (!user) return false;
+          if (item.admin_id != null && String(item.admin_id) === String(user.id)) return true;
+          return myJoinedIds.has(item.id);
+        })
+      : topBarFiltered;
+    return applySort(activityFiltered, sort);
+  }, [discoveryFeed, radius, timeFilter, moreFilters, sort, activeCategories, searchQuery, isOn, myJoinedIds, user]);
 
   // Clear selection when the selected item is filtered out
   useEffect(() => {
@@ -395,7 +415,7 @@ const Home = () => {
   };
 
   // Opens JoinJamModal from EventDetailModal footer action
-  const handleDiscoveryJoin = () => {
+  const handleDiscoveryJoin = requireAuth(() => {
     if (modalItem?.type === "jam") {
       setJoinJamModal({
         open: true,
@@ -409,15 +429,15 @@ const Home = () => {
       });
     }
     closeDiscoveryModal();
-  };
+  });
 
   // Opens RSVPShowModal from EventDetailModal footer action
-  const handleDiscoveryRsvp = () => {
+  const handleDiscoveryRsvp = requireAuth(() => {
     if (modalItem?.type === "promote_show") {
       setRsvpShowModal({ open: true, show: modalItem });
     }
     closeDiscoveryModal();
-  };
+  });
 
   // ── Search result select: fly map to entity or location ───────────────────
   const handleSearchResultSelect = (result) => {
@@ -439,17 +459,30 @@ const Home = () => {
     const item = discoveryById[itemId];
     const coords = getDiscoveryCoordinates(item);
     if (coords) {
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
       setFlyToTarget({
         latitude: coords.latitude,
         longitude: coords.longitude,
         zoom: item?.locationVisibility === "approximate" ? 13.2 : 14,
+        // On mobile, offset the camera so the selected pin lands in the visible
+        // zone above the expanded Near You sheet rather than hidden behind it.
+        // Top: clears the search + chip controls (~96px).
+        // Bottom: clears the expanded sheet (55dvh) + bottom nav (60px) + buffer.
+        ...(isMobile && {
+          padding: {
+            top: 56,
+            bottom: Math.round(window.innerHeight * 0.48) + 60,
+            left: 20,
+            right: 20,
+          },
+        }),
         _ts: nextFlyToken(),
       });
     }
   };
 
   // ── Radius → viewport: reframe around user when radius changes ────────────
-  // Skips on initial mount (no user location yet); fires on every subsequent change.
+  // Also fires once when GPS first resolves so the initial 25mi radius is framed.
   const isFirstRadiusRender = useRef(true);
   useEffect(() => {
     if (isFirstRadiusRender.current) { isFirstRadiusRender.current = false; return; }
@@ -462,6 +495,9 @@ const Home = () => {
   const handleRecenter = () => {
     const coords = userLocation ?? FALLBACK_VIEW;
     setFlyToTarget({ ...coords, zoom: 14, _ts: nextFlyToken() });
+    setRecenterKey((k) => k + 1);
+    setRecentering(true);
+    setTimeout(() => setRecentering(false), 700);
   };
 
   const handleReset = () => {
@@ -483,15 +519,28 @@ const Home = () => {
   };
 
   // Single click: lock selection, clear any stale hover, fly map to item.
+  // On mobile: also expand Near You so the selected card is immediately visible.
   const handleItemClick = (itemId) => {
+    // Tapping the already-selected pin/card opens the modal (two-tap-to-open pattern).
+    // First tap selects; second tap on the same item commits and opens detail.
+    if (itemId === selectedDiscoveryId) {
+      openDiscoveryModal(itemId);
+      return;
+    }
     dismissWelcome();
     setHoveredDiscoveryId(null);
     setSelectedDiscoveryId(itemId);
     flyToItem(itemId);
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setNearYouCollapsed(false);
+    }
   };
 
-  // Double click: select + open detail modal immediately.
+  // Double click: select + open detail modal — desktop only.
+  // On mobile the two-tap pattern in handleItemClick handles this;
+  // dblclick is unreliable on touch and conflicts with iOS zoom gestures.
   const handleItemDoubleClick = (itemId) => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
     setSelectedDiscoveryId(itemId);
     openDiscoveryModal(itemId);
   };
@@ -500,11 +549,15 @@ const Home = () => {
   const handleItemAction = (itemId) => openDiscoveryModal(itemId);
 
   // ── Scroll selected card into view ─────────────────────────────────────────
+  // requestAnimationFrame ensures the card list is visible (sheet just expanded)
+  // before scrollIntoView fires — avoids scrolling into a hidden element.
   useEffect(() => {
     if (selectedDiscoveryId) {
-      cardRefs.current[selectedDiscoveryId]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
+      requestAnimationFrame(() => {
+        cardRefs.current[selectedDiscoveryId]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
       });
     }
   }, [selectedDiscoveryId]);
@@ -520,13 +573,19 @@ const Home = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Click-outside: deselect jam ────────────────────────────────────────────
+  // ── Click-outside: deselect jam + collapse sheet on mobile ────────────────
   useEffect(() => {
     const handler = (e) => {
       if (isDiscoveryModalOpen) return;
       const inNearYou = nearYouRef.current?.contains(e.target);
       const inPreview = previewRef.current?.contains(e.target);
-      if (!inNearYou && !inPreview) setSelectedDiscoveryId(null);
+      if (!inNearYou && !inPreview) {
+        setSelectedDiscoveryId(null);
+        // On mobile: tapping the map collapses the Near You sheet
+        if (typeof window !== "undefined" && window.innerWidth < 768) {
+          setNearYouCollapsed(true);
+        }
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -548,6 +607,9 @@ const Home = () => {
           flyToTarget={flyToTarget}
           userLocation={userLocation}
           onUserLocation={setUserLocation}
+          onLocationDenied={() => setLocationDenied(true)}
+          radius={radius}
+          recenterKey={recenterKey}
         />
 
         {/* Top navbar-to-map gradient */}
@@ -601,6 +663,45 @@ const Home = () => {
         }}
       />
 
+      {/* Location denied banner */}
+      <AnimatePresence>
+        {locationDenied && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed top-[4.5rem] left-1/2 -translate-x-1/2 z-30 pointer-events-auto"
+          >
+            <div
+              className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-[13px] font-medium text-white/80"
+              style={{
+                background: "rgba(18,18,18,0.88)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: "1px solid rgba(220,46,115,0.25)",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 12px rgba(220,46,115,0.1)",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(220,46,115,0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <circle cx="12" cy="12" r="3" fill="rgba(220,46,115,0.8)" strokeWidth="0" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
+              <span>Enable location to see jams near you</span>
+              <button
+                onClick={() => setLocationDenied(false)}
+                aria-label="Dismiss"
+                className="ml-1 opacity-40 hover:opacity-80 transition-opacity"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M1 1l10 10M11 1L1 11" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* UI layer */}
       <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col pointer-events-none">
 
@@ -613,10 +714,12 @@ const Home = () => {
           allItems={discoveryFeed}
           radius={radius}
           onRadiusChange={setRadius}
+          onRadiusOpenChange={setRadiusOpen}
           time={timeFilter}
           onTimeChange={setTimeFilter}
           moreFilters={moreFilters}
           onMoreFiltersChange={setMoreFilters}
+          onMobileFiltersOpen={() => setMobileFiltersOpen(true)}
         />
 
         {/* Main content */}
@@ -627,33 +730,60 @@ const Home = () => {
           {/* Near You panel */}
           <div
             ref={nearYouRef}
-            className="w-full md:w-[380px] md:max-w-[calc(100vw-2rem)] shrink-0 md:pt-2 md:pr-6 pointer-events-auto fixed md:relative bottom-[60px] md:bottom-auto left-0 right-0 md:left-auto md:right-auto z-30 md:z-auto px-3 md:px-0 pb-2 md:pb-0"
+            className="w-full md:w-[380px] md:max-w-[calc(100vw-2rem)] shrink-0 md:pt-2 md:pr-6 pointer-events-auto fixed md:relative bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-auto left-0 right-0 md:left-auto md:right-auto z-30 md:z-auto px-4 md:px-0 pb-1 md:pb-0"
           >
-            <div className="rounded-[28px] bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_0_20px_rgba(220,46,115,0.55)] p-5">
+            <div className="rounded-tl-[20px] rounded-tr-[20px] rounded-bl-[10px] rounded-br-[10px] md:rounded-[28px] bg-[#1c1c1e]/70 md:bg-neutral-900/50 backdrop-blur-2xl border border-white/[0.08] md:border md:border-white/10 shadow-[0_-6px_24px_rgba(220,46,115,0.10),0_-2px_12px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.05)] md:shadow-[0_0_20px_rgba(220,46,115,0.55)] px-4 pt-2.5 pb-2.5 md:p-5">
+
+              {/* Mobile drag handle — tappable to expand/collapse (mirrors header click) */}
+              <div
+                className="md:hidden w-8 h-[3px] rounded-full bg-white/[0.22] mx-auto mb-1.5 shrink-0 cursor-pointer"
+                onClick={() => {
+                  setNearYouCollapsed(prev => {
+                    const nextCollapsed = !prev;
+                    if (nextCollapsed && typeof window !== "undefined" && window.innerWidth < 768) {
+                      setSelectedDiscoveryId(null);
+                    }
+                    return nextCollapsed;
+                  });
+                }}
+              ></div>
 
               {/* Header — tappable on mobile to collapse/expand */}
               <div
                 className="flex items-center justify-between mb-0 md:mb-4 cursor-pointer md:cursor-default"
-                onClick={() => setNearYouCollapsed(prev => !prev)}
+                onClick={() => {
+                  setNearYouCollapsed(prev => {
+                    const nextCollapsed = !prev;
+                    // Collapsing the sheet on mobile: clear selection so the
+                    // highlighted pin and open sheet always reflect the same state
+                    if (nextCollapsed && typeof window !== "undefined" && window.innerWidth < 768) {
+                      setSelectedDiscoveryId(null);
+                    }
+                    return nextCollapsed;
+                  });
+                }}
               >
                 <div className="flex items-center gap-2">
-                  <h2 className="text-white font-medium text-xl">
+                  <h2 className="text-[13px] tracking-[0.06em] md:text-xl font-semibold md:font-medium text-white">
                     {activeCategories.length === 1
                       ? (CATEGORY_HEADINGS[activeCategories[0]] ?? "Near You")
                       : "Near You"}
                   </h2>
                   {filteredItems.length > 0 && (
-                    <span className="text-xs text-neutral-500">{filteredItems.length}</span>
+                    <span className="md:hidden inline-flex items-center px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-[11px] font-medium text-neutral-400">{filteredItems.length}</span>
+                  )}
+                  {filteredItems.length > 0 && (
+                    <span className="hidden md:inline text-xs text-neutral-500">{filteredItems.length}</span>
                   )}
                 </div>
                 <div className="flex gap-2.5 items-center">
                   {/* Mobile chevron */}
                   <svg
                     className="md:hidden"
-                    width="16" height="16" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                    width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round"
                     style={{
-                      color: 'rgba(255,255,255,0.4)',
+                      color: 'rgba(255,255,255,0.5)',
                       transform: nearYouCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s ease',
                     }}
@@ -666,12 +796,12 @@ const Home = () => {
                     onClick={e => e.stopPropagation()}
                   >
                     <SortMenu value={sort} onChange={setSort} />
-                    <GlowSwitch
-                      value={isOn}
-                      size="sm"
-                      onChange={setIsOn}
-                      className="text-sm"
-                    />
+                    <div className="relative group">
+                      <GlowSwitch value={isOn} size="sm" onChange={setIsOn} />
+                      <div className="pointer-events-none absolute bottom-full right-0 mb-2 px-2.5 py-1.5 rounded-lg bg-neutral-900/95 border border-white/10 text-[11px] text-neutral-300 whitespace-nowrap shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        Show only events you've joined or created
+                      </div>
+                    </div>
                     <div className="relative" ref={dropdownRef}>
                       <div
                         onClick={() => setDropdownOpen((v) => !v)}
@@ -696,7 +826,7 @@ const Home = () => {
                                     <circle cx="12" cy="12" r="2" /><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
                                   </svg>
                                 ),
-                                onClick: () => { setCreateJamModalOpen(true); setDropdownOpen(false); },
+                                onClick: requireAuth(() => { setCreateJamModalOpen(true); setDropdownOpen(false); }),
                                 accent: true,
                               },
                               {
@@ -720,7 +850,7 @@ const Home = () => {
                             ))}
                             <div className="mx-4 h-px bg-white/[0.07]" />
                             <button
-                              onClick={() => { setPromoteShowModalOpen(true); setDropdownOpen(false); }}
+                              onClick={requireAuth(() => { setPromoteShowModalOpen(true); setDropdownOpen(false); })}
                               className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
                             >
                               <span className="shrink-0 opacity-70">
@@ -766,7 +896,7 @@ const Home = () => {
                                             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
                                           </svg>
                                         ),
-                                        onClick: () => { setJoinBandModalOpen(true); setDropdownOpen(false); },
+                                        onClick: () => { setDropdownOpen(false); showToast("Coming soon!", "info"); },
                                       },
                                       {
                                         label: "Find a Bandmate",
@@ -775,7 +905,7 @@ const Home = () => {
                                             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
                                           </svg>
                                         ),
-                                        onClick: () => { setFindBandmateModalOpen(true); setDropdownOpen(false); },
+                                        onClick: () => { setDropdownOpen(false); showToast("Coming soon!", "info"); },
                                       },
                                     ].map(({ label, icon, onClick }) => (
                                       <button
@@ -800,14 +930,14 @@ const Home = () => {
               </div>
 
               {/* Cards — always visible on desktop, hidden on mobile when collapsed */}
-              <div className={`md:block ${nearYouCollapsed ? 'hidden' : 'block'}`}>
-                <div className="h-px bg-gray-800 rounded-full mb-4 mt-4" />
+              <div className={`${nearYouCollapsed ? 'hidden md:block' : 'block'}`}>
+                <div className="h-px bg-white/[0.07] rounded-full mt-3 mb-3 md:mt-4 md:mb-4" />
                 {feedLoading ? (
                   <div className="flex items-center justify-center py-10">
                     <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
                   </div>
                 ) : filteredItems.length > 0 ? (
-                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[480px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex flex-col gap-2.5 md:gap-3 overflow-y-auto overscroll-contain max-h-[calc(55dvh-90px)] md:max-h-[480px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {filteredItems.map((item) => (
                       <div key={item.id} ref={(el) => { cardRefs.current[item.id] = el; }}>
                         <DiscoveryCard
@@ -827,12 +957,25 @@ const Home = () => {
                 ) : (
                   <div className="flex flex-col items-center justify-center py-10 gap-2">
                     <span className="text-2xl">🎵</span>
-                    <p className="text-sm text-neutral-400 text-center">
-                      No jams found near you yet.
-                    </p>
-                    <p className="text-xs text-neutral-600 text-center">
-                      Create one or try expanding your radius.
-                    </p>
+                    {isOn ? (
+                      <>
+                        <p className="text-sm text-neutral-400 text-center">
+                          No events yet.
+                        </p>
+                        <p className="text-xs text-neutral-600 text-center">
+                          Create a jam or join one to see it here.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-neutral-400 text-center">
+                          No jams found near you yet.
+                        </p>
+                        <p className="text-xs text-neutral-600 text-center">
+                          Create one or try expanding your radius.
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -840,10 +983,11 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Bottom-left: Jam hover/selected preview — offset right of controls */}
+        {/* Bottom-left: Jam hover/selected preview — desktop only */}
+        {/* On mobile: tapping a pin expands Near You and scrolls to the card instead */}
         <div
           ref={previewRef}
-          className="fixed bottom-8 left-8 z-30 pointer-events-auto"
+          className="hidden md:block fixed md:left-8 md:right-auto z-30 pointer-events-auto md:bottom-8"
         >
           <AnimatePresence mode="wait">
             {previewItem ? (
@@ -852,6 +996,7 @@ const Home = () => {
                 variant="discovery"
                 item={previewItem}
                 onViewItem={() => openDiscoveryModal(previewItem.id)}
+                onDismiss={() => setSelectedDiscoveryId(null)}
               />
             ) : !isLoggedIn && !welcomeDismissed ? (
               <DiscoverPreview
@@ -863,6 +1008,7 @@ const Home = () => {
             ) : null}
           </AnimatePresence>
         </div>
+
 
         <CreateJamModal
           open={createJamModalOpen}
@@ -882,6 +1028,20 @@ const Home = () => {
         <FindBandmateModal open={findBandmateModalOpen} onOpenChange={setFindBandmateModalOpen} />
       </div>
 
+      {/* Mobile-only filters bottom sheet — rendered outside z-20 UI layer so it
+          sits in the root stacking context and is above the bottom nav (z-50) */}
+      <MobileFiltersSheet
+        open={mobileFiltersOpen}
+        onClose={() => setMobileFiltersOpen(false)}
+        radius={radius}
+        onRadiusChange={setRadius}
+        onRadiusOpenChange={setRadiusOpen}
+        time={timeFilter}
+        onTimeChange={setTimeFilter}
+        moreFilters={moreFilters}
+        onMoreFiltersChange={setMoreFilters}
+      />
+
       {/* Map controls — desktop only, touch devices use pinch-to-zoom */}
       <div className="hidden md:block fixed top-[220px] left-8 z-10 pointer-events-auto">
         <MapFloatingControls
@@ -889,8 +1049,30 @@ const Home = () => {
           onReset={handleReset}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
+          radiusOpen={radiusOpen}
+          recentering={recentering}
         />
       </div>
+
+      {/* Mobile map controls — recenter only (pinch-to-zoom handles zoom natively) */}
+      {/* Hidden when Near You is expanded — the user is in browse mode, not map-navigation mode */}
+      {nearYouCollapsed && (
+        <button
+          onClick={handleRecenter}
+          aria-label="Recenter map"
+          className="md:hidden fixed left-4 z-30 w-11 h-11 flex items-center justify-center rounded-full bg-neutral-900/80 backdrop-blur-xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.5),0_0_10px_rgba(220,46,115,0.18)] active:scale-95 transition-all duration-150 bottom-[calc(60px+env(safe-area-inset-bottom)+80px)]"
+          style={{
+            color: recentering ? "#f07aaa" : "rgba(255,255,255,0.75)",
+            filter: recentering ? "drop-shadow(0 0 6px rgba(220,46,115,0.5))" : "none",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" fill="currentColor" strokeWidth="0" opacity="0.7" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        </button>
+      )}
 
       <EventDetailModal
         item={modalItem}
@@ -940,6 +1122,13 @@ const Home = () => {
         accentColor={rsvpShowModal.show?.accentColor}
         onSubmit={() => showService.rsvpShow(rsvpShowModal.show?.id, user?.id)}
         onSuccessNavigateToMyJams={() => navigate("/jams")}
+      />
+
+      {/* Mobile-only create FAB — desktop is untouched (+ dropdown in Near You panel) */}
+      <MobileCreateFAB
+        onCreateJam={requireAuth(() => setCreateJamModalOpen(true))}
+        onPromoteShow={requireAuth(() => setPromoteShowModalOpen(true))}
+        suppress={mobileFiltersOpen || isDiscoveryModalOpen}
       />
     </div>
   );

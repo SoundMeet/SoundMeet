@@ -150,7 +150,7 @@ function CardBody({ item, compact, accent, variant }) {
         }}
       >
         {coverUrl ? (
-          <img src={coverUrl} alt="" aria-hidden="true" className="w-full h-full object-cover" />
+          <img src={coverUrl} alt="" aria-hidden="true" className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <span
             style={{

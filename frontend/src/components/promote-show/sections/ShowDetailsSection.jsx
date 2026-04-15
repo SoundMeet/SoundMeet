@@ -77,7 +77,7 @@ const ShowDetailsSection = ({
     />
 
     {/* Ticket price + capacity */}
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <Field label="Ticket Price" hint="Leave blank or 0 for free">
         <div className="relative">
           <span

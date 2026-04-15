@@ -70,7 +70,7 @@ const MusicNoteIcon = () => (
 const Thumbnail = ({ src, alt }) => (
   <div className="w-[46px] h-[46px] rounded-xl overflow-hidden shrink-0 ring-1 ring-white/[0.08]">
     {src ? (
-      <img src={src} alt={alt} className="w-full h-full object-cover" />
+      <img src={src} alt={alt} className="w-full h-full object-cover" loading="lazy" />
     ) : (
       <div className="w-full h-full bg-gradient-to-br from-neutral-700/80 to-neutral-800 flex items-center justify-center">
         <MusicNoteIcon />

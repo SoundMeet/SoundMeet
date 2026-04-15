@@ -38,8 +38,8 @@ function PhotoCell({ photo, onRemove }) {
         type="button"
         onClick={onRemove}
         aria-label="Remove photo"
-        className="absolute top-2 right-2 w-[22px] h-[22px] flex items-center justify-center rounded-full
-                   opacity-0 group-hover:opacity-100 transition-all duration-150
+        className="absolute top-2 right-2 w-11 h-11 sm:w-[22px] sm:h-[22px] flex items-center justify-center rounded-full
+                   opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-150
                    hover:scale-110 active:scale-95"
         style={{ background: 'rgba(0,0,0,0.72)', color: '#fff', backdropFilter: 'blur(4px)' }}
       >
@@ -68,7 +68,7 @@ function PhotoGrid({ photos, onRemove }) {
     return (
       <div
         className="overflow-hidden rounded-2xl grid grid-cols-2"
-        style={{ height: 220, gap: 2, background: '#0d0d0d' }}
+        style={{ height: 'min(220px, 55vw)', gap: 2, background: '#0d0d0d' }}
       >
         {photos.map((p, i) => (
           <PhotoCell key={i} photo={p} onRemove={() => onRemove(i)} />
@@ -82,7 +82,7 @@ function PhotoGrid({ photos, onRemove }) {
     return (
       <div
         className="overflow-hidden rounded-2xl flex"
-        style={{ height: 250, gap: 2, background: '#0d0d0d' }}
+        style={{ height: 'min(250px, 60vw)', gap: 2, background: '#0d0d0d' }}
       >
         <div className="flex-[3] relative overflow-hidden">
           <PhotoCell photo={photos[0]} onRemove={() => onRemove(0)} />
@@ -281,7 +281,7 @@ export function PhotoComposerBody({ state, onChange }) {
           value={state.caption}
           onChange={(e) => onChange({ caption: e.target.value })}
           placeholder={hasPhotos ? 'Add a caption…' : 'Caption will appear here…'}
-          className="w-full bg-transparent text-[13px] leading-relaxed text-white outline-none
+          className="w-full bg-transparent text-base sm:text-[13px] leading-relaxed text-white outline-none
                      resize-none placeholder:text-white/[0.18]"
           style={{ caretColor: ACCENT }}
           maxLength={500}

@@ -689,7 +689,7 @@ const playSnippet = (snippet, index) => {
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] overflow-y-auto bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
+    <div className="h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)] overflow-y-auto bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
       <main className="mx-auto w-full max-w-[1400px] pb-8">
 
         {/* ─────────────────────────── BANNER ────────────────────────────────── */}
@@ -711,7 +711,7 @@ const playSnippet = (snippet, index) => {
           )}
           {isOwnProfile && (
             <div
-              className="absolute inset-0 z-20 flex items-end justify-center pb-4 opacity-0 group-hover/banner:opacity-100 transition-opacity duration-200 cursor-pointer"
+              className="absolute inset-0 z-20 flex items-end justify-center pb-4 opacity-30 md:opacity-0 group-hover/banner:opacity-100 transition-opacity duration-200 cursor-pointer"
               onClick={() => { setEditOpen(true); setActiveSection("Banner"); }}
               style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 65%)" }}
             >
@@ -750,7 +750,7 @@ const playSnippet = (snippet, index) => {
               {(() => {
                 const avatarSrc = profilePic || formatAvatarUrl(user?.pfp);
                 return avatarSrc ? (
-                  <img src={avatarSrc} alt={name || "avatar"} className="w-full h-full object-cover" />
+                  <img src={avatarSrc} alt={name || "avatar"} className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                   <span className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white select-none">
                     {(name || "?")[0].toUpperCase()}
@@ -758,7 +758,7 @@ const playSnippet = (snippet, index) => {
                 );
               })()}
               {isOwnProfile && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-40 md:opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <circle cx="12" cy="13" r="4" stroke="white" strokeWidth="2"/>
@@ -768,7 +768,7 @@ const playSnippet = (snippet, index) => {
             </motion.div>
 
             {/* CTAs — right side, aligned to avatar baseline */}
-            <div className="flex items-center gap-2 pb-1">
+            <div className="flex flex-wrap items-center gap-2 pb-1">
               {!isOwnProfile && !editOpen && (
                 <>
                   {isLoggedIn && viewedUser?.user_id && friendStatus === "friends" && (
@@ -791,7 +791,7 @@ const playSnippet = (snippet, index) => {
                     <button
                       onClick={handleAddFriend}
                       disabled={friendStatus === "pending"}
-                      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-semibold transition-all duration-200"
                       style={{
                         background: friendStatus === "pending" ? "rgba(255,255,255,0.10)" : "#DC2E73",
                         border: friendStatus === "pending" ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(220,46,115,0.6)",
@@ -824,7 +824,7 @@ const playSnippet = (snippet, index) => {
               className="flex-1 min-w-0"
             >
             <div className="flex items-baseline gap-2.5 flex-wrap">
-              <h1 className="text-4xl font-black tracking-tight text-white leading-none">{name || "—"}</h1>
+              <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-none">{name || "—"}</h1>
               {user?.username && (
                 <span className="text-sm text-white/30 font-medium">@{user.username}</span>
               )}
@@ -834,7 +834,7 @@ const playSnippet = (snippet, index) => {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0 opacity-40">
                   <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
                 </svg>
-                <span className="text-xs text-white/40">{location}</span>
+                <span className="text-xs text-white/40 truncate max-w-[200px] md:max-w-none">{location}</span>
               </div>
             )}
             {/* Primary instrument / genre / vibe identity chips */}
@@ -1331,7 +1331,7 @@ const playSnippet = (snippet, index) => {
                       )}
                     </div>
                     {aboutPhoto && (
-                      <div className="shrink-0 self-start">
+                      <div className="hidden md:block shrink-0 self-start">
                         <div className="w-[80px] h-[100px] rounded-xl overflow-hidden border-4 border-white/80 shadow-lg"
                           style={{ transform: "rotate(5deg)", backgroundImage: `url(${aboutPhoto})`, backgroundSize: "cover", backgroundPosition: "center" }} />
                       </div>
@@ -1488,7 +1488,7 @@ const playSnippet = (snippet, index) => {
                             >
                               {post.author.avatarUrl ? (
                                 <img src={post.author.avatarUrl} alt={post.author.displayName}
-                                  className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                  className="w-8 h-8 rounded-full object-cover shrink-0" loading="lazy" />
                               ) : (
                                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                                   style={{ background: "linear-gradient(135deg,rgba(220,46,115,0.35),rgba(251,64,64,0.2))", color: "#DC2E73" }}>
@@ -1513,7 +1513,7 @@ const playSnippet = (snippet, index) => {
                                           <EventInviteCard type={eventLink.type} id={eventLink.id} compact={false} />
                                         </div>
                                       ) : post.media?.images?.[0] && (
-                                        <img src={post.media.images[0]} alt="" className="mt-2 w-full max-h-32 object-cover rounded-lg" />
+                                        <img src={post.media.images[0]} alt="" className="mt-2 w-full max-h-32 object-cover rounded-lg" loading="lazy" />
                                       )}
                                     </>
                                   );
@@ -1567,7 +1567,7 @@ const playSnippet = (snippet, index) => {
             {/* Close button — sits above the card */}
             <button
               onClick={() => setSelectedPost(null)}
-              className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
+              className="absolute top-3 right-3 z-20 w-11 h-11 md:w-7 md:h-7 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
               style={{ color: "rgba(255,255,255,0.35)" }}
             >
               <svg width="10" height="10" viewBox="0 0 14 14" fill="none">
@@ -1662,7 +1662,7 @@ const playSnippet = (snippet, index) => {
                 <div className="w-6 h-6 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-4 flex flex-col gap-5">
+              <div className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4 md:px-6 flex flex-col gap-5">
                 {/* Genres */}
                 {allTags.filter(t => t.uid.startsWith("g_")).length > 0 && (
                   <div className="flex flex-col gap-2">
@@ -1762,7 +1762,7 @@ const playSnippet = (snippet, index) => {
               <h2 className="text-lg font-semibold">Edit Profile</h2>
               <button
                 onClick={() => { seedFormFromUser(user); setEditOpen(false); }}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
+                className="w-11 h-11 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/10"
                 style={{ color: "rgba(255,255,255,0.4)" }}
               >
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
@@ -1771,7 +1771,7 @@ const playSnippet = (snippet, index) => {
               </button>
             </div>
             {/* Section tabs */}
-            <div className="flex items-center gap-1.5 px-5 py-3 overflow-x-auto hide-scrollbar shrink-0"
+            <div className="flex items-center gap-1.5 px-3 py-2.5 md:px-5 md:py-3 overflow-x-auto hide-scrollbar shrink-0"
               style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
               {[
                 { key: "Name & Location", label: "Identity" },
@@ -1797,7 +1797,7 @@ const playSnippet = (snippet, index) => {
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-5">
+            <div className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4 md:px-6 md:py-5">
               {activeSection === "Name & Location" && (
                 <div className="flex flex-col gap-5">
                   {/* Display name */}
@@ -2135,7 +2135,7 @@ const playSnippet = (snippet, index) => {
                       {/* Auto button */}
                       <button
                         onClick={() => setGlobalText(null)}
-                        className="text-[10px] font-medium px-2.5 py-1 rounded-md transition-all duration-150"
+                        className="text-[10px] font-medium px-2.5 py-1 min-h-[44px] md:min-h-0 rounded-md transition-all duration-150"
                         style={{
                           background: globalTextOverride === null ? "rgba(255,255,255,0.15)" : "transparent",
                           color: globalTextOverride === null ? "#fff" : "#666",
@@ -2149,7 +2149,7 @@ const playSnippet = (snippet, index) => {
                       <button
                         onClick={() => setGlobalText(true)}
                         title="Dark text on all cards"
-                        className="w-8 h-8 rounded-lg transition-all duration-150 hover:scale-105 active:scale-[1.03]"
+                        className="w-11 h-11 md:w-8 md:h-8 rounded-lg transition-all duration-150 hover:scale-105 active:scale-[1.03]"
                         style={{
                           background: "#111",
                           outline: globalTextOverride === true ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
@@ -2160,7 +2160,7 @@ const playSnippet = (snippet, index) => {
                       <button
                         onClick={() => setGlobalText(false)}
                         title="Light text on all cards"
-                        className="w-8 h-8 rounded-lg transition-all duration-150 hover:scale-105 active:scale-[1.03]"
+                        className="w-11 h-11 md:w-8 md:h-8 rounded-lg transition-all duration-150 hover:scale-105 active:scale-[1.03]"
                         style={{
                           background: "#e5e5e5",
                           outline: globalTextOverride === false ? "2px solid #DC2E73" : "1px solid rgba(255,255,255,0.15)",

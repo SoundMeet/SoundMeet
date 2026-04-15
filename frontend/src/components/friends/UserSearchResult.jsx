@@ -51,6 +51,7 @@ function Avatar({ src, name, size = 36 }) {
     <img src={src} alt={name} width={size} height={size}
       className="rounded-full object-cover flex-shrink-0"
       style={{ width: size, height: size, background: '#1c1c1e' }}
+      loading="lazy"
       onError={() => setBroken(true)}
     />
   )
@@ -133,7 +134,7 @@ function ActionBtn({ label, accent = false, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="text-[11px] font-medium px-2.5 py-1 rounded-md transition-opacity hover:opacity-80"
+      className="text-[11px] font-medium px-3 py-2 sm:px-2.5 sm:py-1 rounded-md transition-opacity hover:opacity-80"
       style={accent
         ? { background: 'rgba(220,46,115,0.15)', color: 'rgba(220,46,115,0.9)' }
         : { background: 'rgba(255,255,255,0.07)', color: 'rgba(229,226,225,0.55)' }
@@ -161,8 +162,8 @@ export function UserSearchResult({ user, activeQuery }) {
 
   return (
     <div
-      className="flex items-center gap-3 transition-colors duration-100"
-      style={{ padding: '9px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+      className="flex items-center gap-3 transition-colors duration-100 active:bg-white/[0.06] py-3 sm:py-[9px] px-4"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
@@ -200,8 +201,8 @@ export function UserSearchResult({ user, activeQuery }) {
         {relationshipStatus === 'friends' && (
           <button
             onClick={() => navigate('/chat', { state: { openDmWith: { id, profileId, username, displayName, avatarUrl } } })}
-            className="flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
-            style={{ width: 28, height: 28, color: 'rgba(229,226,225,0.38)', background: 'rgba(255,255,255,0.05)' }}
+            className="flex items-center justify-center rounded-md transition-colors hover:bg-white/10 w-9 h-9 sm:w-7 sm:h-7"
+            style={{ color: 'rgba(229,226,225,0.38)', background: 'rgba(255,255,255,0.05)' }}
             aria-label="Message"
           >
             <MessageIcon />

@@ -48,7 +48,7 @@ function JamRow({ jam, onSelect, index }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
       whileTap={{ scale: 0.985 }}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150"
+      className="w-full flex items-center gap-3 px-3 py-3 sm:py-2.5 rounded-xl text-left transition-colors duration-150"
       style={{
         background: 'rgba(255,255,255,0.03)',
         border:     '1px solid rgba(255,255,255,0.06)',
@@ -222,7 +222,7 @@ export function JamInviteComposerBody({ state, onChange }) {
         value={state.message}
         onChange={(e) => onChange({ message: e.target.value })}
         placeholder="Write a message to go with the invite… (optional)"
-        className="w-full bg-transparent text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
+        className="w-full bg-transparent text-base sm:text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
         style={{ caretColor: ACCENT }}
         maxLength={300}
       />

@@ -1,7 +1,7 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const RADIUS_OPTIONS = [5, 10, 25, 50];
-export const DEFAULT_RADIUS = 10;
+export const RADIUS_OPTIONS = [5, 10, 15, 25, 50];
+export const DEFAULT_RADIUS = 25;
 
 export const TIME_OPTIONS = ["Live Now", "Today", "Tonight", "This Week", "Any Time"];
 export const DEFAULT_TIME = "Any Time";

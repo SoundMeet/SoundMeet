@@ -120,7 +120,7 @@ function UserHeader({ user }) {
         style={{ background: '#2A2A2A' }}
       >
         {user?.pfp ? (
-          <img src={formatAvatarUrl(user.pfp)} alt={displayName} className="w-full h-full object-cover" />
+          <img src={formatAvatarUrl(user.pfp)} alt={displayName} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <span
             className="text-xs font-semibold select-none"

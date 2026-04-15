@@ -10,9 +10,14 @@ const SearchIcon = () => (
   </svg>
 )
 
+function sumUnread(threads) {
+  return threads.reduce((acc, t) => acc + (t.unread ?? 0), 0)
+}
+
 const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, onDMHide, users, currentUserId, onClose }) => {
   const [query, setQuery] = useState('')
   const [newChatOpen, setNewChatOpen] = useState(false)
+  const [mobileTab, setMobileTab] = useState('dm')
 
   const q = query.trim().toLowerCase()
 
@@ -26,6 +31,9 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, onDMHide, user
   const filteredJams = q
     ? jamThreads.filter((t) => t.name?.toLowerCase().includes(q))
     : jamThreads
+
+  const dmUnread  = sumUnread(dmThreads)
+  const jamUnread = sumUnread(jamThreads)
 
   const handleSelect = (id) => {
     onSelect(id)
@@ -53,8 +61,8 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, onDMHide, user
             </span>
             <button
               onClick={() => setNewChatOpen(true)}
-              className="flex items-center justify-center rounded-xl cursor-pointer transition-colors hover:bg-white/10"
-              style={{ width: 30, height: 30, background: 'rgba(255,255,255,0.06)' }}
+              className="flex items-center justify-center rounded-xl cursor-pointer transition-colors hover:bg-white/10 w-11 h-11 md:w-[30px] md:h-[30px]"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
               aria-label="New chat"
             >
               <Plus size={14} color="rgba(229,226,225,0.7)" />
@@ -93,6 +101,49 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, onDMHide, user
               }}
             />
           </div>
+
+          {/* Mobile-only tab toggle */}
+          <div className="flex mt-3 gap-1.5 lg:hidden">
+            {[
+              { key: 'dm',  label: 'DMs',        unread: dmUnread  },
+              { key: 'jam', label: 'Jam Groups',  unread: jamUnread },
+            ].map(({ key, label, unread }) => {
+              const active = mobileTab === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setMobileTab(key)}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 lg:py-1.5 transition-all duration-150 cursor-pointer"
+                  style={{
+                    background: active ? 'rgba(220,46,115,0.18)' : 'rgba(255,255,255,0.04)',
+                    border: active ? '1px solid rgba(220,46,115,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                    fontFamily: 'Sora, sans-serif',
+                    fontSize: '0.72rem',
+                    fontWeight: active ? 700 : 500,
+                    color: active ? '#DC2E73' : 'rgba(229,226,225,0.45)',
+                  }}
+                >
+                  <span>{label}</span>
+                  {unread > 0 && (
+                    <span
+                      className="rounded-full flex items-center justify-center"
+                      style={{
+                        background: active ? '#DC2E73' : 'rgba(229,226,225,0.15)',
+                        color: active ? '#fff' : 'rgba(229,226,225,0.6)',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        minWidth: '1rem',
+                        height: '1rem',
+                        padding: '0 4px',
+                      }}
+                    >
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Subtle divider */}
@@ -100,27 +151,56 @@ const ChatSidebar = ({ dmThreads, jamThreads, activeId, onSelect, onDMHide, user
 
         {/* Scrollable list */}
         <div className="flex-1 overflow-y-auto py-2 px-1">
-          <ChatSectionList
-            title="Direct Messages"
-            items={filteredDms}
-            activeId={activeId}
-            onSelect={handleSelect}
-            onHide={onDMHide}
-            users={users}
-            currentUserId={currentUserId}
-          />
+          {/* Desktop: both sections stacked (unchanged) */}
+          <div className="hidden lg:block">
+            <ChatSectionList
+              title="Direct Messages"
+              items={filteredDms}
+              activeId={activeId}
+              onSelect={handleSelect}
+              onHide={onDMHide}
+              users={users}
+              currentUserId={currentUserId}
+            />
 
-          <div className="mx-3 my-2 h-px bg-white/[0.06]" />
+            <div className="mx-3 my-2 h-px bg-white/[0.06]" />
 
-          <ChatSectionList
-            title="Jam Groups"
-            items={filteredJams}
-            activeId={activeId}
-            onSelect={handleSelect}
-            users={users}
-            currentUserId={currentUserId}
-            showEmptyState
-          />
+            <ChatSectionList
+              title="Jam Groups"
+              items={filteredJams}
+              activeId={activeId}
+              onSelect={handleSelect}
+              users={users}
+              currentUserId={currentUserId}
+              showEmptyState
+            />
+          </div>
+
+          {/* Mobile: single active tab */}
+          <div className="lg:hidden">
+            {mobileTab === 'dm' && (
+              <ChatSectionList
+                title="Direct Messages"
+                items={filteredDms}
+                activeId={activeId}
+                onSelect={handleSelect}
+                onHide={onDMHide}
+                users={users}
+                currentUserId={currentUserId}
+              />
+            )}
+            {mobileTab === 'jam' && (
+              <ChatSectionList
+                title="Jam Groups"
+                items={filteredJams}
+                activeId={activeId}
+                onSelect={handleSelect}
+                users={users}
+                currentUserId={currentUserId}
+                showEmptyState
+              />
+            )}
+          </div>
         </div>
 
       </div>

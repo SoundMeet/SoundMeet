@@ -384,7 +384,7 @@ const AttendeeRow = ({
               <button
                 onClick={onCancelRequest}
                 aria-label="Cancel friend request"
-                className="h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
+                className="h-11 w-11 md:h-7 md:w-7 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
                 style={{
                   background: hoveringRequest ? 'rgba(251,64,64,0.12)' : 'rgba(255,255,255,0.05)',
                   color:      hoveringRequest ? 'rgba(251,64,64,0.7)' : 'rgba(229,226,225,0.22)',
@@ -399,7 +399,7 @@ const AttendeeRow = ({
               <button
                 onClick={onAddFriend}
                 aria-label={`Add ${attendee.displayName} as friend`}
-                className="h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
+                className="h-11 w-11 md:h-7 md:w-7 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
                 style={{
                   background: hexToRgba(accent, 0.1),
                   color:      accent,
@@ -419,7 +419,7 @@ const AttendeeRow = ({
               onClick={onRemove}
               disabled={isRemoving}
               aria-label={`Remove ${attendee.displayName}`}
-              className="h-7 w-7 flex items-center justify-center rounded-full transition-all duration-150 disabled:opacity-40"
+              className="h-11 w-11 md:h-7 md:w-7 flex items-center justify-center rounded-full transition-all duration-150 disabled:opacity-40"
               style={{ background: 'rgba(251,64,64,0.08)', color: 'rgba(251,64,64,0.45)', border: '1px solid rgba(251,64,64,0.1)' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(251,64,64,0.16)'; e.currentTarget.style.color = '#fb4040'; e.currentTarget.style.border = '1px solid rgba(251,64,64,0.25)' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(251,64,64,0.08)'; e.currentTarget.style.color = 'rgba(251,64,64,0.45)'; e.currentTarget.style.border = '1px solid rgba(251,64,64,0.1)' }}
@@ -746,7 +746,7 @@ export function JamChatMembersModal({
                   </div>
                   <button
                     onClick={onClose}
-                    className="h-7 w-7 rounded-full flex items-center justify-center transition-colors duration-150"
+                    className="h-11 w-11 md:h-7 md:w-7 rounded-full flex items-center justify-center transition-colors duration-150"
                     style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(229,226,225,0.5)' }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = '#fff' }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(229,226,225,0.5)' }}

@@ -87,7 +87,7 @@ const Stepper = ({ value, onChange }) => {
       <button
         type="button"
         onClick={() => onChange(String(Math.max(0, num - 1)))}
-        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
+        className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
         style={{
           background: "#2A2A2A",
           color: num > 0 ? "rgba(229,226,225,0.7)" : "rgba(229,226,225,0.2)",
@@ -107,7 +107,7 @@ const Stepper = ({ value, onChange }) => {
       <button
         type="button"
         onClick={() => onChange(String(num + 1))}
-        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
+        className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
         style={{ background: "#2A2A2A", color: "rgba(229,226,225,0.7)" }}
       >
         +
@@ -312,7 +312,7 @@ const CreateJamForm = ({
           <Dialog.Close asChild>
             <button
               aria-label="Close"
-              className="w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10"
+              className="w-11 h-11 md:w-8 md:h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10 flex-shrink-0"
               style={{
                 background: "rgba(255,255,255,0.06)",
                 color: "rgba(229,226,225,0.45)",
@@ -327,7 +327,7 @@ const CreateJamForm = ({
 
       {/* ── Scrollable body ─────────────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto px-6 pb-5"
+        className="flex-1 overflow-y-auto overscroll-contain px-6 pb-5"
         style={{ scrollbarWidth: "none" }}
       >
         <AnimatePresence mode="wait" custom={direction}>

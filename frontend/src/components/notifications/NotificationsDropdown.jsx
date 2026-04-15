@@ -76,7 +76,7 @@ function SettingsPanel({ onBack, mutedTypes, soundEnabled, toggleMuteType, toggl
   const pushActive      = pushEnabled && pushPermission === 'granted'
 
   return (
-    <div className="flex flex-col flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+    <div className="flex flex-col flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarWidth: 'none' }}>
       {/* Header */}
       <div
         className="flex items-center gap-2.5 px-5 py-4 flex-shrink-0"
@@ -85,7 +85,7 @@ function SettingsPanel({ onBack, mutedTypes, soundEnabled, toggleMuteType, toggl
         <button
           type="button"
           onClick={onBack}
-          className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06] focus:outline-none"
+          className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06] focus:outline-none"
           aria-label="Back to notifications"
         >
           <ChevronLeft size={15} style={{ color: 'rgba(229,226,225,0.45)' }} />
@@ -319,14 +319,14 @@ export function NotificationsDropdown() {
             animate={{ opacity: 1, scale: 1,    y:  0 }}
             exit={{ opacity: 0, scale: 0.97, y: -6 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
-            className="fixed md:absolute right-2 md:right-0 top-[60px] md:top-full md:mt-3 z-[200] w-[380px] max-w-[calc(100vw-16px)] md:max-w-[380px] flex flex-col rounded-2xl overflow-hidden" style={{
+            className="fixed md:absolute right-2 md:right-0 top-16 md:top-full md:mt-3 z-[200] w-[380px] max-w-[calc(100vw-16px)] md:max-w-[380px] flex flex-col rounded-2xl overflow-hidden" style={{
               background:           'rgba(13,13,13,0.98)',
               backdropFilter:       'blur(28px)',
               WebkitBackdropFilter: 'blur(28px)',
               border:               '1px solid rgba(255,255,255,0.07)',
               boxShadow:
                 '0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(220,46,115,0.05), inset 0 1px 0 rgba(255,255,255,0.04)',
-              maxHeight:       '560px',
+              maxHeight:       'min(560px, calc(100dvh - 80px))',
               transformOrigin: 'top right',
             }}
           >
@@ -362,7 +362,7 @@ export function NotificationsDropdown() {
                       <button
                         type="button"
                         onClick={markAllRead}
-                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors hover:bg-white/[0.05] focus:outline-none"
+                        className="px-2.5 py-2.5 md:py-1.5 rounded-lg text-[11px] font-medium transition-colors hover:bg-white/[0.05] focus:outline-none"
                         style={{ color: 'rgba(220,46,115,0.8)' }}
                       >
                         Mark all read
@@ -371,7 +371,7 @@ export function NotificationsDropdown() {
                     <button
                       type="button"
                       onClick={() => setShowSettings(true)}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06] focus:outline-none"
+                      className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06] focus:outline-none"
                       aria-label="Notification settings"
                     >
                       <Settings size={14} style={{ color: 'rgba(229,226,225,0.3)' }} />

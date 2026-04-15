@@ -42,7 +42,7 @@ function formatAvatarUrl(path) {
 const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection }) => {
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-200, 200], [-10, 10]);
-  const peekOffset = index % 2 === 0 ? -80 : 80;
+  const peekOffset = index % 2 === 0 ? -40 : 40;
   const displayX = isTop ? dragX : peekOffset;
 
   const likeOpacity = useTransform(dragX, [50, 150], [0, 1]);
@@ -91,7 +91,7 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
       onTap={() => isTop && onClick(profile)}
-      className="absolute w-[85vw] max-w-[380px] h-[60vh] max-h-[500px] bg-[#2A2A2A] rounded-[2rem] overflow-hidden cursor-grab active:cursor-grabbing select-none border border-white/5"
+      className="absolute w-[85vw] max-w-[calc(100vw-32px)] md:max-w-[380px] h-[55dvh] max-h-[620px] md:h-[65vh] bg-[#2A2A2A] rounded-[2rem] overflow-hidden cursor-grab active:cursor-grabbing select-none border border-white/5"
     >
       <div className="relative h-full w-full">
         <img
@@ -100,6 +100,7 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
             "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&w=150&h=150&q=80"
           }
           alt={profile.display_name}
+          loading="lazy"
           className="h-full w-full object-cover pointer-events-none"
         />
 
@@ -123,12 +124,12 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
         )}
 
         <div
-          className={`absolute bottom-0 p-8 w-full font-sora transition-opacity duration-300 ${
+          className={`absolute bottom-0 p-4 md:p-8 w-full font-sora transition-opacity duration-300 ${
             isTop ? "opacity-100" : "opacity-0"
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-[24px] font-bold text-white tracking-tight">
+            <h2 className="text-[20px] md:text-[24px] font-bold text-white tracking-tight">
               {profile.display_name}
             </h2>
             <span className="flex items-center gap-1 text-[10px] font-black uppercase text-white/30 bg-white/5 px-2 py-1 rounded">
@@ -328,8 +329,10 @@ export default function SoundMeetDiscovery() {
   }
 
   return (
-    <div className="flex flex-col bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden h-[calc(100dvh-4rem-60px)] md:h-[calc(100dvh-4rem)]">
-      <header className="h-20 flex items-center justify-center px-8 shrink-0 z-10">
+    <div
+      className="flex flex-col bg-[#0F0F0F] text-[#E5E2E1] font-sora overflow-hidden overscroll-none h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)]"
+    >
+      <header className="h-14 md:h-20 flex items-center justify-center px-4 md:px-8 shrink-0 z-10 overflow-visible">
         <div className="flex items-center gap-4 w-full max-w-[450px]" ref={searchContainerRef}>
           <div className="relative flex-1 group">
             <Search
@@ -414,7 +417,10 @@ export default function SoundMeetDiscovery() {
             </Dialog.Trigger>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100]" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[480px] bg-[#141414]/95 backdrop-blur-[32px] rounded-[1.5rem] p-8 z-[101] flex flex-col focus:outline-none shadow-[0_0_60px_rgba(220,46,115,0.1)]">
+              <Dialog.Content className="fixed bottom-0 left-0 right-0 w-full max-h-[90dvh] landscape:max-h-[80dvh] overflow-y-auto rounded-t-[1.5rem] md:bottom-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[90vw] md:max-w-[480px] md:rounded-[1.5rem] bg-[#141414]/95 backdrop-blur-[32px] p-6 md:p-8 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pb-8 z-[101] flex flex-col focus:outline-none shadow-[0_0_60px_rgba(220,46,115,0.1)]">
+                {/* drag handle — mobile only */}
+                <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4 md:hidden" />
+
                 <div className="flex justify-between items-center mb-6">
                   <Dialog.Title className="text-[20px] font-bold text-white tracking-tight">
                     Discovery Filters
@@ -426,7 +432,7 @@ export default function SoundMeetDiscovery() {
                   </Dialog.Close>
                 </div>
 
-                <div className="flex gap-2 mb-8 bg-[#1C1B1B] p-1 rounded-full border border-white/5">
+                <div className="flex gap-2 mb-6 md:mb-8 bg-[#1C1B1B] p-1 rounded-full border border-white/5">
                   {['instruments', 'roles', 'genres'].map((tab) => (
                     <button
                       key={tab}
@@ -442,7 +448,7 @@ export default function SoundMeetDiscovery() {
                   ))}
                 </div>
 
-                <div className="min-h-[220px]">
+                <div className="min-h-[200px] md:min-h-[220px]">
                   {activeFilterTab === "instruments" && (
                     <FilterSection
                       title="Select Instruments"
@@ -466,7 +472,7 @@ export default function SoundMeetDiscovery() {
                   )}
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6 md:mt-8">
                   <Dialog.Close asChild>
                     <button className="w-full py-4 rounded-full bg-gradient-to-r from-[#DC2E73] to-[#FB4040] text-white font-black text-[11px] uppercase tracking-widest shadow-[0_0_20px_rgba(220,46,115,0.3)] active:scale-[0.98] transition-transform">
                       Apply Filters
@@ -482,14 +488,16 @@ export default function SoundMeetDiscovery() {
       <Dialog.Root open={!!selectedProfile} onOpenChange={(open) => !open && setSelectedProfile(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-[400px] max-h-[90vh] bg-[#141414]/95 backdrop-blur-[32px] rounded-[1.5rem] overflow-y-auto scrollbar-hide z-[101] focus:outline-none shadow-[0_0_60px_rgba(220,46,115,0.1)]">
+          <Dialog.Content className="fixed bottom-0 left-0 right-0 w-full max-h-[90dvh] landscape:max-h-[80dvh] rounded-t-[1.5rem] md:bottom-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[85vw] md:max-w-[400px] md:rounded-[1.5rem] bg-[#141414]/95 backdrop-blur-[32px] overflow-y-auto scrollbar-hide z-[101] focus:outline-none shadow-[0_0_60px_rgba(220,46,115,0.1)]">
             {selectedProfile && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 48 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                 className="relative flex flex-col h-full"
               >
+                {/* drag handle — mobile only */}
+                <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-1 md:hidden" />
                 <Dialog.Title className="sr-only">
                   {selectedProfile.display_name} Details
                 </Dialog.Title>
@@ -497,14 +505,15 @@ export default function SoundMeetDiscovery() {
                   Detailed view of artist profile including instruments, genres, and vibes.
                 </Dialog.Description>
                 <div className="relative h-32 shrink-0 w-full">
-                  <img 
-                    src={formatAvatarUrl(selectedProfile.pfp) || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800"} 
+                  <img
+                    src={formatAvatarUrl(selectedProfile.pfp) || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=800"}
                     className="w-full h-full object-cover"
                     alt=""
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#141414] to-transparent" />
                   <Dialog.Close asChild>
-                    <button className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-black/40 backdrop-blur-md rounded-full text-white/70 hover:text-white transition-all shadow-[0_0_0_1px_rgba(220,46,115,0.15)]">
+                    <button className="absolute top-3 right-3 w-11 h-11 md:w-8 md:h-8 flex items-center justify-center bg-black/40 backdrop-blur-md rounded-full text-white/70 hover:text-white transition-all shadow-[0_0_0_1px_rgba(220,46,115,0.15)]">
                       <X size={16} />
                     </button>
                   </Dialog.Close>
@@ -553,7 +562,7 @@ export default function SoundMeetDiscovery() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2 mt-auto">
+                  <div className="flex flex-col gap-2 mt-auto pb-[env(safe-area-inset-bottom)] md:pb-0">
                     {friends.some(f => f.id === selectedProfile.user_id) ? (
                       <button 
                         disabled
@@ -596,7 +605,7 @@ export default function SoundMeetDiscovery() {
       <main className="flex-1 relative flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[#DC2E73]/5 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="relative w-full max-w-[400px] h-[60vh] flex items-center justify-center">
+        <div className="relative w-full max-w-[400px] h-[55dvh] md:h-[65vh] flex items-center justify-center">
           {loading ? (
             <Loader2 className="w-8 h-8 text-[#DC2E73] animate-spin opacity-50" />
           ) : (
@@ -628,7 +637,10 @@ export default function SoundMeetDiscovery() {
         </div>
       </main>
 
-      <footer className="h-28 flex items-center justify-center gap-10 shrink-0 mb-4">
+      <footer
+        className="flex items-center justify-center gap-10 shrink-0 pt-3 md:py-6"
+        style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+      >
         <button
           className="w-16 h-16 rounded-full bg-[#1C1B1B] flex items-center justify-center text-[#FB4040] border border-white/5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] active:scale-90 transition-all"
           onClick={() =>

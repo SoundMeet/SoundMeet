@@ -56,7 +56,7 @@ const SelectedChip = ({ label, custom, onRemove, accent = "#DC2E73" }) => (
     onClick={onRemove}
     whileTap={{ scale: 0.93 }}
     transition={{ duration: 0.1 }}
-    className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 select-none"
+    className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 min-h-[44px] sm:min-h-0 select-none"
     style={{
       borderRadius: "9999px",
       background: custom ? "rgba(251,64,64,0.1)" : hexToRgba(accent, 0.18),
@@ -78,7 +78,7 @@ const PresetChip = ({ label, onClick }) => (
     whileHover={{ scale: 1.04 }}
     whileTap={{ scale: 0.94 }}
     transition={{ duration: 0.1 }}
-    className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 transition-colors duration-150 select-none"
+    className="inline-flex items-center text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 min-h-[44px] sm:min-h-0 transition-colors duration-150 select-none"
     style={{
       borderRadius: "9999px",
       background: "#2A2A2A",
@@ -311,7 +311,7 @@ const SearchableTagSection = ({
           <button
             type="button"
             onClick={() => setShowAll(true)}
-            className="text-[11px] font-medium tracking-wide transition-colors duration-150 hover:opacity-80"
+            className="inline-flex items-center min-h-[44px] sm:min-h-0 text-[11px] font-medium tracking-wide transition-colors duration-150 hover:opacity-80"
             style={{ color: "rgba(229,226,225,0.3)" }}
           >
             + {hiddenCount} more
@@ -321,7 +321,7 @@ const SearchableTagSection = ({
           <button
             type="button"
             onClick={() => setShowAll(false)}
-            className="text-[11px] font-medium tracking-wide transition-colors duration-150 hover:opacity-80"
+            className="inline-flex items-center min-h-[44px] sm:min-h-0 text-[11px] font-medium tracking-wide transition-colors duration-150 hover:opacity-80"
             style={{ color: "rgba(229,226,225,0.25)" }}
           >
             Show less
@@ -338,7 +338,7 @@ const SearchableTagSection = ({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -6 }}
               transition={{ duration: 0.12 }}
-              className="inline-flex items-center gap-1 text-[11px] font-medium tracking-wide transition-colors duration-150 hover:opacity-90"
+              className="inline-flex items-center gap-1 min-h-[44px] sm:min-h-0 text-[11px] font-medium tracking-wide transition-colors duration-150 hover:opacity-90"
               style={{ color: "rgba(251,112,112,0.7)" }}
             >
               <PlusIcon />

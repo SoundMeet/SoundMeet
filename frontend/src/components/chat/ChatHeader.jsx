@@ -1,4 +1,4 @@
-import { Music2 } from 'lucide-react'
+import { Music2, ChevronLeft } from 'lucide-react'
 
 const AVATAR_PALETTE = ['#C2185B', '#7B1FA2', '#1565C0', '#00695C', '#E65100', '#4527A0']
 
@@ -97,7 +97,7 @@ function ParticipantChips({ participants }) {
 
 // ─── ChatHeader ───────────────────────────────────────────────────────────────
 // participants: derived from jam attendee data; empty array = still loading or DM
-const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick, onMembersClick, onHideDM, onDmHeaderClick }) => {
+const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeaderClick, onMembersClick, onHideDM, onDmHeaderClick, onBackClick }) => {
   const isJam = thread?.type === 'jam'
 
   let threadName  = ''
@@ -116,7 +116,7 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
 
   return (
     <div
-      className="sticky top-0 z-10 flex items-center justify-between px-5 flex-shrink-0"
+      className="sticky top-0 z-10 flex items-center justify-between px-3 lg:px-5 flex-shrink-0"
       style={{
         paddingTop:           isJam && participants.length > 0 ? 10 : 12,
         paddingBottom:        isJam && participants.length > 0 ? 10 : 12,
@@ -126,6 +126,18 @@ const ChatHeader = ({ thread, users, participants = [], onJamLinkClick, onHeader
         boxShadow:            '0 1px 0 rgba(0,0,0,0.2)',
       }}
     >
+      {/* ── Mobile back button ──────────────────────────────────────────────── */}
+      {onBackClick && (
+        <button
+          onClick={onBackClick}
+          className="lg:hidden flex items-center justify-center flex-shrink-0 mr-1 rounded-lg transition-colors hover:bg-white/[0.07]"
+          style={{ width: 32, height: 32, color: 'rgba(229,226,225,0.6)' }}
+          aria-label="Back to chats"
+        >
+          <ChevronLeft size={20} />
+        </button>
+      )}
+
       {/* ── Left: identity block ────────────────────────────────────────────── */}
       <div
         className={[

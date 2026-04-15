@@ -107,12 +107,11 @@ export function FeedPost({ post }) {
 
   return (
     <div
-      className="rounded-2xl transition-all duration-200"
+      className="rounded-2xl transition-all duration-200 px-3 pt-3 pb-2.5 sm:px-[18px] sm:pt-[18px] sm:pb-[14px]"
       style={{
         background: '#1a1a1a',
         border: '1px solid rgba(255,255,255,0.06)',
         borderTopColor: topBorderColor,
-        padding: '18px 18px 14px',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = `rgba(255,255,255,0.11)`
@@ -146,7 +145,7 @@ export function FeedPost({ post }) {
             onChange={(e) => setEditText(e.target.value)}
             onKeyDown={handleEditKeyDown}
             rows={3}
-            className="w-full bg-transparent text-sm leading-relaxed text-white outline-none resize-none"
+            className="w-full bg-transparent text-base sm:text-sm leading-relaxed text-white outline-none resize-none"
             style={{
               caretColor: '#DC2E73',
               border: '1px solid rgba(220,46,115,0.3)',
@@ -158,14 +157,14 @@ export function FeedPost({ post }) {
           <div className="flex gap-2 mt-2">
             <button
               onClick={handleEditSave}
-              className="px-3 py-1 rounded-full text-xs font-semibold text-white transition-all duration-150 hover:brightness-110 active:scale-95"
+              className="px-3 py-3 sm:py-1 rounded-full text-xs font-semibold text-white transition-all duration-150 hover:brightness-110 active:scale-95"
               style={{ background: 'linear-gradient(135deg, #DC2E73, #FB4040)' }}
             >
               Save
             </button>
             <button
               onClick={() => { setIsEditing(false); setEditText(content) }}
-              className="px-3 py-1 rounded-full text-xs font-semibold transition-all duration-150 hover:bg-white/10"
+              className="px-3 py-3 sm:py-1 rounded-full text-xs font-semibold transition-all duration-150 hover:bg-white/10"
               style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(229,226,225,0.5)' }}
             >
               Cancel

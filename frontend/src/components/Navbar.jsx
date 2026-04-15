@@ -3,6 +3,7 @@ import LogowText from "../assets/LogowText.svg";
 import { navItems } from "../constants";
 import { Link, useLocation } from "react-router-dom";
 import ProfileDropdown from "./ProfileDropdown";
+import MobileAccountSheet from "./MobileAccountSheet";
 import { NotificationsDropdown } from "./notifications/NotificationsDropdown";
 
 const Navbar = () => {
@@ -40,10 +41,17 @@ const Navbar = () => {
         ))}
       </div>
 
-      {/* RIGHT: ICONS (BOTH MOBILE AND DESKTOP) */}
+      {/* RIGHT: ICONS */}
       <div className="flex items-center gap-4">
         <NotificationsDropdown />
-        <ProfileDropdown />
+        {/* Desktop: compact dropdown */}
+        <div className="hidden md:block">
+          <ProfileDropdown />
+        </div>
+        {/* Mobile: full account + social side sheet */}
+        <div className="md:hidden">
+          <MobileAccountSheet />
+        </div>
       </div>
 
     </div>

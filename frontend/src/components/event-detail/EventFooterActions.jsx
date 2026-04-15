@@ -121,7 +121,7 @@ const EventFooterActions = ({
           <button
             key={action.actionKey}
             onClick={() => dispatchAction(action.actionKey)}
-            className="shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold transition-all duration-200"
+            className="shrink-0 h-11 md:h-9 px-4 rounded-full text-[13px] font-semibold transition-all duration-200"
             style={{
               background:
                 action.variant === "danger"

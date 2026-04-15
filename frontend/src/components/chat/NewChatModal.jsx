@@ -77,6 +77,7 @@ function Avatar({ src, name, size = 36 }) {
     <img src={src} alt={name} width={size} height={size}
       className="rounded-full object-cover flex-shrink-0"
       style={{ width: size, height: size, background: '#1c1c1e' }}
+      loading="lazy"
       onError={() => setBroken(true)}
     />
   )
@@ -267,7 +268,7 @@ export function NewChatModal({ open, onOpenChange }) {
         />
         <Dialog.Content
           className="fixed inset-0 z-50 flex items-start justify-center outline-none"
-          style={{ paddingTop: '12vh', pointerEvents: 'none' }}
+          style={{ paddingTop: '68px', pointerEvents: 'none' }}
           onEscapeKeyDown={() => onOpenChange(false)}
         >
           <motion.div
@@ -285,7 +286,7 @@ export function NewChatModal({ open, onOpenChange }) {
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16,
               boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 24px 64px rgba(0,0,0,0.7)',
-              maxHeight: '60vh',
+              maxHeight: 'calc(100dvh - 80px)',
               overflow: 'hidden',
             }}
           >
@@ -323,8 +324,8 @@ export function NewChatModal({ open, onOpenChange }) {
                 <button
                   onClick={clearSearch}
                   aria-label="Clear"
-                  className="flex items-center justify-center flex-shrink-0 rounded-md transition-colors hover:bg-white/10"
-                  style={{ width: 22, height: 22, color: 'rgba(255,255,255,0.3)' }}
+                  className="flex items-center justify-center flex-shrink-0 rounded-md transition-colors hover:bg-white/10 w-11 h-11 md:w-[22px] md:h-[22px]"
+                  style={{ color: 'rgba(255,255,255,0.3)' }}
                 >
                   <CloseIcon size={11} />
                 </button>
@@ -347,8 +348,8 @@ export function NewChatModal({ open, onOpenChange }) {
               <Dialog.Close asChild>
                 <button
                   aria-label="Close"
-                  className="flex items-center justify-center flex-shrink-0 rounded-md transition-colors hover:bg-white/10"
-                  style={{ width: 26, height: 26, color: 'rgba(255,255,255,0.28)' }}
+                  className="flex items-center justify-center flex-shrink-0 rounded-md transition-colors hover:bg-white/10 w-11 h-11 md:w-[26px] md:h-[26px]"
+                  style={{ color: 'rgba(255,255,255,0.28)' }}
                 >
                   <CloseIcon size={13} />
                 </button>
@@ -356,7 +357,7 @@ export function NewChatModal({ open, onOpenChange }) {
             </div>
 
             {/* Results */}
-            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+            <div className="flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarWidth: 'none' }}>
               {body}
             </div>
           </motion.div>

@@ -35,7 +35,7 @@ const LineupPill = ({ act, accent, onRemove }) => (
       type="button"
       onClick={() => onRemove(act.id)}
       aria-label={`Remove ${act.name}`}
-      className="flex items-center justify-center w-4 h-4 rounded-full transition-colors duration-150"
+      className="flex items-center justify-center rounded-full transition-colors duration-150 p-[14px] -m-[14px] sm:p-0 sm:m-0 sm:w-4 sm:h-4"
       style={{ color: "rgba(229,226,225,0.35)" }}
     >
       <svg width="8" height="8" viewBox="0 0 14 14" fill="none">
@@ -146,7 +146,7 @@ const AddActForm = ({ accent, gradientFrom, gradientTo, onAdd, onCancel }) => {
           type="button"
           onClick={handleAdd}
           disabled={!name.trim()}
-          className="flex-1 py-2 rounded-lg text-[12px] font-semibold text-white transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed"
+          className="flex-1 py-3 sm:py-2 rounded-lg text-[12px] font-semibold text-white transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed"
           style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
         >
           Add Act
@@ -154,7 +154,7 @@ const AddActForm = ({ accent, gradientFrom, gradientTo, onAdd, onCancel }) => {
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg text-[12px] font-medium transition-colors duration-150"
+          className="px-4 py-3 sm:py-2 rounded-lg text-[12px] font-medium transition-colors duration-150"
           style={{ color: "rgba(229,226,225,0.35)", background: "rgba(255,255,255,0.04)" }}
         >
           Cancel
@@ -244,7 +244,7 @@ const ShowLineupSection = ({ lineup = [], onChange, accent, gradientFrom, gradie
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
-            className="flex items-center gap-2 h-8 px-3 rounded-xl text-[12px] font-medium transition-all duration-150"
+            className="flex items-center gap-2 h-11 sm:h-8 px-3 rounded-xl text-[12px] font-medium transition-all duration-150"
             style={{
               border: `1.5px dashed ${hexToRgba(accent, 0.3)}`,
               color: hexToRgba(accent, 0.7),

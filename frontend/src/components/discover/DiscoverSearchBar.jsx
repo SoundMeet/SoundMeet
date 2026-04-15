@@ -7,8 +7,8 @@ const DEBOUNCE_MS = 180;
 
 const SearchIcon = () => (
   <svg
-    width="13"
-    height="13"
+    width="14"
+    height="14"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -179,9 +179,9 @@ const DiscoverSearchBar = ({
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center gap-2 bg-neutral-800/80 rounded-full
-                 px-3.5 py-[7px] min-w-[300px] max-w-[440px] flex-1
-                 border border-white/[0.07] transition-all duration-200
+      className="relative flex items-center gap-2 bg-neutral-800/65 backdrop-blur-md rounded-full
+                 px-3.5 py-[6px] min-w-0 md:min-w-[300px] max-w-[440px] flex-1
+                 border border-white/[0.09] transition-all duration-200
                  focus-within:border-white/[0.18] focus-within:bg-neutral-800/95
                  focus-within:shadow-[0_0_0_1px_rgba(220,46,115,0.18)]"
     >
@@ -197,7 +197,7 @@ const DiscoverSearchBar = ({
         onFocus={() => {
           if (internalQuery.trim() && hasResults) setIsOpen(true);
         }}
-        className="bg-transparent text-[12.5px] text-white placeholder-neutral-500
+        className="bg-transparent text-[16px] md:text-[12.5px] text-white placeholder-neutral-500/70
                    outline-none w-full min-w-0 leading-none"
         aria-label="Search discover"
         aria-autocomplete="list"
@@ -214,7 +214,7 @@ const DiscoverSearchBar = ({
             e.preventDefault();
             handleClear();
           }}
-          className="shrink-0 w-[18px] h-[18px] flex items-center justify-center
+          className="shrink-0 w-11 h-11 md:w-[18px] md:h-[18px] flex items-center justify-center
                      rounded-full bg-neutral-700/80 text-neutral-400 hover:text-white
                      hover:bg-neutral-600/80 transition-colors duration-150"
           aria-label="Clear search"

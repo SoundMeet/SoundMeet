@@ -76,11 +76,11 @@ export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false,
         type="button"
         onClick={onToggle}
         disabled={loading}
+        className="w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center"
         style={{
-          position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+          position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)',
           background: 'none', border: 'none', cursor: 'pointer', padding: 0,
           color: show ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.24)',
-          display: 'flex', alignItems: 'center',
         }}
       >
         <EyeIcon visible={show} />
@@ -114,7 +114,7 @@ export function ChangePasswordSheet({ open, onClose, onConfirm, loading = false,
               exit={{ opacity: 0, y: 24, scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
               className="w-full sm:max-w-sm bg-neutral-900 border border-white/10 rounded-t-[28px] sm:rounded-[28px] p-6 pointer-events-auto"
-              style={{ boxShadow: '0 0 60px rgba(0,0,0,0.92), 0 0 24px rgba(220,46,115,0.06)' }}
+              style={{ boxShadow: '0 0 60px rgba(0,0,0,0.92), 0 0 24px rgba(220,46,115,0.06)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Drag handle — mobile only */}

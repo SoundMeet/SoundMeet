@@ -211,7 +211,7 @@ export function UserSearchModal({ open, onOpenChange }) {
         />
         <Dialog.Content
           className="fixed inset-0 z-50 flex items-start justify-center outline-none"
-          style={{ paddingTop: '12vh', pointerEvents: 'none' }}
+          style={{ paddingTop: '68px', pointerEvents: 'none' }}
           onEscapeKeyDown={() => onOpenChange(false)}
         >
           <motion.div
@@ -229,7 +229,7 @@ export function UserSearchModal({ open, onOpenChange }) {
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16,
               boxShadow: '0 0 0 1px rgba(0,0,0,0.4), 0 24px 64px rgba(0,0,0,0.7)',
-              maxHeight: '68vh',
+              maxHeight: 'calc(100dvh - 80px)',
               overflow: 'hidden',
             }}
           >
@@ -256,7 +256,7 @@ export function UserSearchModal({ open, onOpenChange }) {
                 onKeyDown={(e) => e.key === 'Escape' && (displayQuery ? clearSearch() : onOpenChange(false))}
                 placeholder="Find people by name, instrument, genre or vibe"
                 autoFocus
-                className="flex-1 bg-transparent text-[14px] text-white outline-none"
+                className="flex-1 bg-transparent text-base sm:text-[14px] text-white outline-none"
                 style={{ caretColor: '#DC2E73', minWidth: 0 }}
               />
 
@@ -277,7 +277,7 @@ export function UserSearchModal({ open, onOpenChange }) {
                 <button
                   aria-label="Close"
                   className="flex items-center justify-center flex-shrink-0 rounded-md transition-colors hover:bg-white/10"
-                  style={{ width: 26, height: 26, color: 'rgba(255,255,255,0.28)' }}
+                  style={{ width: 36, height: 36, color: 'rgba(255,255,255,0.28)' }}
                 >
                   <CloseIcon size={13} />
                 </button>
@@ -285,7 +285,7 @@ export function UserSearchModal({ open, onOpenChange }) {
             </div>
 
             {/* Results */}
-            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+            <div className="flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarWidth: 'none' }}>
               {body}
             </div>
           </motion.div>
