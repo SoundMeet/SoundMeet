@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthModal } from '../context/AuthModalContext'
 import LoginForm from './LoginForm'
 import SignupForm from './SignupForm'
+import ForgotPasswordForm from './ForgotPasswordForm'
 import LogoMark from '../assets/Logo.svg'
 
 // ── Two-dot mode switcher ─────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export default function AuthModal() {
             key="auth-panel"
             role="dialog"
             aria-modal="true"
-            aria-label={view === 'login' ? 'Log in to SoundMeet' : 'Create a SoundMeet account'}
+            aria-label={view === 'login' ? 'Log in to SoundMeet' : view === 'signup' ? 'Create a SoundMeet account' : 'Reset your password'}
             className="auth-modal-panel"
             style={{
               position: 'relative',
@@ -208,6 +209,9 @@ export default function AuthModal() {
                   active={view === 'signup'}
                   onClick={() => switchView('signup')}
                 />
+                {view === 'forgot' && (
+                  <ModeDot label="Reset" active={true} onClick={() => {}} />
+                )}
               </div>
 
               {/* Logo — below the switcher */}
@@ -258,7 +262,7 @@ export default function AuthModal() {
                       lineHeight: 1.4,
                     }}
                   >
-                    {view === 'login' ? 'Good to see you.' : 'Find your sound.'}
+                    {view === 'login' ? 'Good to see you.' : view === 'signup' ? 'Find your sound.' : 'Reset your password.'}
                   </h2>
                   <p
                     style={{
@@ -271,7 +275,9 @@ export default function AuthModal() {
                   >
                     {view === 'login'
                       ? 'Your music community is waiting.'
-                      : 'Join musicians wherever you are.'}
+                      : view === 'signup'
+                      ? 'Join musicians wherever you are.'
+                      : "We'll get you back in."}
                   </p>
                 </motion.div>
               </AnimatePresence>
@@ -287,7 +293,9 @@ export default function AuthModal() {
                   exit={{ opacity: 0, x: view === 'signup' ? -18 : 18 }}
                   transition={{ duration: 0.17, ease: 'easeInOut' }}
                 >
-                  {view === 'login' ? <LoginForm /> : <SignupForm />}
+                  {view === 'login' && <LoginForm />}
+                  {view === 'signup' && <SignupForm />}
+                  {view === 'forgot' && <ForgotPasswordForm onBack={() => switchView('login')} />}
                 </motion.div>
               </AnimatePresence>
             </div>

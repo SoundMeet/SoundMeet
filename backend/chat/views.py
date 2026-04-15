@@ -5,7 +5,7 @@ import requests as http_requests
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .models import EmailVerification
+from .models import EmailVerification, PasswordResetCode
 from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import default_storage
 import json
@@ -924,3 +924,93 @@ def delete_account(request):
     transaction.on_commit(_delete_files)
 
     return Response({'status': 'Account deleted.'}, status=200)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    email = request.data.get('email', '').strip()
+    if not email:
+        return Response({'error': 'Email is required.'}, status=400)
+
+    # Always return 200 — never reveal whether the email exists
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({'status': 'If that email is registered, a code has been sent.'})
+
+    code = str(random.randint(100000, 999999))
+
+    # Invalidate any existing unused codes for this email
+    PasswordResetCode.objects.filter(email__iexact=email, is_used=False).delete()
+    PasswordResetCode.objects.create(email=user.email, code=code)
+
+    try:
+        resend.api_key = os.environ.get('RESEND_API_KEY')
+        resend.Emails.send({
+            'from': 'SoundMeet <noreply@soundmeet.app>',
+            'to': [user.email],
+            'subject': 'Reset your SoundMeet password',
+            'text': (
+                f'Your password reset code is: {code}\n\n'
+                'This code expires in 10 minutes.\n\n'
+                'If you did not request a password reset, you can safely ignore this email.'
+            ),
+        })
+    except Exception:
+        return Response({'error': 'Failed to send email.'}, status=500)
+
+    return Response({'status': 'If that email is registered, a code has been sent.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    email = request.data.get('email', '').strip()
+    code = request.data.get('code', '').strip()
+    new_password = request.data.get('new_password', '')
+    confirm_password = request.data.get('confirm_password', '')
+
+    if not all([email, code, new_password, confirm_password]):
+        return Response({'error': 'All fields are required.'}, status=400)
+
+    if new_password != confirm_password:
+        return Response({'error': 'Passwords do not match.'}, status=400)
+
+    try:
+        reset = PasswordResetCode.objects.filter(
+            email__iexact=email,
+            code=code,
+            is_used=False,
+        ).latest('created_at')
+    except PasswordResetCode.DoesNotExist:
+        return Response({'error': 'Invalid or expired code.'}, status=400)
+
+    if reset.is_expired():
+        return Response({'error': 'This code has expired. Please request a new one.'}, status=400)
+
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({'error': 'Invalid or expired code.'}, status=400)
+
+    try:
+        validate_password(new_password, user)
+    except ValidationError as e:
+        return Response({'error': e.messages[0]}, status=400)
+
+    user.set_password(new_password)
+    user.save()
+
+    reset.is_used = True
+    reset.save()
+
+    # Invalidate all existing tokens and issue a fresh one
+    Token.objects.filter(user=user).delete()
+    new_token = Token.objects.create(user=user)
+
+    return Response({
+        'token': new_token.key,
+        'user_id': user.id,
+        'username': user.username,
+    })
