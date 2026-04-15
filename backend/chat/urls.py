@@ -33,4 +33,6 @@ urlpatterns = [
     path('api/auth/finalize-google/', views.finalize_google_signup, name='finalize_google_signup'),
     path('api/account/change-password/', views.change_password, name='change_password'),
     path('api/account/delete/', views.delete_account, name='delete_account'),
+    path('api/forgot-password/', views.forgot_password, name='forgot_password'),
+    path('api/reset-password/', views.reset_password, name='reset_password'),
 ]

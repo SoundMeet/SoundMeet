@@ -195,6 +195,18 @@ export default function LoginForm() {
         {loading ? 'Signing in…' : 'Log in'}
       </button>
 
+      {/* Forgot password */}
+      <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0' }}>
+        <button
+          type="button"
+          onClick={() => switchView('forgot')}
+          className="auth-btn-text"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontWeight: 500, fontSize: '12px', fontFamily: 'Sora, sans-serif', textDecoration: 'underline', textUnderlineOffset: '2px', padding: 0 }}
+        >
+          Forgot password?
+        </button>
+      </p>
+
       {/* Switch to sign up */}
       <p style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.28)', fontFamily: 'Sora, sans-serif', margin: '2px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
         No account?{' '}

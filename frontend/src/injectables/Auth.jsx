@@ -114,6 +114,21 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const resetPassword = async ({ email, code, newPassword, confirmPassword }) => {
+    const res = await apiFetch('api/reset-password/', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        code,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      }),
+    })
+    setSession(res.token)
+    const profile = await fetchProfile()
+    return profile
+  }
+
   const changePassword = async ({ currentPassword, newPassword, confirmNewPassword }) => {
     const body = { new_password: newPassword, confirm_new_password: confirmNewPassword }
     if (currentPassword) body.current_password = currentPassword
@@ -200,6 +215,7 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         register,
         logout,
+        resetPassword,
         changePassword,
         deleteAccount,
         fetchProfile,
