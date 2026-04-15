@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import Logo from "../assets/Logo.svg";
+import { useAuthModal } from "../context/AuthModalContext.jsx";
 
 /**
  * LocationRequired
@@ -12,7 +12,7 @@ import Logo from "../assets/Logo.svg";
  *   unavailable — browser has no geolocation API
  */
 const LocationRequired = ({ status, onRetry }) => {
-  const navigate = useNavigate();
+  const { openModal } = useAuthModal();
   const isPermanentlyDenied = status === "denied";
   const isUnavailable = status === "unavailable";
 
@@ -22,9 +22,24 @@ const LocationRequired = ({ status, onRetry }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-[#141414] flex flex-col items-center justify-center overflow-hidden select-none">
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-6 select-none"
+      style={{
+        background: "rgba(10,10,10,0.72)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+      }}
+    >
+      <div
+        className="relative w-full max-w-sm overflow-hidden rounded-[28px]"
+        style={{
+          background: "rgba(18,18,18,0.92)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "0 0 80px rgba(0,0,0,0.9), 0 0 40px rgba(220,46,115,0.08)",
+        }}
+      >
 
-      {/* Ambient background glow */}
+      {/* Ambient glow inside the card */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -38,7 +53,7 @@ const LocationRequired = ({ status, onRetry }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 flex flex-col items-center text-center px-6 w-full max-w-sm"
+        className="relative z-10 flex flex-col items-center text-center px-6 py-10 w-full"
       >
 
         {/* ── Visual block ─────────────────────────────────────────── */}
@@ -231,7 +246,7 @@ const LocationRequired = ({ status, onRetry }) => {
 
           {/* Secondary — Sign In */}
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => openModal('login')}
             className="w-full py-3.5 rounded-full text-sm font-medium transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 active:scale-[0.975]"
             style={{
               fontFamily: "Sora, sans-serif",
@@ -268,7 +283,7 @@ const LocationRequired = ({ status, onRetry }) => {
         >
           New to SoundMeet?{" "}
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => openModal('signup')}
             className="underline underline-offset-2 transition-colors duration-150"
             style={{ color: "rgba(229,226,225,0.38)" }}
             onMouseEnter={(e) =>
@@ -283,6 +298,7 @@ const LocationRequired = ({ status, onRetry }) => {
           for a richer experience.
         </motion.p>
       </motion.div>
+      </div>
     </div>
   );
 };

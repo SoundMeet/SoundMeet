@@ -38,6 +38,7 @@ const AutoScrollPillRow = ({ pills = [], className = "" }) => {
         overflowX: "auto",
         scrollbarWidth: "none",
         WebkitOverflowScrolling: "touch",
+        touchAction: "pan-x",
       }}
     >
       {pills.map((p) => (

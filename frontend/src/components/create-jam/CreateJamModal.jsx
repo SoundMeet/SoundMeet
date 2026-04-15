@@ -96,7 +96,7 @@ const CreateJamModal = ({
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           // Mobile: full-width bottom sheet  |  Desktop: 560px centered card
           className="w-full md:w-[560px] flex flex-col overflow-hidden
-            rounded-t-[1.5rem] max-h-[92vh]
+            rounded-t-[1.5rem] max-h-[92dvh] landscape:max-h-[80dvh]
             md:rounded-[1.5rem] md:max-h-[88vh]"
           style={{
             animation: "modalSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -106,6 +106,7 @@ const CreateJamModal = ({
             WebkitBackdropFilter: "blur(32px)",
             boxShadow:
               "0 0 60px rgba(229,226,225,0.03), 0 0 50px rgba(220,46,115,0.1), 0 -1px 0 rgba(220,46,115,0.07)",
+            paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
           {/*

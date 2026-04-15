@@ -238,7 +238,7 @@ const JoinBandForm = ({
           <Dialog.Close asChild>
             <button
               aria-label="Close"
-              className="w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10"
+              className="w-11 h-11 md:w-8 md:h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10 flex-shrink-0"
               style={{
                 background: "rgba(255,255,255,0.06)",
                 color:      "rgba(229,226,225,0.45)",
@@ -253,7 +253,7 @@ const JoinBandForm = ({
 
       {/* Scrollable body */}
       <div
-        className="flex-1 overflow-y-auto px-6 pb-5"
+        className="flex-1 overflow-y-auto overscroll-contain px-6 pb-5"
         style={{ scrollbarWidth: "none" }}
       >
         <AnimatePresence mode="wait" custom={direction}>

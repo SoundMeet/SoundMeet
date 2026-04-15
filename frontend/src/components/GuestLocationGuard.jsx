@@ -37,8 +37,13 @@ const GuestLocationGuard = ({ children }) => {
     return children;
   }
 
-  // Guest: denied, promptable, or browser unavailable — show gate
-  return <LocationRequired status={status} onRetry={retry} />;
+  // Guest: denied, promptable, or browser unavailable — show modal over the map
+  return (
+    <>
+      {children}
+      <LocationRequired status={status} onRetry={retry} />
+    </>
+  );
 };
 
 // Minimal full-screen dark hold screen — avoids any content flash

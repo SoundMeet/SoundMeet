@@ -75,7 +75,7 @@ const EventDetailPage = ({ type }) => {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+      <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
       </div>
     );
@@ -83,7 +83,7 @@ const EventDetailPage = ({ type }) => {
 
   if (error || !item) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center gap-3">
+      <div className="min-h-[calc(100dvh-64px)] flex flex-col items-center justify-center gap-3">
         <p className="text-neutral-400 text-sm">{error ?? "Event not found."}</p>
         <button
           onClick={() => navigate("/")}

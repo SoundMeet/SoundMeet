@@ -64,17 +64,17 @@ const App = () => {
             <div className="sticky top-0 z-50">
               <Navbar />
             </div>
-          <div className="pb-[60px] md:pb-0">
+          <div className="pb-[64px] md:pb-0">
 
             <Routes>
               <Route path="/" element={<OnboardingGuard><GuestLocationGuard><Home /></GuestLocationGuard></OnboardingGuard>} />
-              <Route path="/meet" element={<OnboardingGuard><Meet /></OnboardingGuard>} />
-              <Route path="/jams" element={<OnboardingGuard><MyJams /></OnboardingGuard>} />
-              <Route path="/chat" element={<OnboardingGuard><Chat /></OnboardingGuard>} />
+              <Route path="/meet" element={<OnboardingGuard><PrivateRoute><Meet /></PrivateRoute></OnboardingGuard>} />
+              <Route path="/jams" element={<OnboardingGuard><PrivateRoute><MyJams /></PrivateRoute></OnboardingGuard>} />
+              <Route path="/chat" element={<OnboardingGuard><PrivateRoute><Chat /></PrivateRoute></OnboardingGuard>} />
               <Route path="/feed" element={<OnboardingGuard><PrivateRoute><Feed /></PrivateRoute></OnboardingGuard>} />
-              <Route path="/profile" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
+              <Route path="/profile" element={<OnboardingGuard><PrivateRoute><Profile /></PrivateRoute></OnboardingGuard>} />
               <Route path="/profile/:username" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
-              <Route path="/settings" element={<OnboardingGuard><Settings /></OnboardingGuard>} />
+              <Route path="/settings" element={<OnboardingGuard><PrivateRoute><Settings /></PrivateRoute></OnboardingGuard>} />
               <Route path="/jam/:id"  element={<EventDetailPage type="jam" />} />
               <Route path="/show/:id" element={<EventDetailPage type="show" />} />
               <Route path="*" element={<NotFound />} />

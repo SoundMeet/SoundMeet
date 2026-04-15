@@ -57,7 +57,7 @@ const ContactRow = ({ contact, selected, onToggle }) => (
     {/* Avatar */}
     <div className="flex-shrink-0">
       {contact.avatar
-        ? <img src={contact.avatar} alt="" className="rounded-full object-cover" style={{ width: 38, height: 38 }} />
+        ? <img src={contact.avatar} alt="" className="rounded-full object-cover" style={{ width: 38, height: 38 }} loading="lazy" />
         : <FallbackAvatar name={contact.name} />
       }
     </div>

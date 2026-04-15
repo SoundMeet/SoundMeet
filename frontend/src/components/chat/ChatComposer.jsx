@@ -57,8 +57,11 @@ const ChatComposer = ({ threadName, onSend }) => {
 
   return (
     <div
-      className="flex-shrink-0 px-4 pb-4 pt-3"
-      style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+      className="flex-shrink-0 px-4 pt-3"
+      style={{
+        borderTop: '1px solid rgba(255,255,255,0.05)',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+      }}
     >
       {/* Event invite preview — appears above the input row when a link is detected */}
       {showPreview && (
@@ -124,16 +127,12 @@ const ChatComposer = ({ threadName, onSend }) => {
         {/* Send button */}
         <button
           onClick={handleSend}
-          className="flex items-center justify-center flex-shrink-0 cursor-pointer transition-all duration-200"
+          className="flex items-center justify-center flex-shrink-0 cursor-pointer transition-all duration-200 rounded-full w-11 h-11 md:w-[34px] md:h-[34px]"
           style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
             background: hasText
               ? 'linear-gradient(135deg, #DC2E73, #FB4040)'
               : 'rgba(255,255,255,0.06)',
             boxShadow: hasText ? '0 2px 12px rgba(220,46,115,0.35)' : 'none',
-            flexShrink: 0,
           }}
           aria-label="Send message"
         >

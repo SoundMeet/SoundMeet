@@ -19,6 +19,7 @@ import { showService } from "../../injectables/showService";
 import { chatService } from "../../injectables/chatService";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../injectables/Auth";
+import { useAuthModal } from "../../context/AuthModalContext";
 
 import EventModalHeader from "./EventModalHeader";
 import EventAttendanceSection from "./EventAttendanceSection";
@@ -334,6 +335,7 @@ const EventDetailModal = ({
   standalone = false,
 }) => {
   const { user } = useAuth();
+  const { openModal } = useAuthModal();
   const { showToast } = useToast();
 
   // Augment viewerContext: if admin_id matches the current user they're the creator,
@@ -425,6 +427,7 @@ const EventDetailModal = ({
 
   // ── Open rate sheet — pre-fill with existing rating if available ──────────
   const handleOpenRateSheet = async () => {
+    if (!user) { openModal('login'); return; }
     if (localItem?.rating == null && ctx.isPastEvent && localItem?.id) {
       try {
         const data = await jamService.fetchMyJamRating(localItem.id);
@@ -671,7 +674,7 @@ const EventDetailModal = ({
       />
 
       {/* ── Scrollable body ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarWidth: "none" }}>
         <AnimatePresence mode="wait">
           {isEditing ? (
             isJam ? (
@@ -984,10 +987,10 @@ const EventDetailModal = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="w-full max-w-[600px] flex flex-col bg-neutral-900 border border-white/10 rounded-[28px] overflow-hidden pointer-events-auto"
+              className="w-full max-w-[600px] flex flex-col bg-neutral-900 border border-white/10 rounded-[28px] overflow-hidden pointer-events-auto max-h-[90dvh] landscape:max-h-[80dvh]"
               style={{
-                maxHeight: "90vh",
                 boxShadow: `0 0 80px rgba(0,0,0,0.9), 0 0 48px ${hexToRgba(accent, 0.12)}`,
+                paddingBottom: "env(safe-area-inset-bottom)",
               }}
               onClick={(e) => e.stopPropagation()}
             >

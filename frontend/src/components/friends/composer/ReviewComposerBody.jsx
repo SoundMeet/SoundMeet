@@ -51,7 +51,7 @@ export function ReviewComposerBody({ state, onChange, currentUserId }) {
         value={state.caption}
         onChange={(e) => onChange({ caption: e.target.value })}
         placeholder="Tell people what made this jam memorable…"
-        className="w-full bg-transparent text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
+        className="w-full bg-transparent text-base sm:text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
         style={{ caretColor: ACCENT }}
         maxLength={280}
       />
@@ -72,7 +72,7 @@ export function ReviewComposerBody({ state, onChange, currentUserId }) {
               onMouseEnter={() => setHoveredStar(n)}
               onMouseLeave={() => setHoveredStar(0)}
               onClick={() => onChange({ rating: n === state.rating ? 0 : n })}
-              className="transition-all duration-100 hover:scale-110 active:scale-90"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center transition-all duration-100 hover:scale-110 active:scale-90"
               style={{
                 fontSize: 30,
                 color: n <= activeStars ? ACCENT : 'rgba(255,255,255,0.13)',
@@ -112,7 +112,7 @@ export function ReviewComposerBody({ state, onChange, currentUserId }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05, type: 'spring', stiffness: 400, damping: 28 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors duration-150"
+                className="w-full flex items-start gap-3 p-3.5 sm:p-3 rounded-xl text-left transition-colors duration-150"
                 style={{
                   background: selected ? hexToRgba(ACCENT, 0.1) : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${selected ? hexToRgba(ACCENT, 0.3) : 'rgba(255,255,255,0.07)'}`,

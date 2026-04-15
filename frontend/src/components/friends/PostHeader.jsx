@@ -148,7 +148,7 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
       <div ref={menuRef} className="relative flex-shrink-0">
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 transition-colors duration-150 hover:bg-white/[0.08]"
+          className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center rounded-full flex-shrink-0 transition-colors duration-150 hover:bg-white/[0.08]"
           style={{ color: menuOpen ? 'rgba(229,226,225,0.7)' : 'rgba(229,226,225,0.3)' }}
           aria-label="More options"
         >
@@ -175,7 +175,7 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
                 <>
                   <button
                     onClick={() => { onEdit(); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-left transition-colors hover:bg-white/[0.07]"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-3.5 sm:py-2.5 text-xs text-left transition-colors hover:bg-white/[0.07]"
                     style={{ color: 'rgba(229,226,225,0.8)' }}
                   >
                     <MdEditNote className="text-base flex-shrink-0" style={{ color: 'rgba(229,226,225,0.4)' }} />
@@ -184,7 +184,7 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
                   <button
                     onClick={() => { onDelete(); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-left transition-colors hover:bg-red-500/10"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-3.5 sm:py-2.5 text-xs text-left transition-colors hover:bg-red-500/10"
                     style={{ color: 'rgba(251,100,100,0.85)' }}
                   >
                     <MdDeleteOutline className="text-base flex-shrink-0" />
@@ -194,7 +194,7 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
               ) : (
                 <button
                   onClick={() => setMenuOpen(false)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-left transition-colors hover:bg-white/[0.07]"
+                  className="w-full flex items-center gap-2.5 px-3.5 py-3.5 sm:py-2.5 text-xs text-left transition-colors hover:bg-white/[0.07]"
                   style={{ color: 'rgba(229,226,225,0.5)' }}
                 >
                   Not interested

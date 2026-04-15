@@ -10,6 +10,7 @@ const DiscoverPreview = ({
   variant = "discovery",
   item,
   onViewItem,
+  onDismiss,
   onSignUp,
   onLogIn,
 }) => {
@@ -33,7 +34,7 @@ const DiscoverPreview = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 18 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className="relative w-[460px] px-6 py-5 overflow-visible"
+      className="relative w-[calc(100vw-32px)] max-w-[460px] px-6 py-5 overflow-visible"
     >
       <div
         style={{
@@ -87,6 +88,21 @@ const DiscoverPreview = ({
           filter: "blur(95px)",
         })}
       />
+
+      {variant === "discovery" && onDismiss && (
+        <button
+          onClick={onDismiss}
+          aria-label="Close preview"
+          className="absolute top-0 right-0 w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-colors duration-150"
+          style={{ color: "rgba(255,255,255,0.35)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.75)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.35)")}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M1 1l10 10M11 1L1 11" />
+          </svg>
+        </button>
+      )}
 
       {variant === "discovery" ? (
         <DiscoveryContent item={item} onViewItem={onViewItem} accent={accent} />

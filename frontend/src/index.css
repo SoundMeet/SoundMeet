@@ -190,25 +190,35 @@
   /* Prevent iOS Safari auto-zoom on input focus (triggered by font-size < 16px) */
   @media (max-width: 639px) {
     .auth-input,
-    .auth-input-compact {
-      font-size: 16px;
+    .auth-input-compact,
+    .jam-input,
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+    /* 44px min-height only for explicit full-width form inputs — not search bars or inline inputs */
+    .auth-input,
+    .auth-input-compact,
+    .jam-input {
+      min-height: 44px !important;
     }
   }
 
-  /* AuthModal — bottom-sheet layout on small phones */
-  @media (max-width: 479px) {
+  /* AuthModal — bottom-sheet layout on mobile (all phones, not just tiny ones) */
+  @media (max-width: 639px) {
     .auth-modal-backdrop {
       align-items: flex-end !important;
       padding-left: 0 !important;
       padding-right: 0 !important;
-      /* push sheet above the 60px bottom nav */
-      padding-bottom: 60px !important;
+      /* push sheet above the 64px bottom nav + safe area */
+      padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
     }
     .auth-modal-panel {
       max-width: 100% !important;
       border-radius: 24px 24px 0 0 !important;
-      /* 48px top gap + 60px bottom nav */
-      max-height: calc(100dvh - 48px - 60px) !important;
+      /* 48px top gap + 64px bottom nav */
+      max-height: calc(100dvh - 48px - 64px) !important;
     }
     .auth-modal-header {
       padding: 20px 20px 0 !important;

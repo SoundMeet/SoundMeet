@@ -371,7 +371,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
                       onKeyDown={handleKeyDown}
                       placeholder="Share something with friends…"
                       rows={2}
-                      className="w-full bg-transparent text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
+                      className="w-full bg-transparent text-base sm:text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
                       style={{
                         caretColor: '#DC2E73',
                         minHeight: 52,
@@ -390,7 +390,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
                         <button
                           onClick={() => setDismissedLink(detectedLink)}
                           aria-label="Remove event preview"
-                          className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/20"
+                          className="absolute top-2 right-2 w-11 h-11 sm:w-5 sm:h-5 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/20"
                           style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(229,226,225,0.8)' }}
                         >
                           <PreviewDismissIcon />
@@ -414,7 +414,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
               <button
                 key={key}
                 onClick={() => onOpen(key, '')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all duration-150 active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-[11px] font-medium transition-all duration-150 active:scale-95"
                 style={{
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.07)',
@@ -432,7 +432,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
                 }}
               >
                 <Icon className="text-[13px]" />
-                {label}
+                <span className="hidden sm:inline">{label}</span>
               </button>
             ))}
 
@@ -440,7 +440,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
             <button
               onClick={() => fileInputRef.current?.click()}
               title="Upload photo or audio"
-              className="ml-auto flex items-center justify-center w-7 h-7 rounded-full flex-shrink-0 transition-all duration-150"
+              className="ml-auto flex items-center justify-center w-11 h-11 sm:w-7 sm:h-7 rounded-full flex-shrink-0 transition-all duration-150"
               style={{ color: 'rgba(229,226,225,0.2)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
@@ -474,7 +474,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
                     key={key}
                     onClick={() => handleAttach(key)}
                     title={label}
-                    className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-150 active:scale-90"
+                    className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-full transition-all duration-150 active:scale-90"
                     style={{ color: 'rgba(229,226,225,0.35)' }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = bg
@@ -496,7 +496,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
 
                 <button
                   onClick={() => { setExpanded(false); setText(''); setDismissedLink(null) }}
-                  className="w-7 h-7 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10"
+                  className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10"
                   style={{ color: 'rgba(229,226,225,0.4)' }}
                   title="Cancel"
                 >
@@ -506,7 +506,7 @@ function PostComposer({ author, onOpen, onPost, isDragActive, dragFileType, onDr
                 <button
                   onClick={handlePost}
                   disabled={!canPost}
-                  className="px-4 py-1.5 rounded-full text-xs font-bold text-white transition-all duration-150 hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100"
+                  className="px-4 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-full text-xs font-bold text-white transition-all duration-150 hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100"
                   style={{ background: 'linear-gradient(135deg, #DC2E73, #FB4040)' }}
                 >
                   Post
@@ -809,7 +809,7 @@ export function FeedSection({ feedTab = 'forYou' }) {
 
         {/* Search bar */}
         <div
-          className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-150"
+          className="flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-xl transition-all duration-150"
           style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
           onFocus={() => {}}
           onBlur={() => {}}
@@ -820,7 +820,7 @@ export function FeedSection({ feedTab = 'forYou' }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search posts…"
-            className="flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/[0.22]"
+            className="flex-1 bg-transparent text-base sm:text-[13px] text-white outline-none placeholder:text-white/[0.22]"
             style={{ caretColor: '#DC2E73' }}
             onFocus={(e) => {
               e.currentTarget.closest('div').style.borderColor = 'rgba(220,46,115,0.25)'
@@ -832,7 +832,7 @@ export function FeedSection({ feedTab = 'forYou' }) {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full transition-colors hover:bg-white/10"
+              className="flex-shrink-0 w-6 h-6 sm:w-4 sm:h-4 flex items-center justify-center rounded-full transition-colors hover:bg-white/10"
               style={{ color: 'rgba(229,226,225,0.4)' }}
             >
               <MdClose className="text-xs" />

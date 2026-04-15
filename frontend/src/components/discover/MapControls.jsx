@@ -26,7 +26,7 @@ const MapTooltip = ({ label }) => (
 
 // ── MapControlButton ───────────────────────────────────────────────────────────
 
-const MapControlButton = ({ onClick, tooltip, accent = false, children }) => {
+const MapControlButton = ({ onClick, tooltip, accent = false, active = false, children }) => {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -37,13 +37,18 @@ const MapControlButton = ({ onClick, tooltip, accent = false, children }) => {
     >
       <button
         onClick={onClick}
-        className={`w-10 h-10 flex items-center justify-center rounded-xl
+        className={`w-11 h-11 md:w-10 md:h-10 flex items-center justify-center rounded-xl
           transition-all duration-200 cursor-pointer
           active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20
           ${accent
             ? "text-white hover:text-[#f07aaa] hover:[filter:drop-shadow(0_0_6px_rgba(220,46,115,0.5))]"
             : "text-neutral-400 hover:text-white"
           }`}
+        style={
+          active
+            ? { color: "#f07aaa", filter: "drop-shadow(0 0 6px rgba(220,46,115,0.5))" }
+            : undefined
+        }
       >
         {children}
       </button>
@@ -96,13 +101,13 @@ const IconZoomOut = () => (
  *   onZoomOut    {function} - Zoom out one level
  *   radiusOpen   {boolean}  - When true, slide controls right to avoid overlap with radius dropdown
  */
-const MapFloatingControls = ({ onRecenter, onReset, onZoomIn, onZoomOut, radiusOpen = false }) => (
+const MapFloatingControls = ({ onRecenter, onReset, onZoomIn, onZoomOut, radiusOpen = false, recentering = false }) => (
   <motion.div
     animate={{ x: radiusOpen ? SLIDE_OFFSET : 0 }}
     transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.8 }}
   >
   <div className="flex flex-col items-center py-2 px-1.5 rounded-[1.25rem] bg-neutral-900/55 backdrop-blur-2xl border border-white/10 shadow-[0_0_10px_rgba(220,46,115,0.18),0_4px_24px_rgba(0,0,0,0.5)]">
-    <MapControlButton onClick={onRecenter} tooltip="Recenter on you" accent>
+    <MapControlButton onClick={onRecenter} tooltip="Recenter on you" accent active={recentering}>
       <IconRecenter />
     </MapControlButton>
 

@@ -20,6 +20,7 @@ export function PostPhotoBody({ content, media, jamRef }) {
             <img
               src={images[activeIndex]}
               alt=""
+              loading="lazy"
               className="w-full h-full object-cover"
               style={{ background: '#1a1a1a' }}
             />
@@ -27,19 +28,23 @@ export function PostPhotoBody({ content, media, jamRef }) {
 
           {/* Dot indicators (multi-image) */}
           {images.length > 1 && (
-            <div className="flex justify-center gap-1.5 mt-2">
+            <div className="flex justify-center mt-2">
               {images.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveIndex(i)}
-                  className="rounded-full transition-all duration-200"
-                  style={{
-                    width: i === activeIndex ? 16 : 6,
-                    height: 6,
-                    background: i === activeIndex ? '#DC2E73' : 'rgba(255,255,255,0.2)',
-                  }}
+                  className="py-[11px] px-1 flex items-center justify-center"
                   aria-label={`Image ${i + 1}`}
-                />
+                >
+                  <span
+                    className="block rounded-full transition-all duration-200"
+                    style={{
+                      width: i === activeIndex ? 16 : 6,
+                      height: 6,
+                      background: i === activeIndex ? '#DC2E73' : 'rgba(255,255,255,0.2)',
+                    }}
+                  />
+                </button>
               ))}
             </div>
           )}

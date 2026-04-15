@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Menu } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ChatSidebar from '../components/chat/ChatSidebar'
 import ChatHeader from '../components/chat/ChatHeader'
@@ -749,8 +748,7 @@ const Chat = () => {
   if (!authLoading && !isLoggedIn) {
     return (
       <div
-        className="flex overflow-hidden items-center justify-center"
-        style={{ height: 'calc(100vh - 4rem)' }}
+        className="flex overflow-hidden items-center justify-center h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)]"
       >
         <div className="text-center px-6">
           <p
@@ -781,8 +779,7 @@ const Chat = () => {
   if (authLoading || isLoadingConvs) {
     return (
       <div
-        className="flex overflow-hidden items-center justify-center"
-        style={{ height: 'calc(100vh - 4rem)' }}
+        className="flex overflow-hidden items-center justify-center h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)]"
       >
         <div className="w-8 h-8 rounded-full border-2 border-[#DC2E73] border-t-transparent animate-spin" />
       </div>
@@ -792,13 +789,22 @@ const Chat = () => {
   // ─── Main chat layout ────────────────────────────────────────────────────
   return (
     <div
-      className="flex overflow-hidden"
-      style={{ height: 'calc(100vh - 4rem)' }}
+      // On mobile: subtract navbar (4rem) + bottom nav (4rem) so the page
+      // is exactly viewport-tall and cannot scroll, preventing the Chat
+      // from sliding up behind the sticky navbar.
+      // On desktop (md+): bottom nav is hidden so only navbar is subtracted.
+      className="flex overflow-hidden h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)]"
     >
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 z-30 lg:hidden"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          className="fixed z-30 lg:hidden"
+          style={{
+            top: '4rem', // start below the navbar, not behind it
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+          }}
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -810,7 +816,7 @@ const Chat = () => {
           'transition-transform duration-300 ease-in-out',
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
-        style={{ top: '4rem', bottom: 0, left: 0 }}
+        style={{ top: '4rem', bottom: '4rem', left: 0 }}
       >
         <ChatSidebar
           dmThreads={dmThreads}
@@ -827,16 +833,6 @@ const Chat = () => {
       <div
         className="flex flex-col flex-1 overflow-hidden"
       >
-        <div className="flex items-center lg:hidden px-3 py-1.5 flex-shrink-0">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-[#2A2A2A] transition-colors cursor-pointer"
-            aria-label="Open sidebar"
-          >
-            <Menu size={20} color="#E5E2E1" />
-          </button>
-        </div>
-
         {convError && (
           <div
             className="mx-4 mt-2 px-4 py-2 rounded-xl text-xs flex-shrink-0"
@@ -881,6 +877,20 @@ const Chat = () => {
                   : 'Choose a direct message or jam group from the sidebar.'}
               </p>
             </div>
+            {allThreads.length > 0 && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden px-5 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80 cursor-pointer"
+                style={{
+                  background: 'rgba(220,46,115,0.15)',
+                  border: '1px solid rgba(220,46,115,0.3)',
+                  color: '#DC2E73',
+                  fontFamily: 'Sora, sans-serif',
+                }}
+              >
+                Open Chats
+              </button>
+            )}
           </div>
         )}
 
@@ -895,6 +905,7 @@ const Chat = () => {
               onMembersClick={activeThread.type === 'jam' ? handleHeaderClick : undefined}
               onHideDM={activeThread.type === 'dm' ? handleHideDM : undefined}
               onDmHeaderClick={activeThread.type === 'dm' ? handleDmHeaderClick : undefined}
+              onBackClick={() => setIsSidebarOpen(true)}
             />
 
             {isLoadingMsgs ? (

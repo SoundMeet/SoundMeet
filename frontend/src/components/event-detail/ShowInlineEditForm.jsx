@@ -233,7 +233,7 @@ const ShowInlineEditForm = ({
         )}
 
         {/* Ticket price + max capacity */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Ticket Price" hint="Leave blank for free">
             <div className="relative">
               <span

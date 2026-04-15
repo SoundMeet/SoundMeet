@@ -221,7 +221,7 @@ const CompactVisual = ({ item, accent, darkIcon = false }) => {
       }}
     >
       {item.image ? (
-        <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+        <img src={item.image} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
       ) : item.initials || item.roleLabel || item.posterLabel ? (
         <span
           className={`text-[12px] font-bold tracking-[0.18em] ${darkIcon ? "text-neutral-900/85" : "text-white"}`}
@@ -450,8 +450,8 @@ const DiscoveryCard = ({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl backdrop-blur-sm border px-5 py-4 cursor-pointer transition-all duration-200 ${containerClass}`}
-      style={{ boxShadow }}
+      className={`relative overflow-hidden rounded-2xl backdrop-blur-sm border px-4 py-3.5 md:px-5 md:py-4 cursor-pointer transition-all duration-200 ${containerClass}`}
+      style={{ boxShadow, touchAction: "manipulation" }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onMouseEnter={onMouseEnter}
@@ -469,7 +469,7 @@ const DiscoveryCard = ({
 
       <VariantBody item={item} accent={accent} participationState={participationState} />
 
-      <div className="mt-3.5">
+      <div className="mt-3 md:mt-3.5">
         <button
           disabled={isDisabled}
           onClick={(event) => {
@@ -477,7 +477,7 @@ const DiscoveryCard = ({
             if (!isDisabled) onAction?.(event);
           }}
           aria-label={ctaLabel}
-          className={`w-full h-[38px] rounded-full font-bold text-[12px] uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-[6px] ${
+          className={`w-full h-[36px] md:h-[38px] rounded-full font-bold text-[12px] uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-[6px] ${
             isDisabled
               ? "bg-neutral-800/80 text-gray-500 border border-white/[0.07] cursor-not-allowed"
               : "hover:brightness-105 active:scale-[0.98]"
@@ -489,9 +489,9 @@ const DiscoveryCard = ({
                   background: accent,
                   color: isDarkText ? "#111111" : "#FFFFFF",
                   // Creator CTA = action → full glow. Joined CTA = confirmation → soft glow.
-                  boxShadow: `0 0 14px ${hexToRgba(accent, isJoined ? 0.20 : 0.32)}, 0 0 28px ${hexToRgba(
+                  boxShadow: `0 0 14px ${hexToRgba(accent, isJoined ? 0.16 : 0.20)}, 0 0 28px ${hexToRgba(
                     accent,
-                    isJoined ? 0.07 : 0.12
+                    isJoined ? 0.07 : 0.10
                   )}, 0 3px 10px rgba(0,0,0,0.36)`,
                 }
           }

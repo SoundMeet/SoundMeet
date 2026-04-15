@@ -62,7 +62,7 @@ export function RateJamSheet({ open, onClose, item, onSubmit }) {
               exit={{ opacity: 0, y: 24, scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               className="w-full sm:max-w-sm bg-neutral-900 border border-white/10 rounded-t-[28px] sm:rounded-[28px] p-6 pointer-events-auto"
-              style={{ boxShadow: '0 0 60px rgba(0,0,0,0.9)' }}
+              style={{ boxShadow: '0 0 60px rgba(0,0,0,0.9)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Drag handle (mobile only) */}
@@ -85,7 +85,7 @@ export function RateJamSheet({ open, onClose, item, onSubmit }) {
                     onMouseEnter={() => setHovered(n)}
                     onMouseLeave={() => setHovered(0)}
                     onClick={() => setSelected(n === selected ? 0 : n)}
-                    className="transition-all duration-100 hover:scale-110 active:scale-90"
+                    className="w-11 h-11 flex items-center justify-center transition-all duration-100 hover:scale-110 active:scale-90"
                     style={{
                       fontSize: 36,
                       color: n <= activeStars ? '#DC2E73' : 'rgba(255,255,255,0.12)',
@@ -120,7 +120,7 @@ export function RateJamSheet({ open, onClose, item, onSubmit }) {
                   value={comment}
                   onChange={(e) => setComment(e.target.value.slice(0, MAX_COMMENT))}
                   placeholder="Share your experience… (optional)"
-                  className="w-full bg-transparent text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/20"
+                  className="w-full bg-transparent text-base sm:text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/20"
                   style={{ caretColor: '#DC2E73' }}
                 />
                 <p
@@ -135,7 +135,7 @@ export function RateJamSheet({ open, onClose, item, onSubmit }) {
               <div className="flex gap-2">
                 <button
                   onClick={onClose}
-                  className="flex-1 h-10 rounded-full text-sm font-semibold transition-all duration-150 hover:bg-white/10"
+                  className="flex-1 h-11 md:h-10 rounded-full text-sm font-semibold transition-all duration-150 hover:bg-white/10"
                   style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(229,226,225,0.55)' }}
                 >
                   Cancel
@@ -143,7 +143,7 @@ export function RateJamSheet({ open, onClose, item, onSubmit }) {
                 <button
                   onClick={handleSubmit}
                   disabled={!selected}
-                  className="flex-1 h-10 rounded-full text-sm font-bold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex-1 h-11 md:h-10 rounded-full text-sm font-bold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed"
                   style={{ background: 'linear-gradient(135deg, #DC2E73, #FB4040)' }}
                 >
                   {item?.rating != null ? 'Update' : 'Submit'}

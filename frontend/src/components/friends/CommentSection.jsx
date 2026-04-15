@@ -62,7 +62,7 @@ function Comment({ comment, canDelete, onDelete }) {
           {canDelete && (
             <button
               onClick={onDelete}
-              className="text-[10px] opacity-0 group-hover:opacity-100 transition-all duration-150 hover:text-red-400"
+              className="text-[10px] opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-150 hover:text-red-400"
               style={{ color: 'rgba(229,226,225,0.3)' }}
             >
               Delete
@@ -155,24 +155,24 @@ export function CommentSection({ comments = [], currentUserId, onAdd, onDelete }
               onKeyDown={handleKeyDown}
               placeholder="Write a comment…"
               rows={1}
-              className="flex-1 bg-transparent text-[12px] leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
+              className="flex-1 bg-transparent text-base sm:text-[12px] leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
               style={{ caretColor: '#DC2E73', maxHeight: 80, overflow: 'auto' }}
             />
             <button
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full transition-all duration-150 hover:brightness-110 active:scale-90 disabled:opacity-25 disabled:cursor-not-allowed"
+              className="flex-shrink-0 w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center rounded-full transition-all duration-150 hover:brightness-110 active:scale-90 disabled:opacity-25 disabled:cursor-not-allowed"
               style={{
                 background: canSubmit ? 'linear-gradient(135deg, #DC2E73, #FB4040)' : 'transparent',
                 color: canSubmit ? '#fff' : 'rgba(229,226,225,0.3)',
               }}
             >
-              <MdSend className="text-xs" />
+              <MdSend className="text-sm sm:text-xs" />
             </button>
           </div>
         </div>
 
-        <p className="text-[10px] pl-10" style={{ color: 'rgba(229,226,225,0.2)' }}>
+        <p className="hidden sm:block text-[10px] pl-10" style={{ color: 'rgba(229,226,225,0.2)' }}>
           Enter to post · Shift+Enter for new line
         </p>
       </div>

@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import EventDetailModal from '../components/event-detail/EventDetailModal'
 import CreateJamModal from '../components/create-jam/CreateJamModal'
 import PromoteShowModal from '../components/promote-show/PromoteShowModal'
+import MobileCreateFAB from '../components/MobileCreateFAB'
 import JoinJamModal from '../components/join-jam/JoinJamModal'
 import RSVPShowModal from '../components/rsvp-show/RSVPShowModal'
 import {
@@ -445,7 +446,7 @@ function HostingManageRow({ item, onOpen, onEdit, compact = false }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit && onEdit(item) }}
-            className="text-xs font-medium text-neutral-500 border border-white/[0.08] rounded-full px-3 py-1
+            className="text-xs font-medium text-neutral-500 border border-white/[0.08] rounded-full px-3 py-1.5 sm:py-1
                        transition-all duration-150 group-hover:text-[#DC2E73] group-hover:border-[#DC2E73]/30"
           >
             Edit
@@ -560,8 +561,8 @@ function OverviewTab({ upcomingItems, createdItems, pastItems, onOpen, onEditIte
   const hasContent = upNext.length > 0 || hostingItems.length > 0
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="pt-7 pb-28 space-y-9">
+    <div className="h-full overflow-y-auto overscroll-contain">
+      <div className="pt-4 sm:pt-7 pb-28 space-y-6 sm:space-y-9">
 
         {/* ── Up Next ── */}
         <ContentWrap>
@@ -670,8 +671,8 @@ function EventsTab({ upcomingItems, createdItems, chipFilter, onChipChange, onOp
   const empty = emptyMessages[chipFilter] ?? emptyMessages.all
 
   return (
-    <div className="h-full overflow-y-auto">
-      <ContentWrap className="pt-6 pb-28">
+    <div className="h-full overflow-y-auto overscroll-contain">
+      <ContentWrap className="pt-4 sm:pt-6 pb-28">
         <FilterChips chips={CHIP_SETS.Events} active={chipFilter} onChange={onChipChange} />
         <div className="mt-6">
           {visible.length === 0 ? (
@@ -691,8 +692,8 @@ function EventsTab({ upcomingItems, createdItems, chipFilter, onChipChange, onOp
 
 function OpportunitiesTab({ chipFilter, onChipChange }) {
   return (
-    <div className="h-full overflow-y-auto">
-      <ContentWrap className="pt-6 pb-28">
+    <div className="h-full overflow-y-auto overscroll-contain">
+      <ContentWrap className="pt-4 sm:pt-6 pb-28">
         <FilterChips chips={CHIP_SETS.Opportunities} active={chipFilter} onChange={onChipChange} />
         <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 gap-5">
           <OpportunityScaffoldCard type="join_band" />
@@ -714,8 +715,8 @@ function PastTab({ pastItems, chipFilter, onChipChange, onOpen, searchQuery }) {
   })
 
   return (
-    <div className="h-full overflow-y-auto">
-      <ContentWrap className="pt-6 pb-28">
+    <div className="h-full overflow-y-auto overscroll-contain">
+      <ContentWrap className="pt-4 sm:pt-6 pb-28">
         <FilterChips chips={CHIP_SETS.Past} active={chipFilter} onChange={onChipChange} />
         <div className="mt-6">
           {visible.length === 0 ? (
@@ -748,8 +749,8 @@ function HostingTab({ createdItems, chipFilter, onChipChange, onOpen, onEditItem
   })
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-6 pb-28">
+    <div className="h-full overflow-y-auto overscroll-contain">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28">
         <FilterChips chips={CHIP_SETS.Hosting} active={chipFilter} onChange={onChipChange} />
         <div className="mt-6">
           {visible.length === 0 ? (
@@ -1150,14 +1151,14 @@ const MyJams = () => {
   // ── Render ──────────────────────────────────────────────────
 
   return (
-    <div className="h-[calc(100vh-4rem)] text-white flex flex-col relative overflow-hidden">
+    <div className="h-[calc(100dvh-4rem)] text-white flex flex-col relative overflow-hidden overscroll-none">
 
       {/* ── Page header ── */}
       <div className="shrink-0 border-b border-white/[0.06]">
         <ContentWrap className="!px-0">
 
           {/* ── Identity area: title + subtitle + stats + search ── */}
-          <div className="flex items-start justify-between gap-6 px-4 sm:px-6 lg:px-8 pt-7 pb-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-7 pb-3 sm:pb-5">
             <div className="min-w-0">
               <h1 className="text-[26px] font-bold text-white tracking-tight leading-none">
                 My Jams
@@ -1171,12 +1172,12 @@ const MyJams = () => {
                   <span className="text-[18px] font-bold text-white leading-none tabular-nums">{upcomingItems.length}</span>
                   <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-[0.10em]">Upcoming</span>
                 </div>
-                <div className="w-px h-5 bg-white/[0.07] mx-5" />
+                <div className="w-px h-5 bg-white/[0.07] mx-3 sm:mx-5" />
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-[18px] font-bold text-white leading-none tabular-nums">{pastItems.length}</span>
                   <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-[0.10em]">Past</span>
                 </div>
-                <div className="w-px h-5 bg-white/[0.07] mx-5" />
+                <div className="w-px h-5 bg-white/[0.07] mx-3 sm:mx-5" />
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-[18px] font-bold text-white leading-none tabular-nums">{createdItems.length}</span>
                   <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-[0.10em]">Hosting</span>
@@ -1204,7 +1205,7 @@ const MyJams = () => {
             </div>
 
             {/* Search — self-end baseline-aligns with the stats row */}
-            <div className="self-end shrink-0 flex items-center gap-2.5 bg-neutral-800/60 border border-white/[0.08] rounded-full px-4 py-2.5 w-[160px] sm:w-[230px] lg:w-[272px] transition-all duration-200 focus-within:border-[#DC2E73]/30 focus-within:bg-neutral-800/90 focus-within:shadow-[0_0_0_3px_rgba(220,46,115,0.07)]">
+            <div className="w-full sm:self-end sm:shrink-0 flex items-center gap-2.5 bg-neutral-800/60 border border-white/[0.08] rounded-full px-4 py-2.5 sm:w-[230px] lg:w-[272px] transition-all duration-200 focus-within:border-[#DC2E73]/30 focus-within:bg-neutral-800/90 focus-within:shadow-[0_0_0_3px_rgba(220,46,115,0.07)]">
               <i className="fa-solid fa-magnifying-glass text-neutral-500 text-[11px] shrink-0" />
               <input
                 type="text"
@@ -1217,7 +1218,7 @@ const MyJams = () => {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="shrink-0 w-4 h-4 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-neutral-600 transition-colors duration-150"
+                  className="shrink-0 w-11 h-11 sm:w-4 sm:h-4 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-neutral-600 transition-colors duration-150"
                   aria-label="Clear search"
                 >
                   <span className="text-[11px] text-neutral-300 leading-none">×</span>
@@ -1315,8 +1316,8 @@ const MyJams = () => {
 
       </div>
 
-      {/* ── Floating create menu ── */}
-      <div className="absolute bottom-5 right-4 sm:bottom-6 sm:right-6 lg:right-8 z-10">
+      {/* ── Floating create menu — desktop only ── */}
+      <div className="hidden md:block absolute bottom-5 right-4 sm:bottom-6 sm:right-6 lg:right-8 z-10">
         <CreateMenu
           onCreateJam={() => setCreateOpen(true)}
           onPromoteShow={() => setPromoteShowOpen(true)}
@@ -1427,6 +1428,12 @@ const MyJams = () => {
           if (!open) { setEditingShow(null); loadTab(activeTab) }
         }}
         initialValues={editShowInitialValues}
+      />
+
+      {/* Mobile-only create FAB — desktop uses the CreateMenu above */}
+      <MobileCreateFAB
+        onCreateJam={() => setCreateOpen(true)}
+        onPromoteShow={() => setPromoteShowOpen(true)}
       />
 
     </div>

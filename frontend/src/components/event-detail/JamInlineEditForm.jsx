@@ -46,7 +46,7 @@ const Stepper = ({ value, onChange }) => {
       <button
         type="button"
         onClick={() => onChange(String(Math.max(0, num - 1)))}
-        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
+        className="w-11 h-11 md:w-10 md:h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
         style={{
           background: "#2A2A2A",
           color: num > 0 ? "rgba(229,226,225,0.7)" : "rgba(229,226,225,0.2)",
@@ -66,7 +66,7 @@ const Stepper = ({ value, onChange }) => {
       <button
         type="button"
         onClick={() => onChange(String(num + 1))}
-        className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
+        className="w-11 h-11 md:w-10 md:h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-xl font-light transition-colors duration-150"
         style={{ background: "#2A2A2A", color: "rgba(229,226,225,0.7)" }}
       >
         +

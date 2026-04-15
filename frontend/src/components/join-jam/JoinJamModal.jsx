@@ -221,7 +221,7 @@ const JoinJamModal = ({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className="w-full md:w-[500px] flex flex-col overflow-hidden
-              rounded-t-[1.5rem] max-h-[92vh]
+              rounded-t-[1.5rem] max-h-[92dvh]
               md:rounded-[1.5rem] md:max-h-[88vh]"
             style={{
               pointerEvents: "auto",
@@ -230,6 +230,7 @@ const JoinJamModal = ({
               WebkitBackdropFilter: "blur(32px)",
               boxShadow:
                 "0 0 60px rgba(229,226,225,0.03), 0 0 50px rgba(220,46,115,0.1), 0 -1px 0 rgba(220,46,115,0.07)",
+              paddingBottom: "env(safe-area-inset-bottom)",
             }}
           >
             {/* ── Header ──────────────────────────────────────────────────── */}
@@ -254,7 +255,7 @@ const JoinJamModal = ({
                   <button
                     aria-label="Close"
                     disabled={isSubmitting}
-                    className="w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10 disabled:opacity-40 flex-shrink-0"
+                    className="w-11 h-11 md:w-8 md:h-8 flex items-center justify-center rounded-full transition-colors duration-150 hover:bg-white/10 disabled:opacity-40 flex-shrink-0"
                     style={{
                       background: "rgba(255,255,255,0.06)",
                       color: "rgba(229,226,225,0.45)",
@@ -301,7 +302,7 @@ const JoinJamModal = ({
                 >
                   {/* Scrollable form body */}
                   <div
-                    className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
+                    className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5"
                     style={{ scrollbarWidth: "none" }}
                   >
                     {/* Jam summary card — shown when date or location available */}

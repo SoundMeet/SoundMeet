@@ -62,7 +62,7 @@ export function DeleteAccountSheet({
               exit={{ opacity: 0, y: 24, scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
               className="w-full sm:max-w-sm bg-neutral-900 border border-white/10 rounded-t-[28px] sm:rounded-[28px] p-6 pointer-events-auto"
-              style={{ boxShadow: '0 0 60px rgba(0,0,0,0.92), 0 0 24px rgba(251,64,64,0.08)' }}
+              style={{ boxShadow: '0 0 60px rgba(0,0,0,0.92), 0 0 24px rgba(251,64,64,0.08)', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Drag handle — mobile only */}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { MdMusicNote, MdStars } from 'react-icons/md'
 import { useAuth } from '../injectables/Auth'
@@ -312,10 +312,17 @@ const Friends = () => {
   const [searchOpen, setSearchOpen] = useState(false)
   const [feedTab,    setFeedTab]    = useState('forYou')
 
+  // Lock body scroll so iOS Safari can't scroll the window and push tabs into the navbar
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
   return (
     <div
       className="flex relative"
-      style={{ height: 'calc(100vh - 64px)', overflow: 'hidden' }}
+      style={{ height: 'calc(100dvh - 64px)', overflow: 'hidden', overscrollBehavior: 'none' }}
     >
       {/* Left sidebar — relationships / social rail */}
       <aside
@@ -335,21 +342,6 @@ const Friends = () => {
         {/* Tab bar */}
         <div className="flex-shrink-0">
 
-          {/* Mobile: Feed title + Find People */}
-          <div
-            className="lg:hidden px-4 py-3 flex items-center justify-between"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-          >
-            <h1 className="text-sm font-bold text-white">Feed</h1>
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #DC2E73, #FB4040)' }}
-            >
-              Find People
-            </button>
-          </div>
-
           {/* For you / Friends tabs */}
           <div
             className="flex"
@@ -361,7 +353,7 @@ const Friends = () => {
                 <button
                   key={key}
                   onClick={() => setFeedTab(key)}
-                  className="flex-1 flex flex-col items-center pt-4 pb-3 relative transition-all duration-150 hover:bg-white/[0.03] active:bg-white/[0.05]"
+                  className="flex-1 flex flex-col items-center pt-5 pb-4 sm:pt-4 sm:pb-3 relative transition-all duration-150 hover:bg-white/[0.03] active:bg-white/[0.05]"
                   style={{ color: isActive ? '#fff' : 'rgba(229,226,225,0.35)' }}
                 >
                   <span className={`text-sm ${isActive ? 'font-bold' : 'font-medium'}`}>

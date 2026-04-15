@@ -183,7 +183,7 @@ const EventModalHeader = ({
           onClick={handleShare}
           aria-label={shareCopied ? "Link copied!" : "Copy share link"}
           title={shareCopied ? "Copied!" : "Share event"}
-          className="w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150"
+          className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all duration-150"
           style={{
             background: "rgba(255,255,255,0.07)",
             color: shareCopied ? "rgba(229,226,225,0.75)" : "rgba(229,226,225,0.4)",
@@ -197,7 +197,7 @@ const EventModalHeader = ({
       <button
         onClick={onClose}
         aria-label="Close event details"
-        className="w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 hover:text-white transition-all duration-150"
+        className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-full text-neutral-500 hover:text-white transition-all duration-150"
         style={{ background: "rgba(255,255,255,0.07)" }}
       >
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
@@ -368,6 +368,7 @@ const EventModalHeader = ({
                   src={coverImageUrl}
                   alt=""
                   aria-hidden="true"
+                  loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                 />
                 {/* Expand hint — visible on hover */}
@@ -476,6 +477,7 @@ const EventModalHeader = ({
                     maxWidth: "100%",
                     maxHeight: "85vh",
                     boxShadow: "0 24px 80px rgba(0,0,0,0.8)",
+                    touchAction: "pinch-zoom",
                   }}
                 />
 
@@ -483,7 +485,7 @@ const EventModalHeader = ({
                 <button
                   onClick={() => setPosterOpen(false)}
                   aria-label="Close poster"
-                  className="absolute -top-3 -right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-150"
+                  className="absolute -top-3 -right-3 w-11 h-11 md:w-8 md:h-8 flex items-center justify-center rounded-full transition-colors duration-150"
                   style={{ background: "rgba(30,30,32,0.95)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(229,226,225,0.7)" }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(229,226,225,0.7)"; }}

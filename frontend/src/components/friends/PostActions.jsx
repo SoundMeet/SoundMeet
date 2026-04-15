@@ -26,7 +26,7 @@ export function PostActions({ postId, userId, likes, comments, hasLiked, comment
       {/* Like */}
       <button
         onClick={toggleLike}
-        className="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 hover:bg-white/[0.05] active:scale-95"
+        className="group flex items-center gap-1.5 px-3 py-3.5 sm:py-1.5 rounded-xl text-xs font-medium transition-all duration-150 hover:bg-white/[0.05] active:scale-95"
         style={{ color: liked ? '#DC2E73' : 'rgba(229,226,225,0.42)' }}
         aria-label="Like"
       >
@@ -40,7 +40,7 @@ export function PostActions({ postId, userId, likes, comments, hasLiked, comment
       {/* Comment */}
       <button
         onClick={onToggleComments}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95"
+        className="flex items-center gap-1.5 px-3 py-3.5 sm:py-1.5 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95"
         style={{
           color: commentsOpen ? '#A78BFA' : 'rgba(229,226,225,0.42)',
           background: commentsOpen ? 'rgba(167,139,250,0.08)' : 'transparent',

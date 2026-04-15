@@ -72,7 +72,7 @@ export function ClipComposerBody({ state, onChange }) {
         value={state.caption}
         onChange={(e) => onChange({ caption: e.target.value })}
         placeholder="What's this clip about? (optional)"
-        className="w-full bg-transparent text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
+        className="w-full bg-transparent text-base sm:text-sm leading-relaxed text-white outline-none resize-none placeholder:text-white/25"
         style={{ caretColor: ACCENT }}
         maxLength={500}
       />
@@ -102,7 +102,7 @@ export function ClipComposerBody({ state, onChange }) {
               type="button"
               onClick={() => onChange({ audioFile: null })}
               aria-label="Remove audio"
-              className="transition-opacity hover:opacity-80"
+              className="w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
               style={{ color: 'rgba(229,226,225,0.35)' }}
             >
               <MdClose className="text-sm" />

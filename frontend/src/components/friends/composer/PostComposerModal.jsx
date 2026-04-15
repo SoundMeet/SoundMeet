@@ -90,11 +90,10 @@ export function PostComposerModal({
               exit={{ opacity: 0, y: 40 }}
               transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.9 }}
               className="w-full sm:max-w-[540px] flex flex-col pointer-events-auto overflow-hidden
-                         rounded-t-[24px] sm:rounded-3xl"
+                         rounded-t-[24px] sm:rounded-3xl max-h-[90dvh] landscape:max-h-[80dvh]"
               style={{
                 background: '#1a1a1a',
                 border:     '1px solid rgba(255,255,255,0.08)',
-                maxHeight:  '90vh',
                 boxShadow:  '0 -8px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
               }}
               onClick={(e) => e.stopPropagation()}
@@ -137,7 +136,7 @@ export function PostComposerModal({
                 <button
                   onClick={onClose}
                   aria-label="Close"
-                  className="w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0
+                  className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-full flex-shrink-0
                              transition-colors hover:bg-white/10"
                   style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(229,226,225,0.4)' }}
                 >
@@ -148,7 +147,7 @@ export function PostComposerModal({
               {/* ── Scrollable body ──────────────────────────────────────── */}
               <div
                 ref={bodyRef}
-                className="flex-1 overflow-y-auto px-5 py-4"
+                className="flex-1 overflow-y-auto overscroll-contain px-5 py-4"
                 style={{ scrollbarWidth: 'none' }}
               >
                 {children}
@@ -190,7 +189,7 @@ export function PostComposerModal({
                     onClick={locationClickable ? requestLocation : undefined}
                     disabled={status === 'requesting'}
                     className="inline-flex items-center gap-1 text-[11px] transition-all duration-150
-                               disabled:opacity-40 hover:opacity-80 flex-shrink-0 mr-auto"
+                               disabled:opacity-40 hover:opacity-80 active:opacity-60 flex-shrink-0 mr-auto"
                     style={{
                       color: status === 'denied' || status === 'error'
                         ? 'rgba(229,226,225,0.18)'
@@ -212,7 +211,7 @@ export function PostComposerModal({
                 {/* Cancel */}
                 <button
                   onClick={onClose}
-                  className="px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-150
+                  className="px-4 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-full text-[13px] font-medium transition-all duration-150
                              hover:bg-white/[0.06] active:scale-95 flex-shrink-0"
                   style={{ color: 'rgba(229,226,225,0.32)' }}
                 >
@@ -223,7 +222,7 @@ export function PostComposerModal({
                 <button
                   onClick={() => onSubmit(location)}
                   disabled={!canSubmit || isSubmitting}
-                  className="px-5 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-150
+                  className="px-5 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-full text-[13px] font-semibold transition-all duration-150
                              hover:brightness-110 active:scale-95
                              disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100
                              flex-shrink-0"
