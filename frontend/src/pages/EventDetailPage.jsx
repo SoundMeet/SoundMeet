@@ -4,6 +4,8 @@ import { Helmet } from "react-helmet-async";
 import { jamService } from "../injectables/jamService";
 import { showService } from "../injectables/showService";
 import EventDetailModal from "../components/event-detail/EventDetailModal";
+import JoinJamModal from "../components/join-jam/JoinJamModal";
+import RSVPShowModal from "../components/rsvp-show/RSVPShowModal";
 import { useAuth } from "../injectables/Auth";
 import { useAuthModal } from "../context/AuthModalContext";
 
@@ -27,6 +29,8 @@ const EventDetailPage = ({ type }) => {
   const [viewerContext, setViewerContext] = useState({});
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
+  const [joinJamModal,  setJoinJamModal]  = useState({ open: false, jam: null });
+  const [rsvpShowModal, setRsvpShowModal] = useState({ open: false, show: null });
 
   useEffect(() => {
     setLoading(true);
@@ -64,14 +68,36 @@ const EventDetailPage = ({ type }) => {
     }
   };
 
+  const refreshAttendeeStatus = () => {
+    if (!user?.id) return;
+    const fetchIds = type === "show"
+      ? showService.getMyRsvpdShowIds(user.id)
+      : jamService.getMyAttendingJamIds(user.id);
+    fetchIds.then((ids) => {
+      const isAttendee = ids.includes(Number(id)) || ids.includes(String(id));
+      setViewerContext(isAttendee ? { isAttendee: true } : {});
+    }).catch(() => {});
+  };
+
   const handleJoin = () => {
     if (!user) { openModal("login"); return; }
-    navigate("/");
+    if (!item) return;
+    setJoinJamModal({
+      open: true,
+      jam: {
+        id: item.id,
+        title: item.title,
+        isPrivate: !!item.isPrivate,
+        dateTime: item.dateTime ?? item.metaSecondary ?? null,
+        locationLabel: item.locationName ?? item.subtitle ?? null,
+      },
+    });
   };
 
   const handleRsvp = () => {
     if (!user) { openModal("login"); return; }
-    navigate("/");
+    if (!item) return;
+    setRsvpShowModal({ open: true, show: item });
   };
 
   if (loading) {
@@ -125,6 +151,39 @@ const EventDetailPage = ({ type }) => {
         onClose={handleClose}
         onJoin={handleJoin}
         onRsvp={handleRsvp}
+      />
+
+      <JoinJamModal
+        isOpen={joinJamModal.open}
+        onClose={() => { setJoinJamModal({ open: false, jam: null }); refreshAttendeeStatus(); }}
+        jam={joinJamModal.jam}
+        onSubmit={async (payload) => {
+          const conversationId = await jamService.joinJam(
+            joinJamModal.jam.id,
+            user?.id,
+            {
+              instrumentIds:     payload?.instrumentIds ?? [],
+              customInstruments: payload?.customInstruments ?? [],
+              roleIds:           payload?.roleIds ?? [],
+              customRoles:       payload?.customRoles ?? [],
+              gearIds:           payload?.equipmentOfferingIds ?? [],
+              customGear:        payload?.customEquipmentOfferings ?? [],
+            }
+          );
+          refreshAttendeeStatus();
+          return conversationId;
+        }}
+        onSuccessNavigateToMyJams={() => navigate("/jams")}
+        onSuccessNavigateToGroupChat={() => navigate("/chat", { state: { openJamId: joinJamModal.jam?.id } })}
+      />
+
+      <RSVPShowModal
+        isOpen={rsvpShowModal.open}
+        onClose={() => { setRsvpShowModal({ open: false, show: null }); refreshAttendeeStatus(); }}
+        show={rsvpShowModal.show}
+        accentColor={rsvpShowModal.show?.accentColor}
+        onSubmit={() => showService.rsvpShow(rsvpShowModal.show?.id, user?.id)}
+        onSuccessNavigateToMyJams={() => navigate("/jams")}
       />
     </>
   );
