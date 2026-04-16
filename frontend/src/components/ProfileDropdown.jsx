@@ -14,7 +14,7 @@
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaUser, FaCog, FaSignInAlt, FaSignOutAlt, FaUserPlus } from 'react-icons/fa'
+import { FaUser, FaCog, FaInfoCircle, FaSignInAlt, FaSignOutAlt, FaUserPlus } from 'react-icons/fa'
 import AppDropdown from './ui/AppDropdown'
 import AvatarButton from './AvatarButton'
 import { useAuth } from '../injectables/Auth'
@@ -45,6 +45,12 @@ function buildMenuItems({ isLoggedIn, logout, navigate, openModal, onClose }) {
       label: 'Profile',
       icon: FaUser,
       onClick: () => guardedGo('/profile'),
+    },
+    {
+      id: 'about',
+      label: 'About',
+      icon: FaInfoCircle,
+      onClick: () => go('/about'),
     },
     {
       id: 'settings',

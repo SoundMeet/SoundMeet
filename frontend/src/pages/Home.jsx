@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import MapComponent from "../components/MapComponent";
 import GlowSwitch from "../components/GlowSwitch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,6 +32,7 @@ import {
 import { jamService, normalizeJamRow } from "../injectables/jamService";
 import { showService, normalizeShowRow } from "../injectables/showService";
 import { chatService } from "../injectables/chatService";
+import { supabase } from "../injectables/supaBaseClient";
 import DiscoveryCard from "../components/discover/DiscoveryCard";
 import EventDetailModal from "../components/event-detail/EventDetailModal";
 import {
@@ -159,14 +161,14 @@ const Home = () => {
   const [rawShowRows, setRawShowRows] = useState([]);
   const [feedLoading, setFeedLoading] = useState(true);
 
-  const refreshFeed = () => {
+  const refreshFeed = useCallback(() => {
     jamService.fetchRawDiscoverFeed()
       .then(setRawJamRows)
       .catch((err) => console.error("[Home] Jam feed refresh failed:", err));
     showService.fetchRawShowFeed()
       .then(setRawShowRows)
       .catch((err) => console.error("[Home] Show feed refresh failed:", err));
-  };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +187,32 @@ const Home = () => {
       .finally(() => { if (!cancelled) setFeedLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  // Realtime + tab-focus: shared debounce so simultaneous triggers don't double-fetch
+  useEffect(() => {
+    let debounceTimer = null;
+    const scheduleRefresh = (delayMs = 500) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(refreshFeed, delayMs);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') scheduleRefresh(300);
+    };
+
+    const channel = supabase
+      .channel(`discover_realtime_${user?.id || 'anon'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_jam' }, () => scheduleRefresh(500))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_show' }, () => scheduleRefresh(500))
+      .subscribe();
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearTimeout(debounceTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refreshFeed]);
 
   // Normalize with live userLocation so distanceMiles updates when GPS arrives
   const discoveryFeed = useMemo(
@@ -594,6 +622,11 @@ const Home = () => {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 text-white">
+      <Helmet>
+        <title>Soundmeet — Find Musicians, Join Jams, Make Music</title>
+        <meta name="description" content="Discover jam sessions and live shows near you. Connect with local musicians, find bandmates, and build your music community on Soundmeet." />
+        <link rel="canonical" href="https://www.soundmeet.app/" />
+      </Helmet>
       {/* Full-screen map background */}
       <div className="fixed inset-x-0 bottom-0 top-16 z-0">
         <MapComponent

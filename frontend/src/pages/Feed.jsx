@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { MdMusicNote, MdStars } from 'react-icons/md'
 import { useAuth } from '../injectables/Auth'
@@ -324,9 +325,13 @@ const Friends = () => {
       className="flex relative"
       style={{ height: 'calc(100dvh - 64px)', overflow: 'hidden', overscrollBehavior: 'none' }}
     >
+      <Helmet>
+        <title>Feed</title>
+        <meta name="description" content="See what your friends and local musicians are up to on Soundmeet — new jams, upcoming shows, and posts from the community." />
+      </Helmet>
       {/* Left sidebar — relationships / social rail */}
       <aside
-        className="hidden lg:flex flex-col w-[260px] flex-shrink-0 h-full overflow-y-auto p-4"
+        className="hidden lg:flex flex-col w-[260px] xl:w-[300px] flex-shrink-0 h-full overflow-y-auto p-4 xl:p-5"
         style={{
           borderRight: '1px solid rgba(255,255,255,0.06)',
           background: 'rgba(0,0,0,0.4)',

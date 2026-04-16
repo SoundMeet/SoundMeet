@@ -8,8 +8,7 @@
 import { supabase } from './supaBaseClient';
 import { parseEWKBPoint } from '../utils/parseGeography';
 import { DISCOVERY_COLORS } from '../utils/discovery';
-import { apiFetch } from './Auth'; // <-- Added for Django backend calls
-import { chatService } from './chatService';
+import { apiFetch } from './Auth';
 import { showService } from './showService';
 
 // ─── Shared select clause ─────────────────────────────────────────────────────
@@ -494,19 +493,20 @@ export const jamService = {
       .upsert({ jam_id: Number(jamId), user_id: userId }, { onConflict: 'jam_id,user_id' });
     if (error) throw error;
 
-    await supabase
+    const { error: bringingError } = await supabase
       .from('chat_jamattendeebringing')
       .upsert(
         { jam_id: Number(jamId), user_id: userId, instruments_bringing, roles_bringing, gear_bringing },
         { onConflict: 'jam_id,user_id' }
       );
+    if (bringingError) throw bringingError;
 
     // Chat enrollment is non-fatal: attendance is already committed above.
-    // If getOrCreateJamChat throws (e.g. RLS, schema, network), we log and
-    // continue so the join shows success instead of rolling back in the UI.
+    // Uses the Django endpoint so the insert bypasses Supabase RLS.
     let conversationId = null;
     try {
-      conversationId = await chatService.getOrCreateJamChat(Number(jamId), userId);
+      const res = await apiFetch(`api/jams/${Number(jamId)}/join-chat/`, { method: 'POST' });
+      conversationId = res.conversation_id;
       console.log('[jamService.joinJam] Chat enrolled, conversationId:', conversationId);
     } catch (chatErr) {
       console.error('[jamService.joinJam] Chat enrollment failed (attendance already saved):', chatErr);

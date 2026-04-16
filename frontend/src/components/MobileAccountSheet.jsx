@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { MdSearch, MdClose, MdPersonSearch } from 'react-icons/md'
 import { UserSearchModal } from './friends/UserSearchModal'
-import { FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa'
+import { FaUser, FaCog, FaInfoCircle, FaSignOutAlt } from 'react-icons/fa'
 import { useAuth } from '../injectables/Auth'
 import { useAuthModal } from '../context/AuthModalContext'
 import { useFriends } from '../context/FriendsContext'
@@ -479,6 +479,7 @@ function SheetPanel({ onClose, user, isLoggedIn, logout, openModal, friends, sen
           {/* Account actions */}
           <div className="flex flex-col py-1">
             <ActionRow icon={FaUser} label="My Profile" onClick={() => go('/profile')} />
+            <ActionRow icon={FaInfoCircle} label="About" onClick={() => go('/about')} />
             <ActionRow icon={FaCog} label="Settings" onClick={() => go('/settings')} />
             <ActionRow icon={MdPersonSearch} label="Find People" onClick={() => { onClose(); onFindPeople() }} />
           </div>

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom"
 import { useEffect } from "react"
+import { HelmetProvider, Helmet } from "react-helmet-async"
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
 import Meet from './pages/Meet.jsx'
@@ -7,6 +8,7 @@ import MyJams from './pages/MyJams.jsx'
 import Chat from './pages/Chat.jsx'
 import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
+import About from './pages/About.jsx'
 import Feed from './pages/Feed.jsx'
 import Navbar from './components/Navbar.jsx'
 import GuestLocationGuard from './components/GuestLocationGuard.jsx'
@@ -56,10 +58,22 @@ const App = () => {
     )
   }
   return (
+    <HelmetProvider>
     <ToastProvider>
     <FriendsProvider>
       <NotificationsProvider>
         <AuthModalProvider>
+          <Helmet
+            defaultTitle="Soundmeet — Find Musicians, Join Jams, Make Music"
+            titleTemplate="%s | Soundmeet"
+          >
+            <meta name="description" content="Find musicians, join jams, and make music together. Discover nearby jam sessions, live shows, and connect with local musicians." />
+            <meta property="og:site_name" content="Soundmeet" />
+            <meta property="og:type" content="website" />
+            <meta property="og:image" content="https://www.soundmeet.app/og-banner.png" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:image" content="https://www.soundmeet.app/og-banner.png" />
+          </Helmet>
           <div className='bg-linear-to-r from-black via-neutral-900 to-gray-900 min-h-screen'>
             <div className="sticky top-0 z-50">
               <Navbar />
@@ -74,6 +88,7 @@ const App = () => {
               <Route path="/feed" element={<OnboardingGuard><PrivateRoute><Feed /></PrivateRoute></OnboardingGuard>} />
               <Route path="/profile" element={<OnboardingGuard><PrivateRoute><Profile /></PrivateRoute></OnboardingGuard>} />
               <Route path="/profile/:username" element={<OnboardingGuard><Profile /></OnboardingGuard>} />
+              <Route path="/about" element={<About />} />
               <Route path="/settings" element={<OnboardingGuard><PrivateRoute><Settings /></PrivateRoute></OnboardingGuard>} />
               <Route path="/jam/:id"  element={<EventDetailPage type="jam" />} />
               <Route path="/show/:id" element={<EventDetailPage type="show" />} />
@@ -89,6 +104,7 @@ const App = () => {
       </NotificationsProvider>
     </FriendsProvider>
     </ToastProvider>
+    </HelmetProvider>
   )
 }
 

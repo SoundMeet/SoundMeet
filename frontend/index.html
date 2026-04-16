@@ -25,6 +25,67 @@
     <meta name="twitter:title" content="Soundmeet" />
     <meta name="twitter:description" content="Find musicians, join jams, and make music together." />
     <meta name="twitter:image" content="https://www.soundmeet.app/og-banner.png" />
+
+    <!-- Structured Data: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Soundmeet",
+      "url": "https://www.soundmeet.app",
+      "logo": "https://www.soundmeet.app/logo.png",
+      "description": "Find musicians, join jams, and make music together.",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "cjames.marin03@gmail.com",
+        "contactType": "customer support"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: WebSite with search -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Soundmeet",
+      "url": "https://www.soundmeet.app",
+      "description": "Find musicians, join jams, and make music together. Discover nearby jam sessions, live shows, and connect with local musicians.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.soundmeet.app/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Soundmeet",
+      "url": "https://www.soundmeet.app",
+      "applicationCategory": "EntertainmentApplication",
+      "operatingSystem": "All",
+      "description": "A platform for musicians to discover jam sessions, live shows, and other musicians nearby. Create or join jams, find bandmates, and coordinate through group chat.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Map-based jam and show discovery",
+        "Create and host jam sessions",
+        "Join open jam sessions",
+        "Musician profile with instruments and genres",
+        "Swipe-based musician matchmaking",
+        "Group chat for jam coordination",
+        "Activity feed",
+        "Join a Band and Find a Bandmate listings"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

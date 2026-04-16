@@ -109,6 +109,11 @@ export function PostHeader({ author, createdAt, location, postType, isOwn, onEdi
             >
               {author.displayName}
             </p>
+            {author.username && (
+              <span className="text-[12px] leading-tight" style={{ color: 'rgba(229,226,225,0.35)' }}>
+                {author.username}
+              </span>
+            )}
             {badge && (
               <span
                 className="text-[10px] font-semibold px-1.5 py-[2px] rounded-full flex-shrink-0"

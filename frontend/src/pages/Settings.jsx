@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { AnimatePresence, motion } from 'framer-motion'
 import { FaBell, FaLink, FaLock, FaMusic, FaPalette, FaUser } from 'react-icons/fa'
 import { useAuth } from '../injectables/Auth'
@@ -777,6 +778,10 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen px-4 pt-10 pb-28 flex flex-col items-center">
+      <Helmet>
+        <title>Settings</title>
+        <meta name="description" content="Manage your Soundmeet account settings — profile, music identity, privacy, notifications, and appearance." />
+      </Helmet>
       <div className="w-full max-w-lg">
 
         {/* Header */}

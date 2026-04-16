@@ -237,6 +237,16 @@
   }
 }
 
+/* Emoji picker — center on mobile, right-align on desktop */
+@media (max-width: 639px) {
+  .emoji-picker-wrapper {
+    left: 0 !important;
+    right: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+  }
+}
+
 /* MapLibre popup overrides */
   .maplibregl-popup-content {
     background: transparent !important;

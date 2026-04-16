@@ -238,6 +238,8 @@ export function NotificationsProvider({ children }) {
 
   const [notifications, setNotifications] = useState([])
   const [loadingIds, setLoadingIds] = useState(new Set())
+  const loadingIdsRef = useRef(loadingIds)
+  useEffect(() => { loadingIdsRef.current = loadingIds }, [loadingIds])
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const pageRef = useRef(0)
@@ -342,6 +344,37 @@ export function NotificationsProvider({ children }) {
       .catch((err) => console.error('Failed to load notifications:', err))
   }, [user?.id])
 
+  // ── Re-fetch on tab focus ──
+  useEffect(() => {
+    if (!user?.id) return
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        socialService
+          .getMyNotifications(user.id, PAGE_SIZE, 0)
+          .then((raw) => enrichNotifications(raw))
+          .then((fresh) => {
+            setNotifications((prev) => {
+              const existingIds = new Set(prev.map((n) => n.id))
+              const newItems = fresh.filter((n) => !existingIds.has(n.id))
+              if (newItems.length === 0) {
+                // Merge read-state updates from fresh data
+                const freshMap = new Map(fresh.map((n) => [n.id, n]))
+                return prev.map((n) => freshMap.get(n.id) ?? n)
+              }
+              // Prepend new items, merge updates for existing
+              const freshMap = new Map(fresh.map((n) => [n.id, n]))
+              const updated = prev.map((n) => freshMap.get(n.id) ?? n)
+              const updatedIds = new Set(updated.map((n) => n.id))
+              return [...newItems.filter((n) => !updatedIds.has(n.id)), ...updated]
+            })
+          })
+          .catch((err) => console.error('Failed to refresh notifications on focus:', err))
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [user?.id])
+
   // ── Load more (pagination) ──
   const loadMore = useCallback(async () => {
     if (!user?.id || loadingMore || !hasMore) return
@@ -388,6 +421,8 @@ export function NotificationsProvider({ children }) {
 
           // Track as new for entry animation (cleared after 3s)
           setNewNotifIds((prev) => new Set(prev).add(enriched.id))
+          const existingTimer = newTimersRef.current.get(enriched.id)
+          if (existingTimer) clearTimeout(existingTimer)
           const timer = setTimeout(() => {
             setNewNotifIds((prev) => {
               const next = new Set(prev)
@@ -528,7 +563,7 @@ export function NotificationsProvider({ children }) {
   // ── Accept friend request ──
   const acceptRequest = useCallback(
     async (notificationId, requestId) => {
-      if (loadingIds.has(notificationId)) return
+      if (loadingIdsRef.current.has(notificationId)) return
       setLoadingIds((prev) => new Set(prev).add(notificationId))
       try {
         await socialService.handleFriendRequest(requestId, 'ACCEPT')
@@ -558,7 +593,7 @@ export function NotificationsProvider({ children }) {
         })
       }
     },
-    [loadingIds, showToast]
+    [showToast, user?.id, fetchFriends]
   )
 
   // ── Cleanup new-notif timers on unmount ──
@@ -571,7 +606,7 @@ export function NotificationsProvider({ children }) {
   // ── Decline friend request ──
   const declineRequest = useCallback(
     async (notificationId, requestId) => {
-      if (loadingIds.has(notificationId)) return
+      if (loadingIdsRef.current.has(notificationId)) return
       setLoadingIds((prev) => new Set(prev).add(notificationId))
       try {
         await socialService.handleFriendRequest(requestId, 'DENY')
@@ -588,7 +623,7 @@ export function NotificationsProvider({ children }) {
         })
       }
     },
-    [loadingIds, showToast]
+    [showToast]
   )
 
   return (

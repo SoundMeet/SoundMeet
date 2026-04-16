@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import ChatSidebar from '../components/chat/ChatSidebar'
 import ChatHeader from '../components/chat/ChatHeader'
 import MessageList from '../components/chat/MessageList'
@@ -788,6 +789,11 @@ const Chat = () => {
 
   // ─── Main chat layout ────────────────────────────────────────────────────
   return (
+    <>
+    <Helmet>
+      <title>Chat</title>
+      <meta name="description" content="Coordinate with your jam session members — discuss setlists, gear, and logistics in Soundmeet group chat." />
+    </Helmet>
     <div
       // On mobile: subtract navbar (4rem) + bottom nav (4rem) so the page
       // is exactly viewport-tall and cannot scroll, preventing the Chat
@@ -1059,6 +1065,7 @@ const Chat = () => {
         </>
       )}
     </div>
+    </>
   )
 }
 

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdSearch, MdMusicNote, MdHeadphones, MdStars, MdPhotoCamera, MdClose, MdStar, MdUploadFile } from 'react-icons/md'
 import { postService } from '../../injectables/postService'
+import { supabase } from '../../injectables/supaBaseClient'
 import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
 import { useAuth } from '../../injectables/Auth'
 import { useFriends } from '../../context/FriendsContext'
@@ -121,7 +122,6 @@ function CharCounter({ length }) {
 // ─── PostComposer (inline Twitter-style) ──────────────────────────────────────
 
 const ATTACH_BUTTONS = [
-  { key: 'clip',   icon: MdHeadphones,  color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', label: 'Post Clip'     },
   { key: 'jam',    icon: MdMusicNote,   color: '#DC2E73', bg: 'rgba(220,46,115,0.12)',  label: 'Invite to Jam' },
   { key: 'show',   icon: MdStars,       color: '#FCD34D', bg: 'rgba(252,211,77,0.12)',  label: 'Promote Show'  },
   { key: 'photo',  icon: MdPhotoCamera, color: '#34D399', bg: 'rgba(52,211,153,0.12)',  label: 'Share Photo'   },
@@ -559,6 +559,33 @@ export function FeedSection({ feedTab = 'forYou' }) {
 
   useEffect(() => { loadPosts() }, [loadPosts])
 
+  // Realtime + tab-focus: shared debounce so simultaneous triggers don't double-fetch
+  useEffect(() => {
+    let debounceTimer = null
+    const scheduleLoad = (delayMs = 500) => {
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(loadPosts, delayMs)
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') scheduleLoad(300)
+    }
+
+    const channel = supabase
+      .channel(`feed_realtime_${user?.id || 'anon'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_post' }, () => scheduleLoad(500))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_comment' }, () => scheduleLoad(500))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_post_likes' }, () => scheduleLoad(500))
+      .subscribe()
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      clearTimeout(debounceTimer)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, loadPosts])
+
   // Active composer type: 'clip' | 'jam' | 'show' | 'photo' | null
   const [openType, setOpenType]     = useState(null)
   const [composerState, setComposerState] = useState({})
@@ -586,9 +613,14 @@ export function FeedSection({ feedTab = 'forYou' }) {
 
   // Plain text post (no modal needed)
   const handleTextPost = useCallback(async (content) => {
-    await postService.createNewPost(content, null)
-    loadPosts()
-  }, [loadPosts])
+    try {
+      await postService.createNewPost(content, null)
+      loadPosts()
+    } catch (err) {
+      console.error('text post failed:', err)
+      showToast('Failed to create post. Please try again.', 'error')
+    }
+  }, [loadPosts, showToast])
 
   const patchComposerState = (type, patch) => {
     setComposerState((prev) => ({

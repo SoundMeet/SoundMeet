@@ -28,6 +28,7 @@ import { hexToRgba } from '../../utils/discovery'
 import { nameToInitials } from '../../utils/eventComputed'
 import { DestructiveConfirmSheet } from '../event-detail/DestructiveConfirmSheet'
 import { ProfilesRUS } from '../../services/ProfilesRUS'
+import { useFriends } from '../../context/FriendsContext'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -492,6 +493,7 @@ export function JamChatMembersModal({
   onLeaveJam,
 }) {
   const navigate = useNavigate()
+  const { sendFriendRequest: sendFriendRequestViaContext, cancelSentRequest: cancelSentRequestViaContext, sentRequests: contextSentRequests } = useFriends()
   const [attendees,       setAttendees]       = useState([])
   const [friendIds,       setFriendIds]       = useState(new Set())
   const [activeTab,       setActiveTab]       = useState('all')
@@ -572,8 +574,8 @@ export function JamChatMembersModal({
   const handleAddFriend = async (userId) => {
     setSentRequests((prev) => new Map(prev).set(String(userId), null))
     try {
-      const res = await socialService.sendFriendRequest(userId)
-      setSentRequests((prev) => new Map(prev).set(String(userId), res?.id ?? null))
+      await sendFriendRequestViaContext(userId)
+      setSentRequests((prev) => new Map(prev).set(String(userId), 'sent'))
     } catch (err) {
       console.error('[JamChatMembersModal] add friend failed:', err)
       setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m })
@@ -581,10 +583,23 @@ export function JamChatMembersModal({
   }
 
   const handleCancelRequest = async (userId) => {
-    const requestId = sentRequests.get(String(userId))
+    // Find the real request ID from FriendsContext — wait briefly for re-fetch if needed
+    let ctxReq = contextSentRequests.find((r) => String(r.toUser?.id) === String(userId))
+    if (!ctxReq?.id) {
+      // Context may not have re-fetched yet after the optimistic send; try a direct lookup
+      try {
+        const fresh = await socialService.getSentFriendRequests(currentUserId)
+        ctxReq = fresh.find((r) => String(r.to_user?.id) === String(userId))
+      } catch { /* fall through */ }
+    }
+    const requestId = ctxReq?.id
+    if (!requestId) {
+      console.warn('[JamChatMembersModal] cancel: could not resolve request ID for user', userId)
+      return
+    }
     setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m })
     try {
-      if (requestId) await socialService.cancelFriendRequest(requestId)
+      await cancelSentRequestViaContext(requestId)
     } catch (err) {
       console.error('[JamChatMembersModal] cancel request failed:', err)
       setSentRequests((prev) => new Map(prev).set(String(userId), requestId))

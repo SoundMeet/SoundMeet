@@ -15,6 +15,7 @@ import { formatAvatarUrl } from "../../utils/formatAvatarUrl";
 import { hexToRgba } from "../../utils/discovery";
 import { nameToInitials } from "../../utils/eventComputed";
 import { ProfilesRUS } from "../../services/ProfilesRUS";
+import { useFriends } from "../../context/FriendsContext";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -529,6 +530,7 @@ const AttendeeRow = ({
 
 export function ManageAttendeesModal({ open, onClose, item, accent, currentUserId, isAdminMode = true }) {
   const navigate = useNavigate();
+  const { sendFriendRequest: sendFriendRequestViaContext, cancelSentRequest: cancelSentRequestViaContext, sentRequests: contextSentRequests } = useFriends();
   const isShow = item?.type === "promote_show";
   const [attendees,       setAttendees]       = useState([]);
   const [friendIds,       setFriendIds]       = useState(new Set());
@@ -589,12 +591,10 @@ export function ManageAttendeesModal({ open, onClose, item, accent, currentUserI
   }, [open]);
 
   const handleAddFriend = async (userId) => {
-    // Optimistically mark as sent (no requestId yet)
     setSentRequests((prev) => new Map(prev).set(String(userId), null));
     try {
-      const res = await socialService.sendFriendRequest(userId);
-      const requestId = res?.id ?? null;
-      setSentRequests((prev) => new Map(prev).set(String(userId), requestId));
+      await sendFriendRequestViaContext(userId);
+      setSentRequests((prev) => new Map(prev).set(String(userId), 'sent'));
     } catch (err) {
       console.error("[ManageAttendeesModal] add friend failed:", err);
       setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m; });
@@ -602,10 +602,11 @@ export function ManageAttendeesModal({ open, onClose, item, accent, currentUserI
   };
 
   const handleCancelRequest = async (userId) => {
-    const requestId = sentRequests.get(String(userId));
+    const ctxReq = contextSentRequests.find((r) => String(r.toUser?.id) === String(userId));
+    const requestId = ctxReq?.id;
     setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m; });
     try {
-      if (requestId) await socialService.cancelFriendRequest(requestId);
+      if (requestId) await cancelSentRequestViaContext(requestId);
     } catch (err) {
       console.error("[ManageAttendeesModal] cancel request failed:", err);
       setSentRequests((prev) => new Map(prev).set(String(userId), requestId));
