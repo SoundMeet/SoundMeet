@@ -192,7 +192,7 @@ const ChatComposer = ({ threadName, onSend }) => {
         {/* Emoji picker toggle */}
         <button
           ref={emojiButtonRef}
-          onClick={() => setShowEmojiPicker((v) => !v)}
+          onClick={() => { setShowJamPicker(false); setShowEmojiPicker((v) => !v) }}
           className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10 flex-shrink-0"
           style={{ width: 32, height: 32, color: showEmojiPicker ? '#DC2E73' : 'rgba(229,226,225,0.35)' }}
           aria-label="Emoji picker"
@@ -203,7 +203,7 @@ const ChatComposer = ({ threadName, onSend }) => {
 
         {/* Jam invite picker toggle */}
         <button
-          onClick={() => setShowJamPicker(true)}
+          onClick={() => { setShowEmojiPicker(false); setShowJamPicker(true) }}
           className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10 flex-shrink-0"
           style={{ width: 32, height: 32, color: showJamPicker ? '#DC2E73' : 'rgba(229,226,225,0.35)' }}
           aria-label="Send jam invite"

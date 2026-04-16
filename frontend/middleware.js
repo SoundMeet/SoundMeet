@@ -11,6 +11,7 @@
 
 const SUPABASE_URL = 'https://hbdoqesapzedjwdgtnyq.supabase.co'
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+if (!SUPABASE_ANON_KEY) console.warn('[middleware] SUPABASE_ANON_KEY is not set — crawler OG tags will fail')
 const STORAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public/media`
 const SITE_URL = 'https://www.soundmeet.app'
 const DEFAULT_IMAGE = `${SITE_URL}/og-banner.png`
@@ -49,6 +50,7 @@ function isCrawler(ua) {
 // ─── Supabase REST helper ────────────────────────────────────────────────────
 
 async function supabaseGet(path) {
+  if (!SUPABASE_ANON_KEY) return null
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
       apikey: SUPABASE_ANON_KEY,
