@@ -421,6 +421,8 @@ export function NotificationsProvider({ children }) {
 
           // Track as new for entry animation (cleared after 3s)
           setNewNotifIds((prev) => new Set(prev).add(enriched.id))
+          const existingTimer = newTimersRef.current.get(enriched.id)
+          if (existingTimer) clearTimeout(existingTimer)
           const timer = setTimeout(() => {
             setNewNotifIds((prev) => {
               const next = new Set(prev)

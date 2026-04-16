@@ -536,7 +536,7 @@ def create_jam(request):
 def join_jam_chat(request, jam_id):
     """Add the authenticated user to the jam's chat conversation."""
     jam = get_object_or_404(Jam, id=jam_id)
-    if not jam.users_attending.filter(id=request.user.id).exists() and jam.created_by != request.user:
+    if not jam.users_attending.filter(id=request.user.id).exists() and jam.admin != request.user:
         return Response({'error': 'You must be an attendee of this jam to join its chat.'}, status=403)
     conversation = Conversation.objects.filter(jam=jam).first()
     if not conversation:
@@ -831,6 +831,8 @@ def handle_friend_request(request, request_id):
     elif action == 'DENY':
         fr.delete()
         return Response({'status': 'Denied and deleted'})
+    else:
+        return Response({'error': 'Invalid action. Must be ACCEPT or DENY.'}, status=400)
 
 
 @api_view(['POST'])

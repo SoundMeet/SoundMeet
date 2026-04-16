@@ -613,9 +613,14 @@ export function FeedSection({ feedTab = 'forYou' }) {
 
   // Plain text post (no modal needed)
   const handleTextPost = useCallback(async (content) => {
-    await postService.createNewPost(content, null)
-    loadPosts()
-  }, [loadPosts])
+    try {
+      await postService.createNewPost(content, null)
+      loadPosts()
+    } catch (err) {
+      console.error('text post failed:', err)
+      showToast('Failed to create post. Please try again.', 'error')
+    }
+  }, [loadPosts, showToast])
 
   const patchComposerState = (type, patch) => {
     setComposerState((prev) => ({

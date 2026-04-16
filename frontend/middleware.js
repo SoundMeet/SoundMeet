@@ -108,7 +108,7 @@ async function fetchShow(id) {
 
 async function fetchProfile(username) {
   const row = await supabaseGet(
-    `chat_profile?id=eq.${username}&select=id,username,display_name,about,pfp,instruments_liked:chat_profile_instruments_liked(instrument:chat_instrument(name))`
+    `chat_profile?id=eq.${encodeURIComponent(username)}&select=id,username,display_name,about,pfp,instruments_liked:chat_profile_instruments_liked(instrument:chat_instrument(name))`
   )
   if (!row) return null
   const name = row.display_name || row.username || 'Musician'
@@ -137,7 +137,7 @@ function escapeHtml(str) {
 
 function buildOgHtml({ title, description, image, url }) {
   const t = escapeHtml(title)
-  const d = escapeHtml(description.slice(0, 200))
+  const d = escapeHtml(description.length > 197 ? description.slice(0, 197) + '...' : description)
   const i = escapeHtml(image)
   const u = escapeHtml(url)
 

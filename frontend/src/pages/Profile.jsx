@@ -247,7 +247,6 @@ const Profile = () => {
     setViewedUserLoading(true);
     apiService.getProfileById(routeUsername)
     .then(data => {
-  console.log("viewedUser pfp:", data?.pfp);
   setViewedUser(data);
     })
       .catch(err => {
