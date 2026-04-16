@@ -85,7 +85,7 @@ export const postService = {
           id,
           content,
           created_at,
-          author:author_id ( id, username )
+          author:author_id ( id, username, chat_profile ( id, display_name, pfp ) )
         )
       `)
       .order('created_at', { ascending: false });
@@ -122,6 +122,13 @@ export const postService = {
     });
   },
 
+  async updatePost(postId, content) {
+    return await apiFetch(`api/posts/${postId}/edit/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    });
+  },
+
   async getPostsByUser(authorId, currentUserId, limit = 3) {
     const { data, error } = await supabase
       .from('chat_post')
@@ -145,7 +152,7 @@ export const postService = {
           id,
           content,
           created_at,
-          author:author_id ( id, username )
+          author:author_id ( id, username, chat_profile ( id, display_name, pfp ) )
         )
       `)
       .eq('author_id', authorId)

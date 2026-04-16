@@ -64,11 +64,17 @@ export function FriendsProvider({ children }) {
   const [allUsersError, setAllUsersError] = useState(null)
   const [allUsersFetched, setAllUsersFetched] = useState(false)
 
-  // Keep a ref to friends so fetchAllUsers can read the latest value without
-  // needing it as a dependency (which would cause unnecessary re-fetches).
+  const sentRequestsRef = useRef([])
+
+  // Keep refs so fetchAllUsers can read the latest values without
+  // needing them as dependencies (which would cause unnecessary re-fetches).
   useEffect(() => {
     friendsRef.current = friends
   }, [friends])
+
+  useEffect(() => {
+    sentRequestsRef.current = sentRequests
+  }, [sentRequests])
 
   const fetchFriends = useCallback(async (userId) => {
     try {
@@ -94,14 +100,20 @@ export function FriendsProvider({ children }) {
     setAllUsersError(null)
     try {
       const raw = await socialService.getPeopleProfiles(user.id)
-      // Read friends from ref so we stamp the correct status immediately,
+      // Read from refs so we stamp the correct status immediately,
       // regardless of whether the sync useEffect has fired yet.
       const friendIds = new Set(friendsRef.current.map((f) => String(f.id)))
+      const sentRequestUserIds = new Set(
+        sentRequestsRef.current.map((r) => String(r.toUser?.id)).filter(Boolean)
+      )
       setAllUsers(
-        raw.map((u) => ({
-          ...u,
-          relationshipStatus: friendIds.has(String(u.id)) ? 'friends' : 'none',
-        }))
+        raw.map((u) => {
+          const uid = String(u.id)
+          let relationshipStatus = 'none'
+          if (friendIds.has(uid)) relationshipStatus = 'friends'
+          else if (sentRequestUserIds.has(uid)) relationshipStatus = 'request_sent'
+          return { ...u, relationshipStatus }
+        })
       )
       setAllUsersFetched(true)
     } catch (err) {
@@ -123,6 +135,19 @@ export function FriendsProvider({ children }) {
     fetchSentRequests(user.id)
   }, [user?.id, fetchFriends, fetchSentRequests])
 
+  // Re-fetch on tab focus
+  useEffect(() => {
+    if (!user?.id) return
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchFriends(user.id)
+        fetchSentRequests(user.id)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [user?.id, fetchFriends, fetchSentRequests])
+
   // Reset allUsers cache when user changes
   useEffect(() => {
     setAllUsers([])
@@ -130,20 +155,28 @@ export function FriendsProvider({ children }) {
     setAllUsersError(null)
   }, [user?.id])
 
-  // Sync friend relationship status into allUsers whenever friends list changes
-  // (covers cases where friends update after allUsers is already populated)
+  // Sync relationship status into allUsers whenever friends or sentRequests change
+  // (covers cases where either updates after allUsers is already populated)
   useEffect(() => {
     if (allUsers.length === 0) return
     const friendIds = new Set(friends.map((f) => String(f.id)))
+    const sentRequestUserIds = new Set(
+      sentRequests.map((r) => String(r.toUser?.id)).filter(Boolean)
+    )
     setAllUsers((prev) =>
       prev.map((u) => {
-        const isFriend = friendIds.has(String(u.id))
+        const uid = String(u.id)
+        const isFriend = friendIds.has(uid)
+        const isRequestSent = sentRequestUserIds.has(uid)
+
         if (isFriend && u.relationshipStatus !== 'friends') return { ...u, relationshipStatus: 'friends' }
         if (!isFriend && u.relationshipStatus === 'friends') return { ...u, relationshipStatus: 'none' }
+        if (isRequestSent && u.relationshipStatus !== 'request_sent') return { ...u, relationshipStatus: 'request_sent' }
+        if (!isRequestSent && u.relationshipStatus === 'request_sent') return { ...u, relationshipStatus: 'none' }
         return u
       })
     )
-  }, [friends]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [friends, sentRequests]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: refresh friends list when a FRIEND_ACCEPTED notification arrives
   // (fires for the requester — user B — when their request is accepted)
@@ -197,6 +230,54 @@ export function FriendsProvider({ children }) {
 
     return () => supabase.removeChannel(channel)
   }, [user?.id, fetchFriends])
+
+  // Realtime: refresh sent requests when THIS user sends a new friend request
+  // (covers cases where the request is sent outside this context, e.g. SwipeStack)
+  useEffect(() => {
+    if (!user?.id) return
+
+    const channel = supabase
+      .channel(`sent_requests_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_friendrequest',
+          filter: `from_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchSentRequests(user.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_friendrequest',
+          filter: `from_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchSentRequests(user.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'chat_friendrequest',
+          filter: `from_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchSentRequests(user.id)
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [user?.id, fetchSentRequests])
 
   // Return the current relationship status for a given userId
   const getRelationshipStatus = useCallback(
@@ -252,21 +333,40 @@ export function FriendsProvider({ children }) {
   const sendFriendRequest = useCallback(async (targetUserId) => {
     if (!user?.id) throw new Error('Not authenticated')
 
-    // Optimistic update
+    // Build optimistic sent request stub from allUsers data
+    const targetUser = allUsers.find((u) => u.id === targetUserId)
+    const optimisticRequest = {
+      id: `optimistic-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      toUser: targetUser
+        ? {
+            id: targetUser.id,
+            username: targetUser.username || '',
+            displayName: targetUser.displayName || '',
+            avatarUrl: targetUser.avatarUrl || null,
+          }
+        : { id: targetUserId, username: '', displayName: '', avatarUrl: null },
+    }
+
+    // Optimistic updates
     setAllUsers((prev) =>
       prev.map((u) => (u.id === targetUserId ? { ...u, relationshipStatus: 'request_sent' } : u))
     )
+    setSentRequests((prev) => [...prev, optimisticRequest])
 
     try {
       await socialService.sendFriendRequest(targetUserId)
+      // Re-fetch to get the real request ID from the server
+      fetchSentRequests(user.id)
     } catch (err) {
       // Rollback
       setAllUsers((prev) =>
         prev.map((u) => (u.id === targetUserId ? { ...u, relationshipStatus: 'none' } : u))
       )
+      setSentRequests((prev) => prev.filter((r) => r.id !== optimisticRequest.id))
       throw err
     }
-  }, [user?.id])
+  }, [user?.id, allUsers, fetchSentRequests])
 
   const cancelSentRequest = useCallback(async (requestId) => {
     const req = sentRequests.find((r) => r.id === requestId) ?? null
@@ -281,7 +381,19 @@ export function FriendsProvider({ children }) {
     }
 
     try {
-      await socialService.cancelFriendRequest(requestId)
+      let cancelId = requestId
+      // If this is an optimistic request (real ID hasn't arrived from server yet),
+      // re-fetch to get the real ID before calling cancel.
+      if (String(requestId).startsWith('optimistic-')) {
+        if (!user?.id) return
+        const fresh = await socialService.getSentFriendRequests(user.id)
+        const match = fresh.find(
+          (r) => targetUserId && String(r.to_user?.id) === String(targetUserId)
+        )
+        if (!match) return // request may have already been handled server-side
+        cancelId = match.id
+      }
+      await socialService.cancelFriendRequest(cancelId)
     } catch (err) {
       // Rollback on failure
       if (req) setSentRequests((prev) => [...prev, req])
@@ -294,7 +406,7 @@ export function FriendsProvider({ children }) {
       }
       throw err
     }
-  }, [sentRequests])
+  }, [sentRequests, user?.id])
 
   const updateRelationship = useCallback((userId, newStatus) => {
     setAllUsers((prev) =>

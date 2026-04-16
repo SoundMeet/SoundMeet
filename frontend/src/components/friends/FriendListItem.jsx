@@ -21,7 +21,7 @@ function FriendAvatar({ displayName, avatarUrl }) {
       <img
         src={avatarUrl}
         alt={displayName}
-        className="w-9 h-9 rounded-full object-cover"
+        className="w-9 h-9 xl:w-10 xl:h-10 rounded-full object-cover"
         style={{ background: '#222' }}
         onError={() => setImgError(true)}
       />
@@ -30,7 +30,7 @@ function FriendAvatar({ displayName, avatarUrl }) {
 
   return (
     <div
-      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 select-none"
+      className="w-9 h-9 xl:w-10 xl:h-10 rounded-full flex items-center justify-center flex-shrink-0 select-none"
       style={{ background: 'linear-gradient(135deg, #DC2E73 0%, #c02460 100%)' }}
     >
       <span className="text-xs font-bold text-white">{initials}</span>
@@ -95,7 +95,7 @@ export function FriendListItem({ friend }) {
   return (
     <>
       <div ref={containerRef} className="relative">
-        <div className="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-150 hover:bg-white/[0.05]">
+        <div className="group flex items-center gap-3 px-3 py-2.5 xl:px-3.5 xl:py-3 rounded-xl transition-colors duration-150 hover:bg-white/[0.05]">
           {/* Avatar — click opens profile */}
           <button
             onClick={handleViewProfile}
@@ -107,13 +107,13 @@ export function FriendListItem({ friend }) {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate leading-snug">{displayName}</p>
+            <p className="text-sm xl:text-[15px] font-medium text-white truncate leading-snug">{displayName}</p>
             {instruments?.length > 0 ? (
-              <p className="text-[11px] truncate leading-snug" style={{ color: 'rgba(167,139,250,0.65)' }}>
+              <p className="text-[11px] xl:text-xs truncate leading-snug" style={{ color: 'rgba(167,139,250,0.65)' }}>
                 {instruments.slice(0, 2).join(' · ')}
               </p>
             ) : (
-              <p className="text-[11px] leading-snug" style={{ color: 'rgba(229,226,225,0.28)' }}>
+              <p className="text-[11px] xl:text-xs leading-snug" style={{ color: 'rgba(229,226,225,0.28)' }}>
                 Musician
               </p>
             )}

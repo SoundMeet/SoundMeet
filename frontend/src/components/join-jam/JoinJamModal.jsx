@@ -18,7 +18,6 @@ const INITIAL_FORM = {
   instruments: tagGroup(),
   roles: tagGroup(),
   equipmentOfferings: tagGroup(),
-  noteToHost: "",
 };
 
 // ─── Tag group handler factory (module-level) ─────────────────────────────────
@@ -400,52 +399,6 @@ const JoinJamModal = ({
                       )}
                     </AnimatePresence>
 
-                    <Divider />
-
-                    {/* Note to host */}
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="join-jam-note"
-                        className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.1em]"
-                        style={{ color: "rgba(229,226,225,0.4)" }}
-                      >
-                        Message to host
-                        <span
-                          className="normal-case text-[10px] tracking-normal font-normal"
-                          style={{ color: "rgba(229,226,225,0.22)" }}
-                        >
-                          optional
-                        </span>
-                      </label>
-                      <textarea
-                        id="join-jam-note"
-                        rows={3}
-                        maxLength={300}
-                        className="jam-input resize-none w-full"
-                        style={{ borderRadius: "0.75rem" }}
-                        placeholder="Anything you want the host to know?"
-                        value={form.noteToHost}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            noteToHost: e.target.value,
-                          }))
-                        }
-                      />
-                      {form.noteToHost.length > 0 && (
-                        <p
-                          className="text-[10px] text-right tabular-nums"
-                          style={{
-                            color:
-                              form.noteToHost.length > 270
-                                ? "rgba(251,64,64,0.7)"
-                                : "rgba(229,226,225,0.2)",
-                          }}
-                        >
-                          {form.noteToHost.length}/300
-                        </p>
-                      )}
-                    </div>
 
                     {/* Error message */}
                     <AnimatePresence>

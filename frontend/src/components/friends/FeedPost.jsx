@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../injectables/Auth'
 import { postService } from '../../injectables/postService'
+import { useToast } from '../../context/ToastContext'
 import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
 import { PostHeader } from './PostHeader'
 import { PostTextBody } from './PostTextBody'
@@ -22,12 +23,13 @@ const TYPE_TOP_COLOR = {
 
 function normalizeComment(c) {
   if (!c) return null
+  const profile = c.author?.chat_profile?.[0] ?? c.author?.chat_profile ?? null
   return {
     id:        c.id ?? `unknown-${Math.random()}`,
     author: {
       id:          c.author?.id ?? null,
-      displayName: c.author?.username ?? 'Unknown',
-      avatarUrl:   null,
+      displayName: profile?.display_name ?? c.author?.username ?? 'Unknown',
+      avatarUrl:   profile?.pfp ? formatAvatarUrl(profile.pfp) : null,
     },
     content:   c.content ?? '',
     createdAt: c.created_at ?? null,
@@ -36,6 +38,7 @@ function normalizeComment(c) {
 
 export function FeedPost({ post }) {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const { author, type, postType, media, jamRef, showRef, reviewRef, location, likes, comments, hasLiked, createdAt } = post
 
   const isOwn = !!user && author.id === user.id
@@ -59,9 +62,19 @@ export function FeedPost({ post }) {
     setTimeout(() => editRef.current?.focus(), 50)
   }
 
-  const handleEditSave = () => {
-    if (editText.trim()) setContent(editText.trim())
+  const handleEditSave = async () => {
+    const trimmed = editText.trim()
+    if (!trimmed || trimmed === content) { setIsEditing(false); return }
+    const prev = content
+    setContent(trimmed)
     setIsEditing(false)
+    try {
+      await postService.updatePost(post.id, trimmed)
+    } catch (err) {
+      console.error('edit post failed:', err)
+      setContent(prev)
+      showToast('Failed to save edit. Please try again.', 'error')
+    }
   }
 
   const handleEditKeyDown = (e) => {

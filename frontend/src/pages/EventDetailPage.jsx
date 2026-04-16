@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { jamService } from "../injectables/jamService";
 import { showService } from "../injectables/showService";
 import EventDetailModal from "../components/event-detail/EventDetailModal";
@@ -95,16 +96,37 @@ const EventDetailPage = ({ type }) => {
     );
   }
 
+  const isShow = item.type === 'promote_show';
+  const metaTitle = item.title || (isShow ? 'Live Show' : 'Jam Session');
+  const metaDesc = item.description || item.summary || `${isShow ? 'Live show' : 'Jam session'}${item.locationName ? ` at ${item.locationName}` : ''}${item.genres?.length ? ` — ${item.genres.join(', ')}` : ''}. Join on Soundmeet.`;
+  const metaImage = item.coverImageUrl || 'https://www.soundmeet.app/og-banner.png';
+  const metaUrl = `https://www.soundmeet.app/${isShow ? 'show' : 'jam'}/${id}`;
+
   return (
-    <EventDetailModal
-      item={item}
-      open={true}
-      standalone
-      viewerContext={viewerContext}
-      onClose={handleClose}
-      onJoin={handleJoin}
-      onRsvp={handleRsvp}
-    />
+    <>
+      <Helmet>
+        <title>{metaTitle}</title>
+        <meta name="description" content={metaDesc} />
+        <link rel="canonical" href={metaUrl} />
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDesc} />
+        <meta property="og:image" content={metaImage} />
+        <meta property="og:url" content={metaUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:title" content={metaTitle} />
+        <meta name="twitter:description" content={metaDesc} />
+        <meta name="twitter:image" content={metaImage} />
+      </Helmet>
+      <EventDetailModal
+        item={item}
+        open={true}
+        standalone
+        viewerContext={viewerContext}
+        onClose={handleClose}
+        onJoin={handleJoin}
+        onRsvp={handleRsvp}
+      />
+    </>
   );
 };
 

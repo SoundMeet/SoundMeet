@@ -27,11 +27,11 @@ export function FriendsSidebar() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 shrink-0">
+      <div className="px-4 pt-4 pb-3 lg:px-4 lg:pt-4 lg:pb-3 xl:px-5 xl:pt-5 xl:pb-4 shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-white tracking-tight">Friends</h2>
-            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(229,226,225,0.35)' }}>
+            <h2 className="text-sm lg:text-sm xl:text-base font-bold text-white tracking-tight">Friends</h2>
+            <p className="text-[11px] xl:text-xs mt-0.5" style={{ color: 'rgba(229,226,225,0.35)' }}>
               {friends.length} connection{friends.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -47,10 +47,10 @@ export function FriendsSidebar() {
       </div>
 
       {/* Search */}
-      <div className="px-4 pb-3 shrink-0">
+      <div className="px-4 pb-3 xl:px-5 xl:pb-4 shrink-0">
         <div className="relative">
           <MdSearch
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-base xl:text-lg pointer-events-none"
             style={{ color: 'rgba(229,226,225,0.3)' }}
           />
           <input
@@ -58,7 +58,7 @@ export function FriendsSidebar() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search friends…"
-            className="w-full pl-8 pr-8 py-2 text-sm rounded-xl outline-none text-white bg-white/[0.05] border border-white/[0.07] focus:border-white/[0.15] transition-colors duration-150"
+            className="w-full pl-8 pr-8 py-2 xl:py-2.5 xl:pl-9 text-sm xl:text-sm rounded-xl outline-none text-white bg-white/[0.05] border border-white/[0.07] focus:border-white/[0.15] transition-colors duration-150"
             style={{ caretColor: '#DC2E73' }}
           />
           {search && (
@@ -74,7 +74,7 @@ export function FriendsSidebar() {
       </div>
 
       {/* Tabs */}
-      <div className="px-4 pb-3 shrink-0">
+      <div className="px-4 pb-3 xl:px-5 xl:pb-4 shrink-0">
         <div
           className="flex rounded-xl p-0.5 gap-0.5"
           style={{ background: 'rgba(255,255,255,0.05)' }}
@@ -100,7 +100,7 @@ export function FriendsSidebar() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-2 pb-4" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 overflow-y-auto px-2 pb-4 xl:px-3" style={{ scrollbarWidth: 'none' }}>
         {tab === 'friends' ? (
           <FriendsTabContent
             friends={filteredFriends}
@@ -125,7 +125,7 @@ function TabButton({ active, onClick, children }) {
     <button
       onClick={onClick}
       type="button"
-      className="flex-1 flex items-center justify-center py-1.5 rounded-[9px] text-xs font-semibold transition-all duration-150"
+      className="flex-1 flex items-center justify-center py-1.5 xl:py-2 rounded-[9px] text-xs xl:text-[13px] font-semibold transition-all duration-150"
       style={{
         background: active ? 'rgba(255,255,255,0.09)' : 'transparent',
         color: active ? 'rgba(229,226,225,0.9)' : 'rgba(229,226,225,0.4)',

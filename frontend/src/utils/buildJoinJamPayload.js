@@ -42,8 +42,6 @@ export const buildJoinJamPayload = (jamId, isPrivate, form) => ({
   equipmentOfferingIds:     form.equipmentOfferings.selectedIds,
   customEquipmentOfferings: form.equipmentOfferings.customValues,
 
-  noteToHost: form.noteToHost.trim(),
-
   // Derived from jam.isPrivate — centralized here, not scattered across UI
   derivedJoinStatus: deriveJoinStatus(isPrivate),
 });

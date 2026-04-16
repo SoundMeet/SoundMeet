@@ -2,3 +2,6 @@ User-agent: *
 Allow: /
 
 Sitemap: https://www.soundmeet.app/sitemap.xml
+
+# AI crawler discovery
+# See https://www.soundmeet.app/llms.txt for structured site info

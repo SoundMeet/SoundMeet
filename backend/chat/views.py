@@ -20,7 +20,7 @@ from django.db.models import Avg, Count
 from .models import (
     Profile, Post, Comment, FriendRequest, Notification,
     BandmateListing, BandmateCandidate, Jam, JamRating, Show, Genre, Band, Conversation,
-    Artist, Instrument, Vibe, MusicSnip
+    ConversationParticipant, Artist, Instrument, Vibe, MusicSnip
 )
 
 @api_view(['POST'])
@@ -251,6 +251,22 @@ def get_profile(request):
         'friends_count': profile.friends_count,
         'has_usable_password': request.user.has_usable_password(),
     })
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def edit_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    if post.author != request.user:
+        return Response({'error': 'You can only edit your own posts.'}, status=403)
+
+    content = request.data.get('content', '').strip()
+    if not content:
+        return Response({'error': 'Content cannot be empty.'}, status=400)
+
+    post.content = content
+    post.save(update_fields=['content', 'updated_at'])
+    return Response({'id': post.id, 'content': post.content, 'updated_at': post.updated_at})
 
 
 @api_view(['POST'])
@@ -513,6 +529,27 @@ def create_jam(request):
     set_m2m('gear_needed_ids', jam.gear_needed)
 
     return Response({'status': 'Jam created successfully', 'jam_id': jam.id})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def join_jam_chat(request, jam_id):
+    """Add the authenticated user to the jam's chat conversation."""
+    jam = get_object_or_404(Jam, id=jam_id)
+    conversation = Conversation.objects.filter(jam=jam).first()
+    if not conversation:
+        return Response({'error': 'No chat room exists for this jam.'}, status=404)
+
+    participant, created = ConversationParticipant.objects.get_or_create(
+        conversation=conversation,
+        user=request.user,
+        defaults={'left_at': None},
+    )
+    if not created and participant.left_at is not None:
+        participant.left_at = None
+        participant.save(update_fields=['left_at'])
+
+    return Response({'conversation_id': str(conversation.id)})
 
 
 @api_view(['POST'])

@@ -1,0 +1,36 @@
+# Soundmeet
+
+> Find musicians, join jams, and make music together.
+
+Soundmeet is a web platform that connects musicians for real-life jam sessions and live shows. Musicians can discover events near them, join jams, create their own sessions, and chat with other musicians — all based on location and shared musical interests.
+
+## Core Features
+
+- **Discover Jams & Shows**: Browse a map-based feed of nearby jam sessions and live shows. Filter by genre, instrument, and distance.
+- **Create Events**: Host your own jam session or live show. Set the location, genre, instruments needed, and invite musicians.
+- **Join a Jam**: Request to join open jam sessions. Event hosts can accept or decline musicians.
+- **Musician Profiles**: Every user has a profile with their instruments, genres, experience level, and location.
+- **Meet Musicians**: Swipe-based matchmaking to find compatible musicians nearby — like finding a bandmate or joining a band.
+- **Group Chat**: In-app messaging for each jam session so members can coordinate details.
+- **Activity Feed**: See what your friends and local musicians are up to — new jams, shows, and posts.
+- **Opportunities**: Post or browse "Join a Band" and "Find a Bandmate" listings for longer-term musical partnerships.
+
+## Key Pages
+
+- `/` — Home: Map-based discovery of nearby jams and shows
+- `/jam/:id` — Jam detail page with event info, attendees, and join button
+- `/show/:id` — Show/event detail page
+- `/meet` — Swipe-based musician matchmaking
+- `/jams` — Your joined and created jams
+- `/chat` — Group chat for jam sessions
+- `/feed` — Activity feed from friends and local musicians
+- `/profile/:username` — Public musician profile
+
+## Who It's For
+
+Soundmeet is for musicians of all skill levels who want to find other musicians to play with in person. Whether you're a beginner looking for your first jam, an experienced player seeking bandmates, or a band looking for a new member — Soundmeet helps you connect through music.
+
+## Links
+
+- Website: https://www.soundmeet.app
+- Contact: cjames.marin03@gmail.com

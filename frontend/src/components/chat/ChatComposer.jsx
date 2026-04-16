@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { Mic, SendHorizontal } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Music, SendHorizontal, Smile } from 'lucide-react'
+import EmojiPicker, { Theme } from 'emoji-picker-react'
 import { extractEventLink } from '../../utils/eventLinkParser'
 import { EventInviteCard } from '../event-invite/EventInviteCard'
+import { JamPickerSheet } from './JamPickerSheet'
 
 // Small X icon for the dismiss button
 const DismissIcon = () => (
@@ -16,8 +18,27 @@ const ChatComposer = ({ threadName, onSend }) => {
   // Track which specific event link has been dismissed so the user can freely edit
   // text around the link without the preview instantly re-appearing.
   const [dismissedLink, setDismissedLink] = useState(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showJamPicker, setShowJamPicker] = useState(false)
+  const emojiPickerRef = useRef(null)
+  const emojiButtonRef = useRef(null)
 
   const hasText = input.trim().length > 0
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    if (!showEmojiPicker) return
+    const handleClickOutside = (e) => {
+      if (
+        emojiPickerRef.current && !emojiPickerRef.current.contains(e.target) &&
+        emojiButtonRef.current && !emojiButtonRef.current.contains(e.target)
+      ) {
+        setShowEmojiPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showEmojiPicker])
 
   // Derive event link from current input on every render (cheap string match)
   const detectedLink = extractEventLink(input)
@@ -46,6 +67,18 @@ const ChatComposer = ({ threadName, onSend }) => {
     onSend(input.trim())
     setInput('')
     setDismissedLink(null)
+    setShowEmojiPicker(false)
+  }
+
+  const handleEmojiClick = (emojiData) => {
+    setInput((prev) => prev + emojiData.emoji)
+    setShowEmojiPicker(false)
+  }
+
+  const handleJamSelect = (jamId) => {
+    const link = `/jam/${jamId}`
+    setInput((prev) => (prev ? `${prev} ${link}` : link))
+    setShowJamPicker(false)
   }
 
   const handleKeyDown = (e) => {
@@ -59,6 +92,7 @@ const ChatComposer = ({ threadName, onSend }) => {
     <div
       className="flex-shrink-0 px-4 pt-3"
       style={{
+        position: 'relative',
         borderTop: '1px solid rgba(255,255,255,0.05)',
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
       }}
@@ -82,6 +116,47 @@ const ChatComposer = ({ threadName, onSend }) => {
           </button>
         </div>
       )}
+
+      {/* Emoji picker popover */}
+      {showEmojiPicker && (
+        <div
+          ref={emojiPickerRef}
+          className="emoji-picker-wrapper"
+          style={{
+            position: 'absolute',
+            bottom: '100%',
+            right: 0,
+            marginBottom: 8,
+            zIndex: 50,
+          }}
+        >
+          <EmojiPicker
+            theme={Theme.DARK}
+            onEmojiClick={handleEmojiClick}
+            searchDisabled={false}
+            skinTonesDisabled
+            width={320}
+            height={380}
+            previewConfig={{ showPreview: false }}
+            style={{
+              '--epr-bg-color': '#1a1a1a',
+              '--epr-category-label-bg-color': '#1a1a1a',
+              '--epr-hover-bg-color': 'rgba(220,46,115,0.15)',
+              '--epr-search-input-bg-color': 'rgba(255,255,255,0.07)',
+              '--epr-text-color': '#E5E2E1',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Jam picker sheet */}
+      <JamPickerSheet
+        open={showJamPicker}
+        onClose={() => setShowJamPicker(false)}
+        onSelectJam={handleJamSelect}
+      />
 
       {/* Input row */}
       <div
@@ -114,14 +189,27 @@ const ChatComposer = ({ threadName, onSend }) => {
           }}
         />
 
-        {/* Mic */}
+        {/* Emoji picker toggle */}
         <button
+          ref={emojiButtonRef}
+          onClick={() => setShowEmojiPicker((v) => !v)}
           className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10 flex-shrink-0"
-          style={{ width: 32, height: 32, color: 'rgba(229,226,225,0.35)' }}
-          aria-label="Record voice"
+          style={{ width: 32, height: 32, color: showEmojiPicker ? '#DC2E73' : 'rgba(229,226,225,0.35)' }}
+          aria-label="Emoji picker"
           tabIndex={-1}
         >
-          <Mic size={16} />
+          <Smile size={16} />
+        </button>
+
+        {/* Jam invite picker toggle */}
+        <button
+          onClick={() => setShowJamPicker(true)}
+          className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-white/10 flex-shrink-0"
+          style={{ width: 32, height: 32, color: showJamPicker ? '#DC2E73' : 'rgba(229,226,225,0.35)' }}
+          aria-label="Send jam invite"
+          tabIndex={-1}
+        >
+          <Music size={16} />
         </button>
 
         {/* Send button */}

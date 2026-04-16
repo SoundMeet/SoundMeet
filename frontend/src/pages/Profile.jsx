@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { jamService } from "../injectables/jamService";
 import { apiService } from "../injectables/apiCalls";
@@ -688,8 +689,29 @@ const playSnippet = (snippet, index) => {
     );
   }
 
+  const profileName = user?.display_name || user?.username || 'Musician';
+  const profileDesc = user?.about
+    ? `${profileName} — ${user.about.slice(0, 140)}`
+    : `${profileName} on Soundmeet${user?.instruments?.length ? ` — plays ${user.instruments.slice(0, 3).map(i => typeof i === 'string' ? i : i.name).join(', ')}` : ''}`;
+  const profileImage = user?.pfp ? formatAvatarUrl(user.pfp) : 'https://www.soundmeet.app/og-banner.png';
+  const profileUrl = routeUsername
+    ? `https://www.soundmeet.app/profile/${routeUsername}`
+    : 'https://www.soundmeet.app/profile';
+
   return (
     <div className="h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)] overflow-y-auto bg-neutral-900/50 backdrop-blur-2xl text-white flex flex-col">
+      <Helmet>
+        <title>{profileName}</title>
+        <meta name="description" content={profileDesc} />
+        <link rel="canonical" href={profileUrl} />
+        <meta property="og:title" content={`${profileName} on Soundmeet`} />
+        <meta property="og:description" content={profileDesc} />
+        <meta property="og:image" content={profileImage} />
+        <meta property="og:url" content={profileUrl} />
+        <meta name="twitter:title" content={`${profileName} on Soundmeet`} />
+        <meta name="twitter:description" content={profileDesc} />
+        <meta name="twitter:image" content={profileImage} />
+      </Helmet>
       <main className="mx-auto w-full max-w-[1400px] pb-8">
 
         {/* ─────────────────────────── BANNER ────────────────────────────────── */}

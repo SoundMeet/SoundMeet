@@ -26,7 +26,9 @@ import {
 import { apiService } from "../injectables/apiCalls";
 import { socialService } from "../injectables/socialService";
 import { useAuth } from "../injectables/Auth";
+import { useFriends } from "../context/FriendsContext";
 import { ProfilesRUS } from "../services/ProfilesRUS";
+import { SKILL_LEVELS } from "./onboarding/onboardingConfig";
 
 const SUPABASE_URL = "https://hbdoqesapzedjwdgtnyq.supabase.co"; 
 const BUCKET_URL = `${SUPABASE_URL}/storage/v1/object/public/media/`;
@@ -39,11 +41,10 @@ function formatAvatarUrl(path) {
   return `${BUCKET_URL}${cleanPath}`;
 }
 
-const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection }) => {
+const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, cardRefs }) => {
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-200, 200], [-10, 10]);
   const peekOffset = index % 2 === 0 ? -40 : 40;
-  const displayX = isTop ? dragX : peekOffset;
 
   const likeOpacity = useTransform(dragX, [50, 150], [0, 1]);
   const nopeOpacity = useTransform(dragX, [-50, -150], [0, 1]);
@@ -58,35 +59,51 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
     ]
   );
 
+  // Store the resolved exit x so it survives across renders
+  const exitXRef = useRef(null);
+
   const handleDragEnd = (_, info) => {
     const threshold = 150;
-    if (info.offset.x > threshold) onSwipe("right", profile.id);
-    else if (info.offset.x < -threshold) onSwipe("left", profile.id);
+    if (info.offset.x > threshold) {
+      exitXRef.current = 1000;
+      onSwipe("right", profile.id);
+    } else if (info.offset.x < -threshold) {
+      exitXRef.current = -1000;
+      onSwipe("left", profile.id);
+    }
   };
 
-  const getExitX = () => {
-    if (forcedDirection === "right") return 1000;
-    if (forcedDirection === "left") return -1000;
-    return dragX.get() > 0 ? 1000 : -1000;
-  };
+  // Register a way for parent to set exit direction for button-triggered swipes
+  useEffect(() => {
+    cardRefs.current[profile.id] = (dir) => {
+      exitXRef.current = dir === "right" ? 1000 : -1000;
+      dragX.set(dir === "right" ? 200 : -200);
+    };
+    return () => { delete cardRefs.current[profile.id]; };
+  }, [profile.id, cardRefs, dragX]);
 
   return (
     <motion.div
       style={{
-        x: displayX,
+        x: isTop ? dragX : peekOffset,
         rotate: isTop ? rotate : 0,
-        scale: isTop ? 1 : 0.94,
-        opacity: isTop ? 1 : 0.35,
-        filter: `blur(${isTop ? 0 : 4}px)`,
         boxShadow: isTop ? cardGlow : "none",
         zIndex: index,
       }}
-      exit={{
-        x: getExitX(),
+      initial={false}
+      animate={{
+        scale: isTop ? 1 : 0.94,
+        opacity: isTop ? 1 : 0.35,
+        filter: `blur(${isTop ? 0 : 4}px)`,
+      }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      custom={exitXRef}
+      exit={(custom) => ({
+        x: custom.current ?? (dragX.get() >= 0 ? 1000 : -1000),
         opacity: 0,
         scale: 0.5,
-        transition: { duration: 0.4, ease: "easeIn" },
-      }}
+        transition: { duration: 0.35, ease: "easeIn" },
+      })}
       drag={isTop ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
@@ -133,7 +150,9 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
               {profile.display_name}
             </h2>
             <span className="flex items-center gap-1 text-[10px] font-black uppercase text-white/30 bg-white/5 px-2 py-1 rounded">
-              <MapPin size={10} /> {profile.distance || "??"}km
+              {profile.city && <><MapPin size={10} /> {profile.city}</>}
+              {profile.city && profile.skill_level && <span className="mx-1">·</span>}
+              {profile.skill_level && (SKILL_LEVELS.find(s => s.value === profile.skill_level)?.name || profile.skill_level)}
             </span>
           </div>
 
@@ -175,13 +194,16 @@ const SwipeCard = ({ profile, onSwipe, onClick, isTop, index, forcedDirection })
 
 export default function SoundMeetDiscovery() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth();
+  const { sendFriendRequest: sendFriendRequestViaContext } = useFriends();
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [friends, setFriends] = useState([]);
-  const [lastSwipeDirection, setLastSwipeDirection] = useState(null);
+  const [sentRequestUserIds, setSentRequestUserIds] = useState(new Set());
+  const [sessionSwipedIds, setSessionSwipedIds] = useState(new Set());
+  const cardRefs = useRef({});  // profile.id → (dir) => sets dragX
   const [activeFilterTab, setActiveFilterTab] = useState("instruments");
   const [filters, setFilters] = useState({
     genres: [],
@@ -203,14 +225,18 @@ export default function SoundMeetDiscovery() {
       
       try {
         setLoading(true);
-        const [profilesData, formOptions, friendsData] = await Promise.all([
+        const [profilesData, formOptions, friendsData, sentRequestsData] = await Promise.all([
           apiService.getProfiles(),
           apiService.getAllFormOptions(),
-          socialService.getMyFriends(user.id)
+          socialService.getMyFriends(user.id),
+          socialService.getSentFriendRequests(user.id)
         ]);
         const otherProfiles = profilesData.filter(p => p.user_id !== user.id);
         setProfiles(otherProfiles);
         setFriends(friendsData || []);
+        setSentRequestUserIds(new Set(
+          (sentRequestsData || []).map(r => r.to_user?.id).filter(Boolean)
+        ));
         
         setOptions({
           genres: formOptions.genres?.map(g => g.name) || [],
@@ -254,6 +280,8 @@ export default function SoundMeetDiscovery() {
     return profiles.filter((p) => {
       const isAlreadyFriend = friends.some((f) => f.id === p.user_id);
       if (isAlreadyFriend) return false;
+      if (sentRequestUserIds.has(p.user_id)) return false;
+      if (sessionSwipedIds.has(p.user_id)) return false;
 
       const matchSearch = p.display_name
         .toLowerCase()
@@ -267,25 +295,30 @@ export default function SoundMeetDiscovery() {
       const matchRole =
         filters.roles.length === 0 ||
         (p.roles && p.roles.some((r) => filters.roles.includes(r.name)));
-        
+
       return matchSearch && matchGenre && matchInst && matchRole;
     });
-  }, [profiles, searchQuery, filters, friends]);
+  }, [profiles, searchQuery, filters, friends, sentRequestUserIds, sessionSwipedIds]);
 
   const handleSwipe = async (direction, id) => {
-    setLastSwipeDirection(direction);
+    const prof = profiles.find((p) => p.id === id);
+    if (!prof) return;
+
+    // Set dragX on the card BEFORE state update removes it from the list.
+    // AnimatePresence snapshots the card at this point, so dragX.get() > 0
+    // correctly determines which direction the exit animation flies.
+    cardRefs.current[id]?.(direction);
+
+    // Track both directions so swiped profiles don't reappear
+    setSessionSwipedIds((prev) => new Set(prev).add(prof.user_id));
+
     if (direction === "right") {
-      const prof = profiles.find((p) => p.id === id)
       try {
-        await socialService.sendFriendRequest(prof.user_id);
+        await sendFriendRequestViaContext(prof.user_id);
       } catch (err) {
         console.error("Failed to send friend request on swipe:", err);
       }
     }
-    setTimeout(() => {
-      setProfiles((prev) => prev.filter((p) => p.id !== id));
-      setLastSwipeDirection(null);
-    }, 0);
   };
 
   const FilterSection = ({ title, items, storageKey }) => (
@@ -564,15 +597,23 @@ export default function SoundMeetDiscovery() {
 
                   <div className="flex flex-col gap-2 mt-auto pb-[env(safe-area-inset-bottom)] md:pb-0">
                     {friends.some(f => f.id === selectedProfile.user_id) ? (
-                      <button 
+                      <button
                         disabled
                         className="w-full py-3 rounded-full bg-[#DC2E73]/10 text-[#DC2E73] font-bold text-[12px] border border-[#DC2E73]/30 flex items-center justify-center gap-2 opacity-80"
                       >
                         <Check size={14} />
                         Friends
                       </button>
+                    ) : sentRequestUserIds.has(selectedProfile.user_id) || sessionSwipedIds.has(selectedProfile.user_id) ? (
+                      <button
+                        disabled
+                        className="w-full py-3 rounded-full bg-white/5 text-white/40 font-bold text-[12px] border border-white/10 flex items-center justify-center gap-2"
+                      >
+                        <Check size={14} />
+                        Request Sent
+                      </button>
                     ) : (
-                      <button 
+                      <button
                         onClick={async () => {
                           try {
                             handleSwipe("right", selectedProfile.id);
@@ -621,7 +662,7 @@ export default function SoundMeetDiscovery() {
                       isTop={actualIndex === 0}
                       onSwipe={handleSwipe}
                       onClick={setSelectedProfile}
-                      forcedDirection={actualIndex === 0 ? lastSwipeDirection : null}
+                      cardRefs={cardRefs}
                     />
                   );
                 })}

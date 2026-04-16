@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdSend } from 'react-icons/md'
 import { useAuth } from '../../injectables/Auth'
+import { formatAvatarUrl } from '../../utils/formatAvatarUrl'
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -134,12 +135,21 @@ export function CommentSection({ comments = [], currentUserId, onAdd, onDelete }
         {/* Input row */}
         <div className="flex gap-2.5">
           {/* Own avatar */}
-          <div
-            className="w-7 h-7 rounded-full flex-shrink-0 mt-1 flex items-center justify-center text-[10px] font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.5), rgba(251,64,64,0.3))' }}
-          >
-            {(user?.display_name ?? user?.username ?? 'Y')?.[0]}
-          </div>
+          {user?.pfp ? (
+            <img
+              src={formatAvatarUrl(user.pfp)}
+              alt={user.display_name ?? user.username}
+              className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-1"
+              style={{ background: '#222' }}
+            />
+          ) : (
+            <div
+              className="w-7 h-7 rounded-full flex-shrink-0 mt-1 flex items-center justify-center text-[10px] font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, rgba(220,46,115,0.5), rgba(251,64,64,0.3))' }}
+            >
+              {(user?.display_name ?? user?.username ?? 'Y')?.[0]}
+            </div>
+          )}
 
           <div
             className="flex-1 flex items-end gap-2 px-3 py-2 rounded-2xl transition-all duration-150"

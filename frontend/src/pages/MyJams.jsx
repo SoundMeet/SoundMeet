@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Helmet } from 'react-helmet-async'
 import EventDetailModal from '../components/event-detail/EventDetailModal'
 import CreateJamModal from '../components/create-jam/CreateJamModal'
 import PromoteShowModal from '../components/promote-show/PromoteShowModal'
@@ -24,6 +25,7 @@ import { jamService } from '../injectables/jamService'
 import { getEventLifecycleState } from '../utils/eventComputed'
 import { showService } from '../injectables/showService'
 import { chatService } from '../injectables/chatService'
+import { supabase } from '../injectables/supaBaseClient'
 import { useAuth } from '../injectables/Auth'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -911,6 +913,8 @@ const MyJams = () => {
   const { showToast } = useToast()
 
   const [activeTab,   setActiveTab]   = useState('Overview')
+  const activeTabRef = useRef(activeTab)
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
   const [chipFilter,  setChipFilter]  = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -986,6 +990,35 @@ const MyJams = () => {
     setChipFilter('all')
     loadTab(activeTab)
   }, [activeTab, loadTab])
+
+  // Realtime + tab-focus: shared debounce so simultaneous triggers don't double-fetch
+  // Uses activeTabRef to avoid re-subscribing on every tab switch
+  useEffect(() => {
+    let debounceTimer = null
+    const scheduleLoad = (delayMs = 500) => {
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => loadTab(activeTabRef.current), delayMs)
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') scheduleLoad(300)
+    }
+
+    const channel = supabase
+      .channel(`myjams_realtime_${user?.id || 'anon'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_jam' }, () => scheduleLoad(500))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_show' }, () => scheduleLoad(500))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_jam_users_attending' }, () => scheduleLoad(500))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_show_users_attending' }, () => scheduleLoad(500))
+      .subscribe()
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      clearTimeout(debounceTimer)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, loadTab])
 
   // ── Modal dispatch ──────────────────────────────────────────
 
@@ -1152,6 +1185,10 @@ const MyJams = () => {
 
   return (
     <div className="h-[calc(100dvh-4rem)] text-white flex flex-col relative overflow-hidden overscroll-none">
+      <Helmet>
+        <title>My Jams</title>
+        <meta name="description" content="Manage your jam sessions, shows, and opportunities on Soundmeet. See what you've joined, created, and hosted." />
+      </Helmet>
 
       {/* ── Page header ── */}
       <div className="shrink-0 border-b border-white/[0.06]">
@@ -1393,8 +1430,25 @@ const MyJams = () => {
 
       <JoinJamModal
         isOpen={joinJamModal.open}
-        onClose={() => setJoinJamModal({ open: false, jam: null })}
+        onClose={() => { setJoinJamModal({ open: false, jam: null }); loadTab(activeTab); }}
         jam={joinJamModal.jam}
+        onSubmit={async (payload) => {
+          const conversationId = await jamService.joinJam(
+            joinJamModal.jam.id,
+            user?.id,
+            {
+              instrumentIds:        payload?.instrumentIds ?? [],
+              customInstruments:    payload?.customInstruments ?? [],
+              roleIds:              payload?.roleIds ?? [],
+              customRoles:          payload?.customRoles ?? [],
+              gearIds:              payload?.equipmentOfferingIds ?? [],
+              customGear:           payload?.customEquipmentOfferings ?? [],
+            }
+          );
+          loadTab(activeTab);
+          return conversationId;
+        }}
+        onSuccessNavigateToMyJams={() => setActiveTab('Events')}
       />
 
       <RSVPShowModal
