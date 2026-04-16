@@ -13,7 +13,7 @@
  *   POST   /api/friends/decline/{request_id}/
  *   DELETE /api/friends/{user_id}/
  */
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useAuth } from '../injectables/Auth'
 import { socialService } from '../injectables/socialService'
 import { supabase } from '../injectables/supaBaseClient'
@@ -439,24 +439,28 @@ export function FriendsProvider({ children }) {
     }
   }, [allUsers, friends])
 
+  const value = useMemo(() => ({
+    friends,
+    sentRequests,
+    allUsers,
+    allUsersLoading,
+    allUsersError,
+    allUsersFetched,
+    fetchFriends,
+    fetchAllUsers,
+    updateRelationship,
+    getRelationshipStatus,
+    removeFriend,
+    sendFriendRequest,
+    cancelSentRequest,
+  }), [
+    friends, sentRequests, allUsers, allUsersLoading, allUsersError, allUsersFetched,
+    fetchFriends, fetchAllUsers, updateRelationship, getRelationshipStatus,
+    removeFriend, sendFriendRequest, cancelSentRequest,
+  ])
+
   return (
-    <FriendsContext.Provider
-      value={{
-        friends,
-        sentRequests,
-        allUsers,
-        allUsersLoading,
-        allUsersError,
-        allUsersFetched,
-        fetchFriends,
-        fetchAllUsers,
-        updateRelationship,
-        getRelationshipStatus,
-        removeFriend,
-        sendFriendRequest,
-        cancelSentRequest,
-      }}
-    >
+    <FriendsContext.Provider value={value}>
       {children}
     </FriendsContext.Provider>
   )
