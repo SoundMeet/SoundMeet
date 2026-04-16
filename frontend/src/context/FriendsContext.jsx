@@ -369,7 +369,8 @@ export function FriendsProvider({ children }) {
   }, [user?.id, allUsers, fetchSentRequests])
 
   const cancelSentRequest = useCallback(async (requestId) => {
-    const req = sentRequests.find((r) => r.id === requestId) ?? null
+    // Read from ref to avoid stale closure over sentRequests state
+    const req = sentRequestsRef.current.find((r) => r.id === requestId) ?? null
     const targetUserId = req?.toUser?.id ?? null
 
     // Optimistic updates
@@ -406,7 +407,7 @@ export function FriendsProvider({ children }) {
       }
       throw err
     }
-  }, [sentRequests, user?.id])
+  }, [user?.id])
 
   const updateRelationship = useCallback((userId, newStatus) => {
     setAllUsers((prev) =>

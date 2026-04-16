@@ -536,6 +536,8 @@ def create_jam(request):
 def join_jam_chat(request, jam_id):
     """Add the authenticated user to the jam's chat conversation."""
     jam = get_object_or_404(Jam, id=jam_id)
+    if not jam.users_attending.filter(id=request.user.id).exists() and jam.created_by != request.user:
+        return Response({'error': 'You must be an attendee of this jam to join its chat.'}, status=403)
     conversation = Conversation.objects.filter(jam=jam).first()
     if not conversation:
         return Response({'error': 'No chat room exists for this jam.'}, status=404)

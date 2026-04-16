@@ -67,12 +67,14 @@ export function FeedPost({ post }) {
     if (!trimmed || trimmed === content) { setIsEditing(false); return }
     const prev = content
     setContent(trimmed)
-    setIsEditing(false)
     try {
       await postService.updatePost(post.id, trimmed)
+      setIsEditing(false)
     } catch (err) {
       console.error('edit post failed:', err)
       setContent(prev)
+      setIsEditing(true)
+      setEditText(trimmed)
       showToast('Failed to save edit. Please try again.', 'error')
     }
   }

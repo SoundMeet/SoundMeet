@@ -583,12 +583,23 @@ export function JamChatMembersModal({
   }
 
   const handleCancelRequest = async (userId) => {
-    // Find the real request ID from FriendsContext
-    const ctxReq = contextSentRequests.find((r) => String(r.toUser?.id) === String(userId))
+    // Find the real request ID from FriendsContext — wait briefly for re-fetch if needed
+    let ctxReq = contextSentRequests.find((r) => String(r.toUser?.id) === String(userId))
+    if (!ctxReq?.id) {
+      // Context may not have re-fetched yet after the optimistic send; try a direct lookup
+      try {
+        const fresh = await socialService.getSentFriendRequests(currentUserId)
+        ctxReq = fresh.find((r) => String(r.to_user?.id) === String(userId))
+      } catch { /* fall through */ }
+    }
     const requestId = ctxReq?.id
+    if (!requestId) {
+      console.warn('[JamChatMembersModal] cancel: could not resolve request ID for user', userId)
+      return
+    }
     setSentRequests((prev) => { const m = new Map(prev); m.delete(String(userId)); return m })
     try {
-      if (requestId) await cancelSentRequestViaContext(requestId)
+      await cancelSentRequestViaContext(requestId)
     } catch (err) {
       console.error('[JamChatMembersModal] cancel request failed:', err)
       setSentRequests((prev) => new Map(prev).set(String(userId), requestId))
