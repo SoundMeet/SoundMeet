@@ -12,6 +12,7 @@ import JoinBandModal from "../components/join-band/JoinBandModal";
 import FindBandmateModal from "../components/find-bandmate/FindBandmateModal";
 import MobileCreateFAB from "../components/MobileCreateFAB";
 import DiscoverPreview from "../components/DiscoverPreview";
+import FirstJamNudge from "../components/create-jam/FirstJamNudge";
 import { useAuth } from "../injectables/Auth.jsx";
 import { useAuthModal } from "../context/AuthModalContext.jsx";
 import { useToast } from "../context/ToastContext.jsx";
@@ -119,6 +120,16 @@ const Home = () => {
   const dismissWelcome = () => {
     sessionStorage.setItem("sm_welcome_dismissed", "1");
     setWelcomeDismissed(true);
+  };
+
+  // First-jam nudge — shown to logged-in users who haven't created a jam yet
+  const [nudgeDismissed, setNudgeDismissed] = useState(
+    () => !!localStorage.getItem("sm_first_jam_nudge_dismissed")
+  );
+  const hasCreatedJam = !!localStorage.getItem("sm_has_created_jam");
+  const dismissNudge = () => {
+    localStorage.setItem("sm_first_jam_nudge_dismissed", "1");
+    setNudgeDismissed(true);
   };
 
   // ── Refs ───────────────────────────────────────────────────────────────────
@@ -623,8 +634,8 @@ const Home = () => {
   return (
     <div className="fixed inset-0 text-white">
       <Helmet>
-        <title>Soundmeet — Find Musicians, Join Jams, Make Music</title>
-        <meta name="description" content="Discover jam sessions and live shows near you. Connect with local musicians, find bandmates, and build your music community on Soundmeet." />
+        <title>SoundMeet — Find Musicians, Join Jams, Make Music</title>
+        <meta name="description" content="Discover jam sessions and live shows near you. Connect with local musicians, find bandmates, and build your music community on SoundMeet." />
         <link rel="canonical" href="https://www.soundmeet.app/" />
       </Helmet>
       {/* Full-screen map background */}
@@ -1038,6 +1049,13 @@ const Home = () => {
                 onSignUp={() => openModal("signup")}
                 onLogIn={() => openModal("login")}
               />
+            ) : isLoggedIn && !hasCreatedJam && !nudgeDismissed ? (
+              <FirstJamNudge
+                key="first-jam-nudge"
+                variant="preview"
+                onCreateJam={() => setCreateJamModalOpen(true)}
+                onDismiss={dismissNudge}
+              />
             ) : null}
           </AnimatePresence>
         </div>
@@ -1047,6 +1065,7 @@ const Home = () => {
           open={createJamModalOpen}
           onOpenChange={(open) => { setCreateJamModalOpen(open); if (!open) { setEditingJam(null); refreshFeed(); } }}
           initialValues={editInitialValues}
+          firstJam={!hasCreatedJam}
         />
         <PromoteShowModal
           open={promoteShowModalOpen}

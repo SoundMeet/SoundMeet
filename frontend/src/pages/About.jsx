@@ -19,11 +19,11 @@ import LogoWithText from '../assets/LogowText.svg'
 const FAQ_ITEMS = [
   {
     q: 'How do I find musicians near me?',
-    a: 'Open Soundmeet and the map on the home page shows jam sessions and live shows happening near your location. You can filter by genre, instrument, and distance to find exactly the kind of musicians you want to play with.',
+    a: 'Open SoundMeet and the map on the home page shows jam sessions and live shows happening near your location. You can filter by genre, instrument, and distance to find exactly the kind of musicians you want to play with.',
   },
   {
-    q: 'Is Soundmeet free to use?',
-    a: 'Yes — Soundmeet is completely free. Create a profile, discover jams, host your own sessions, and connect with other musicians at no cost.',
+    q: 'Is SoundMeet free to use?',
+    a: 'Yes — SoundMeet is completely free. Create a profile, discover jams, host your own sessions, and connect with other musicians at no cost.',
   },
   {
     q: 'How do I create a jam session?',
@@ -31,14 +31,14 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How do I promote a live show?',
-    a: 'Create a "Show" event instead of a jam session. Add your venue, lineup, date, time, and a description. Shows appear on the Soundmeet map for local musicians and music fans to discover.',
+    a: 'Create a "Show" event instead of a jam session. Add your venue, lineup, date, time, and a description. Shows appear on the SoundMeet map for local musicians and music fans to discover.',
   },
   {
     q: 'What is the Meet feature?',
     a: 'Meet is a swipe-based matchmaking system for musicians. See profiles of nearby musicians and swipe right if you want to connect. If you both swipe right, you match and can start chatting — perfect for finding bandmates or jam partners.',
   },
   {
-    q: 'Can I use Soundmeet to find a bandmate?',
+    q: 'Can I use SoundMeet to find a bandmate?',
     a: 'Absolutely. Use the "Find a Bandmate" opportunity listing if your band is looking for a new member, or browse "Join a Band" listings if you\'re a musician looking to join one. You can also use the Meet feature to match with compatible musicians.',
   },
   {
@@ -47,15 +47,15 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Do I need to be an experienced musician?',
-    a: 'Not at all. Soundmeet is for musicians of every skill level — from total beginners looking for their first jam to seasoned pros seeking new collaborators. Many jam hosts specify the vibe and skill level in their descriptions, so you can find sessions that match your comfort zone.',
+    a: 'Not at all. SoundMeet is for musicians of every skill level — from total beginners looking for their first jam to seasoned pros seeking new collaborators. Many jam hosts specify the vibe and skill level in their descriptions, so you can find sessions that match your comfort zone.',
   },
   {
-    q: 'What cities is Soundmeet available in?',
-    a: 'Soundmeet works everywhere. It\'s location-based, so wherever you are, you\'ll see jams and musicians near you. The more musicians in your area who join, the more vibrant your local scene becomes.',
+    q: 'What cities is SoundMeet available in?',
+    a: 'SoundMeet works everywhere. It\'s location-based, so wherever you are, you\'ll see jams and musicians near you. The more musicians in your area who join, the more vibrant your local scene becomes.',
   },
   {
-    q: 'How is Soundmeet different from other music apps?',
-    a: 'Most music apps focus on streaming or learning. Soundmeet is built specifically for connecting musicians in person — to jam, perform, and form bands together. It\'s the social network for making music, not just listening to it.',
+    q: 'How is SoundMeet different from other music apps?',
+    a: 'Most music apps focus on streaming or learning. SoundMeet is built specifically for connecting musicians in person — to jam, perform, and form bands together. It\'s the social network for making music, not just listening to it.',
   },
 ]
 
@@ -162,7 +162,7 @@ const FEATURES = [
     icon: FaBullhorn,
     title: 'Promote Live Shows',
     description:
-      'Playing a gig? Create a show listing with your venue, lineup, and details. Get discovered by local musicians and music fans on the Soundmeet map.',
+      'Playing a gig? Create a show listing with your venue, lineup, and details. Get discovered by local musicians and music fans on the SoundMeet map.',
   },
   {
     icon: FaSearch,
@@ -174,7 +174,7 @@ const FEATURES = [
     icon: FaHandshake,
     title: 'Find a Bandmate or Join a Band',
     description:
-      'Post or browse opportunity listings. Looking for a drummer? Need a band to join? Soundmeet connects musicians seeking each other for longer-term collaborations.',
+      'Post or browse opportunity listings. Looking for a drummer? Need a band to join? SoundMeet connects musicians seeking each other for longer-term collaborations.',
   },
   {
     icon: FaComments,
@@ -202,8 +202,8 @@ export default function About() {
   return (
     <div className="min-h-screen">
       <Helmet>
-        <title>About Soundmeet — Find Musicians, Join Jams, Make Music</title>
-        <meta name="description" content="Learn what Soundmeet offers — discover jams, promote shows, meet musicians, find bandmates, and more. Everything you need to make music together." />
+        <title>About SoundMeet — Find Musicians, Join Jams, Make Music</title>
+        <meta name="description" content="Learn what SoundMeet offers — discover jams, promote shows, meet musicians, find bandmates, and more. Everything you need to make music together." />
         <link rel="canonical" href="https://www.soundmeet.app/about" />
       </Helmet>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
@@ -223,7 +223,7 @@ export default function About() {
             </span>
             <img
               src={LogoWithText}
-              alt="Soundmeet"
+              alt="SoundMeet"
               className="h-7 sm:h-9 relative top-[1px]"
             />
           </h1>
@@ -231,7 +231,7 @@ export default function About() {
             className="text-base sm:text-lg leading-relaxed max-w-2xl"
             style={{ color: 'rgba(229,226,225,0.6)', fontFamily: 'Sora, sans-serif' }}
           >
-            Soundmeet is the platform for musicians who want to play together in
+            SoundMeet is the platform for musicians who want to play together in
             person. Discover jam sessions and live shows near you, connect with
             local musicians, find bandmates, and build your music community —
             all from one app.
@@ -244,7 +244,7 @@ export default function About() {
             className="text-xl font-bold text-white mb-6"
             style={{ fontFamily: 'Sora, sans-serif' }}
           >
-            What You Can Do on Soundmeet
+            What You Can Do on SoundMeet
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {FEATURES.map((f, i) => (

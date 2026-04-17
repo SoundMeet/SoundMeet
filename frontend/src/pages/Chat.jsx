@@ -792,7 +792,7 @@ const Chat = () => {
     <>
     <Helmet>
       <title>Chat</title>
-      <meta name="description" content="Coordinate with your jam session members — discuss setlists, gear, and logistics in Soundmeet group chat." />
+      <meta name="description" content="Coordinate with your jam session members — discuss setlists, gear, and logistics in SoundMeet group chat." />
     </Helmet>
     <div
       // On mobile: subtract navbar (4rem) + bottom nav (4rem) so the page

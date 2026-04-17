@@ -138,6 +138,7 @@ const CreateJamForm = ({
   onClose,
   onJamCreated,
   initialValues,
+  firstJam,
 }) => {
   const isEditMode = !!initialValues;
   const { user } = useAuth();
@@ -268,6 +269,7 @@ const CreateJamForm = ({
         onClose();
       } else {
         const result = await jamService.createJam(form, user.id);
+        localStorage.setItem("sm_has_created_jam", "1");
         if (onJamCreated) {
           onJamCreated(String(result.jam_id), form.title, form.isPrivate);
         } else {
@@ -290,13 +292,15 @@ const CreateJamForm = ({
       <div className="flex items-center justify-between px-6 pt-5 pb-4 flex-shrink-0">
         <div>
           <Dialog.Title className="text-xl font-bold text-white tracking-tight">
-            {isEditMode ? "Edit Jam" : "Create a Jam"}
+            {isEditMode ? "Edit Jam" : firstJam ? "Let's set up your jam" : "Create a Jam"}
           </Dialog.Title>
           <p
             className="text-[10px] font-medium uppercase tracking-[0.12em] mt-0.5"
             style={{ color: "rgba(229,226,225,0.32)" }}
           >
-            {STEPS[step - 1].label}
+            {firstJam && step === 1
+              ? "Just a few details to get started"
+              : STEPS[step - 1].label}
           </p>
         </div>
 
@@ -347,6 +351,7 @@ const CreateJamForm = ({
                 touched={touched}
                 onChange={setField}
                 onBlur={handleBlur}
+                firstJam={firstJam}
               />
             </motion.div>
           )}
@@ -399,6 +404,7 @@ const CreateJamForm = ({
                   onChange={setField}
                   setForm={setForm}
                   accent={THEME.accent}
+                  firstJam={firstJam}
                 />
 
                 {/* Description + participation at the bottom of the last step */}

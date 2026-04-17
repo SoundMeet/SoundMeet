@@ -29,6 +29,7 @@ const CreateJamModal = ({
   open,
   onOpenChange,
   initialValues,
+  firstJam,
 }) => {
   const { options, isLoading } = useFormOptions()
   const [phase, setPhase]           = useState('form')  // 'form' | 'created'
@@ -146,6 +147,7 @@ const CreateJamModal = ({
                     onClose={() => onOpenChange(false)}
                     onJamCreated={handleJamCreated}
                     initialValues={initialValues}
+                    firstJam={firstJam && !initialValues}
                   />
                 </motion.div>
               )

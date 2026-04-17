@@ -84,7 +84,7 @@ async function fetchJam(id) {
     title: row.name || 'Jam Session',
     description:
       row.description ||
-      `Jam session${row.location_name ? ` at ${row.location_name}` : ''}${genres.length ? ` — ${genres.join(', ')}` : ''}. Join on Soundmeet.`,
+      `Jam session${row.location_name ? ` at ${row.location_name}` : ''}${genres.length ? ` — ${genres.join(', ')}` : ''}. Join on SoundMeet.`,
     image: resolveMedia(row.cover_image) || DEFAULT_IMAGE,
     url: `${SITE_URL}/jam/${id}`,
   }
@@ -100,7 +100,7 @@ async function fetchShow(id) {
     title: row.name || 'Live Show',
     description:
       row.description ||
-      `Live show${row.venue_name || row.location_name ? ` at ${row.venue_name || row.location_name}` : ''}${genres.length ? ` — ${genres.join(', ')}` : ''}. Check it out on Soundmeet.`,
+      `Live show${row.venue_name || row.location_name ? ` at ${row.venue_name || row.location_name}` : ''}${genres.length ? ` — ${genres.join(', ')}` : ''}. Check it out on SoundMeet.`,
     image: resolveMedia(row.cover_image) || DEFAULT_IMAGE,
     url: `${SITE_URL}/show/${id}`,
   }
@@ -116,10 +116,10 @@ async function fetchProfile(username) {
     .map((i) => i.instrument?.name)
     .filter(Boolean)
   return {
-    title: `${name} on Soundmeet`,
+    title: `${name} on SoundMeet`,
     description:
       row.about ||
-      `${name}${instruments.length ? ` plays ${instruments.slice(0, 3).join(', ')}` : ''} on Soundmeet.`,
+      `${name}${instruments.length ? ` plays ${instruments.slice(0, 3).join(', ')}` : ''} on SoundMeet.`,
     image: resolveMedia(row.pfp) || DEFAULT_IMAGE,
     url: `${SITE_URL}/profile/${username}`,
   }
@@ -145,7 +145,7 @@ function buildOgHtml({ title, description, image, url }) {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>${t} | Soundmeet</title>
+  <title>${t} | SoundMeet</title>
   <meta name="description" content="${d}" />
 
   <meta property="og:title" content="${t}" />
@@ -153,7 +153,7 @@ function buildOgHtml({ title, description, image, url }) {
   <meta property="og:image" content="${i}" />
   <meta property="og:url" content="${u}" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Soundmeet" />
+  <meta property="og:site_name" content="SoundMeet" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${t}" />

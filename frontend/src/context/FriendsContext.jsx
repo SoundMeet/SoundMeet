@@ -333,6 +333,10 @@ export function FriendsProvider({ children }) {
   const sendFriendRequest = useCallback(async (targetUserId) => {
     if (!user?.id) throw new Error('Not authenticated')
 
+    // Don't send if already friends
+    const isFriend = friendsRef.current.some((f) => String(f.id) === String(targetUserId))
+    if (isFriend) return
+
     // Build optimistic sent request stub from allUsers data
     const targetUser = allUsers.find((u) => u.id === targetUserId)
     const optimisticRequest = {

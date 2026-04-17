@@ -64,11 +64,11 @@ const App = () => {
       <NotificationsProvider>
         <AuthModalProvider>
           <Helmet
-            defaultTitle="Soundmeet — Find Musicians, Join Jams, Make Music"
-            titleTemplate="%s | Soundmeet"
+            defaultTitle="SoundMeet — Find Musicians, Join Jams, Make Music"
+            titleTemplate="%s | SoundMeet"
           >
             <meta name="description" content="Find musicians, join jams, and make music together. Discover nearby jam sessions, live shows, and connect with local musicians." />
-            <meta property="og:site_name" content="Soundmeet" />
+            <meta property="og:site_name" content="SoundMeet" />
             <meta property="og:type" content="website" />
             <meta property="og:image" content="https://www.soundmeet.app/og-banner.png" />
             <meta name="twitter:card" content="summary_large_image" />

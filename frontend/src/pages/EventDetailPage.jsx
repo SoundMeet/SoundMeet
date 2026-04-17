@@ -124,7 +124,7 @@ const EventDetailPage = ({ type }) => {
 
   const isShow = item.type === 'promote_show';
   const metaTitle = item.title || (isShow ? 'Live Show' : 'Jam Session');
-  const metaDesc = item.description || item.summary || `${isShow ? 'Live show' : 'Jam session'}${item.locationName ? ` at ${item.locationName}` : ''}${item.genres?.length ? ` — ${item.genres.join(', ')}` : ''}. Join on Soundmeet.`;
+  const metaDesc = item.description || item.summary || `${isShow ? 'Live show' : 'Jam session'}${item.locationName ? ` at ${item.locationName}` : ''}${item.genres?.length ? ` — ${item.genres.join(', ')}` : ''}. Join on SoundMeet.`;
   const metaImage = item.coverImageUrl || 'https://www.soundmeet.app/og-banner.png';
   const metaUrl = `https://www.soundmeet.app/${isShow ? 'show' : 'jam'}/${id}`;
 

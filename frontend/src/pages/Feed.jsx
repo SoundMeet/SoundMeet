@@ -327,7 +327,7 @@ const Friends = () => {
     >
       <Helmet>
         <title>Feed</title>
-        <meta name="description" content="See what your friends and local musicians are up to on Soundmeet — new jams, upcoming shows, and posts from the community." />
+        <meta name="description" content="See what your friends and local musicians are up to on SoundMeet — new jams, upcoming shows, and posts from the community." />
       </Helmet>
       {/* Left sidebar — relationships / social rail */}
       <aside

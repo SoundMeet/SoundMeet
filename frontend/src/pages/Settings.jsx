@@ -780,7 +780,7 @@ export default function Settings() {
     <div className="min-h-screen px-4 pt-10 pb-28 flex flex-col items-center">
       <Helmet>
         <title>Settings</title>
-        <meta name="description" content="Manage your Soundmeet account settings — profile, music identity, privacy, notifications, and appearance." />
+        <meta name="description" content="Manage your SoundMeet account settings — profile, music identity, privacy, notifications, and appearance." />
       </Helmet>
       <div className="w-full max-w-lg">
 

@@ -791,6 +791,9 @@ def send_friend_request(request):
     if request.user == target_user:
         return Response({'error': 'Cannot add yourself'}, status=400)
 
+    if target_user in request.user.profile.friends.all():
+        return Response({'error': 'Already friends'}, status=400)
+
     fr, created = FriendRequest.objects.get_or_create(from_user=request.user, to_user=target_user)
 
     if created:

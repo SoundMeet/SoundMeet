@@ -111,7 +111,7 @@ const OvernightBadge = () => (
  *   onChange    (field, value) => void
  *   onBlur      (field) => void
  */
-const JamBasicInfoSection = ({ form, errors, touched, onChange, onBlur }) => {
+const JamBasicInfoSection = ({ form, errors, touched, onChange, onBlur, firstJam }) => {
   const overnight = isOvernightEnd(form.startTime, form.endTime);
 
   // Hint text for end time: overnight context beats the generic optional note
@@ -128,6 +128,7 @@ const JamBasicInfoSection = ({ form, errors, touched, onChange, onBlur }) => {
         label="Jam Title"
         required
         error={touched.title && errors.title}
+        hint={firstJam && !form.title ? "Something catchy — 'Sunday Blues Jam' or 'Garage Rock Thursday'" : undefined}
       >
         <div className="relative">
           <input

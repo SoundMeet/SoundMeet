@@ -78,7 +78,7 @@ const ValidationMessage = ({ message }) => (
  *   onChange (field, value) => void  — for simple scalar / flag fields
  *   setForm  (updater) => void       — for TagGroupState mutations
  */
-const JamTaxonomySection = ({ form, options, errors, onChange, setForm }) => {
+const JamTaxonomySection = ({ form, options, errors, onChange, setForm, firstJam }) => {
   const clearPresetIds = (field) =>
     setForm((prev) => ({
       ...prev,
@@ -91,8 +91,44 @@ const JamTaxonomySection = ({ form, options, errors, onChange, setForm }) => {
     if (next) clearPresetIds(tagField);
   };
 
+  const applyKeepItSimple = () => {
+    setForm((prev) => ({
+      ...prev,
+      isOpenToAllGenres: true,
+      isOpenToAllVibes: true,
+      isOpenToAllInstruments: true,
+      genres: { ...prev.genres, presetIds: [] },
+      vibes: { ...prev.vibes, presetIds: [] },
+      instrumentsNeeded: { ...prev.instrumentsNeeded, presetIds: [] },
+    }));
+  };
+
+  const allTogglesOn = form.isOpenToAllGenres && form.isOpenToAllVibes && form.isOpenToAllInstruments;
+
   return (
     <div className="space-y-5">
+      {/* First-jam shortcut */}
+      {firstJam && !allTogglesOn && (
+        <motion.button
+          type="button"
+          onClick={applyKeepItSimple}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
+          style={{
+            background: "rgba(220,46,115,0.10)",
+            color: "#DC2E73",
+            border: "1px solid rgba(220,46,115,0.18)",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+          Keep it simple — open to everyone
+        </motion.button>
+      )}
+
       {/* ── STYLE & LINEUP ──────────────────────────────────────────────────── */}
       <GroupHeading>Style &amp; Lineup</GroupHeading>
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { jamService } from "../injectables/jamService";
 import { apiService } from "../injectables/apiCalls";
 import { postService } from "../injectables/postService";
@@ -217,6 +217,7 @@ function getPillEmoji(text) {
 const Profile = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Name & Location");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // ── Route param — /profile/:username ─────────────────────────────────────
   // If a username is present in the URL we're viewing someone else's profile.
@@ -464,6 +465,14 @@ const Profile = () => {
     setCropState({ open: false, variant: "square", rawImage: null });
   };
 
+  // ── Lightbox escape key ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handler = (e) => { if (e.key === "Escape") setLightboxOpen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxOpen]);
+
   // ── Posts state ───────────────────────────────────────────────────────────
   const audioRef = useRef(null);
 
@@ -691,7 +700,7 @@ const playSnippet = (snippet, index) => {
   const profileName = user?.display_name || user?.username || 'Musician';
   const profileDesc = user?.about
     ? `${profileName} — ${user.about.slice(0, 140)}`
-    : `${profileName} on Soundmeet${user?.instruments?.length ? ` — plays ${user.instruments.slice(0, 3).map(i => typeof i === 'string' ? i : i.name).join(', ')}` : ''}`;
+    : `${profileName} on SoundMeet${user?.instruments?.length ? ` — plays ${user.instruments.slice(0, 3).map(i => typeof i === 'string' ? i : i.name).join(', ')}` : ''}`;
   const profileImage = user?.pfp ? formatAvatarUrl(user.pfp) : 'https://www.soundmeet.app/og-banner.png';
   const profileUrl = routeUsername
     ? `https://www.soundmeet.app/profile/${routeUsername}`
@@ -703,11 +712,11 @@ const playSnippet = (snippet, index) => {
         <title>{profileName}</title>
         <meta name="description" content={profileDesc} />
         <link rel="canonical" href={profileUrl} />
-        <meta property="og:title" content={`${profileName} on Soundmeet`} />
+        <meta property="og:title" content={`${profileName} on SoundMeet`} />
         <meta property="og:description" content={profileDesc} />
         <meta property="og:image" content={profileImage} />
         <meta property="og:url" content={profileUrl} />
-        <meta name="twitter:title" content={`${profileName} on Soundmeet`} />
+        <meta name="twitter:title" content={`${profileName} on SoundMeet`} />
         <meta name="twitter:description" content={profileDesc} />
         <meta name="twitter:image" content={profileImage} />
       </Helmet>
@@ -760,24 +769,21 @@ const playSnippet = (snippet, index) => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
-              className={`w-[96px] h-[96px] shrink-0 rounded-full relative overflow-hidden group/avatar${isOwnProfile ? " cursor-pointer" : ""}`}
-              onClick={isOwnProfile ? () => { setEditOpen(true); setActiveSection("Profile Picture"); } : undefined}
+              className="w-[96px] h-[96px] shrink-0 rounded-full relative overflow-hidden group/avatar cursor-pointer"
+              onClick={() => setLightboxOpen(true)}
               style={{
                 background: "linear-gradient(135deg, #DC2E73 0%, #7C3AED 100%)",
                 border: "3px solid #111",
                 boxShadow: "0 4px 20px rgba(0,0,0,0.65)",
               }}
             >
-              {(() => {
-                const avatarSrc = profilePic || formatAvatarUrl(user?.pfp);
-                return avatarSrc ? (
-                  <img src={avatarSrc} alt={name || "avatar"} className="w-full h-full object-cover" loading="lazy" />
+              {(profilePic || formatAvatarUrl(user?.pfp)) ? (
+                  <img src={profilePic || formatAvatarUrl(user?.pfp)} alt={name || "avatar"} className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                   <span className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white select-none">
                     {(name || "?")[0].toUpperCase()}
                   </span>
-                );
-              })()}
+                )}
               {isOwnProfile && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-40 md:opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -1761,6 +1767,94 @@ const playSnippet = (snippet, index) => {
           </div>
         </div>
       )}
+
+      {/* Avatar Lightbox */}
+      <AnimatePresence>
+        {lightboxOpen && (
+          <div className="fixed inset-0 z-[1500] flex items-center justify-center">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setLightboxOpen(false)}
+            />
+
+            {/* Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="relative z-10 flex flex-col items-center gap-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setLightboxOpen(false)}
+                className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-neutral-800 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-neutral-700 transition-colors z-20 cursor-pointer"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              </button>
+
+              {/* Large avatar */}
+              {(profilePic || formatAvatarUrl(user?.pfp)) ? (
+                <img
+                  src={profilePic || formatAvatarUrl(user?.pfp)}
+                  alt={name || "avatar"}
+                  className="w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-full object-cover"
+                  style={{
+                    border: "3px solid rgba(255,255,255,0.08)",
+                    boxShadow: "0 8px 48px rgba(0,0,0,0.6)",
+                  }}
+                />
+              ) : (
+                <div
+                  className="w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, #DC2E73 0%, #7C3AED 100%)",
+                    border: "3px solid rgba(255,255,255,0.08)",
+                    boxShadow: "0 8px 48px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  <span className="text-7xl font-black text-white select-none">
+                    {(name || "?")[0].toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {/* Display name */}
+              <p className="text-white/90 text-lg font-semibold">{name}</p>
+
+              {/* Change Photo — own profile only */}
+              {isOwnProfile && (
+                <button
+                  onClick={() => {
+                    setLightboxOpen(false);
+                    setEditOpen(true);
+                    setActiveSection("Profile Picture");
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 cursor-pointer"
+                  style={{
+                    background: "rgba(255,255,255,0.09)",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    color: "rgba(255,255,255,0.80)",
+                    backdropFilter: "blur(8px)",
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                  Change Photo
+                </button>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Edit Modal — own profile only */}
       {isOwnProfile && editOpen && (

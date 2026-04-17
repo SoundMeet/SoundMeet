@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Helmet } from 'react-helmet-async'
 import EventDetailModal from '../components/event-detail/EventDetailModal'
 import CreateJamModal from '../components/create-jam/CreateJamModal'
+import FirstJamNudge from '../components/create-jam/FirstJamNudge'
 import PromoteShowModal from '../components/promote-show/PromoteShowModal'
 import MobileCreateFAB from '../components/MobileCreateFAB'
 import JoinJamModal from '../components/join-jam/JoinJamModal'
@@ -552,7 +553,7 @@ function OpportunityScaffoldCard({ type }) {
 // Tab content components
 // ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ upcomingItems, createdItems, pastItems, onOpen, onEditItem, searchQuery = '' }) {
+function OverviewTab({ upcomingItems, createdItems, pastItems, onOpen, onEditItem, onCreateJam, searchQuery = '' }) {
   const q = searchQuery.trim().toLowerCase()
   const matchSearch = (item) => !q || matchesDiscoverySearch(item, q)
 
@@ -631,11 +632,15 @@ function OverviewTab({ upcomingItems, createdItems, pastItems, onOpen, onEditIte
         {/* First-time empty state */}
         {!hasContent && recentPast.length === 0 && (
           <ContentWrap>
-            <EmptyState
-              icon={EmptyIcons.waveform}
-              title="Your dashboard is empty"
-              subtitle="Create a jam, RSVP to a show, or post a band opportunity to get started"
-            />
+            {createdItems.length === 0 && onCreateJam ? (
+              <FirstJamNudge variant="empty" onCreateJam={onCreateJam} />
+            ) : (
+              <EmptyState
+                icon={EmptyIcons.waveform}
+                title="Your dashboard is empty"
+                subtitle="Create a jam, RSVP to a show, or post a band opportunity to get started"
+              />
+            )}
           </ContentWrap>
         )}
 
@@ -1187,7 +1192,7 @@ const MyJams = () => {
     <div className="h-[calc(100dvh-4rem)] text-white flex flex-col relative overflow-hidden overscroll-none">
       <Helmet>
         <title>My Jams</title>
-        <meta name="description" content="Manage your jam sessions, shows, and opportunities on Soundmeet. See what you've joined, created, and hosted." />
+        <meta name="description" content="Manage your jam sessions, shows, and opportunities on SoundMeet. See what you've joined, created, and hosted." />
       </Helmet>
 
       {/* ── Page header ── */}
@@ -1308,6 +1313,7 @@ const MyJams = () => {
             pastItems={pastItems}
             onOpen={openItem}
             onEditItem={handleEditItem}
+            onCreateJam={() => setCreateOpen(true)}
             searchQuery={searchQuery}
           />
         )}
@@ -1473,6 +1479,7 @@ const MyJams = () => {
           }
         }}
         initialValues={editInitialValues}
+        firstJam={createdItems.length === 0}
       />
 
       <PromoteShowModal

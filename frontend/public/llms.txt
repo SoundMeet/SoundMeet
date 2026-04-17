@@ -1,8 +1,8 @@
-# Soundmeet
+# SoundMeet
 
 > Find musicians, join jams, and make music together.
 
-Soundmeet is a web platform that connects musicians for real-life jam sessions and live shows. Musicians can discover events near them, join jams, create their own sessions, and chat with other musicians — all based on location and shared musical interests.
+SoundMeet is a web platform that connects musicians for real-life jam sessions and live shows. Musicians can discover events near them, join jams, create their own sessions, and chat with other musicians — all based on location and shared musical interests.
 
 ## Core Features
 
@@ -28,7 +28,7 @@ Soundmeet is a web platform that connects musicians for real-life jam sessions a
 
 ## Who It's For
 
-Soundmeet is for musicians of all skill levels who want to find other musicians to play with in person. Whether you're a beginner looking for your first jam, an experienced player seeking bandmates, or a band looking for a new member — Soundmeet helps you connect through music.
+SoundMeet is for musicians of all skill levels who want to find other musicians to play with in person. Whether you're a beginner looking for your first jam, an experienced player seeking bandmates, or a band looking for a new member — SoundMeet helps you connect through music.
 
 ## Links
 

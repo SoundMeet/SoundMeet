@@ -1,6 +1,6 @@
 {
-  "name": "Soundmeet",
-  "short_name": "Soundmeet",
+  "name": "SoundMeet",
+  "short_name": "SoundMeet",
   "description": "Find musicians, join jams, and make music together.",
   "start_url": "/",
   "display": "standalone",
