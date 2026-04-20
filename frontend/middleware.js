@@ -160,7 +160,7 @@ function buildOgHtml({ title, description, image, url }) {
   <meta name="twitter:description" content="${d}" />
   <meta name="twitter:image" content="${i}" />
 
-  <meta http-equiv="refresh" content="0;url=${u}" />
+  <link rel="canonical" href="${u}" />
 </head>
 <body></body>
 </html>`
